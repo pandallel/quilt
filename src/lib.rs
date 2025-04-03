@@ -1,3 +1,4 @@
+pub mod events;
 pub mod materials;
 
 pub use materials::{Material, MaterialStatus, MaterialFileType, MaterialRegistry};

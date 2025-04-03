@@ -1,17 +1,26 @@
 use std::collections::HashMap;
-use event_emitter::{EventEmitter, EventListener};
+use std::cell::RefCell;
+use crate::events::{EventSource, EventListener, EventEmitter};
 use crate::materials::types::{Material, MaterialEvent, MaterialStatus};
 
 /// A registry for storing and managing materials with event emission
 ///
 /// Note: Current implementation is not thread-safe. If concurrent access is needed,
 /// consider using tokio::sync::RwLock or implementing proper error handling for std::sync::RwLock
-#[derive(Default)]
 pub struct MaterialRegistry {
     /// Storage for materials, indexed by their ID
     materials: HashMap<String, Material>,
     /// Event emitter for material events
-    events: EventEmitter<MaterialEvent>,
+    events: EventSource<MaterialEvent>,
+}
+
+impl EventEmitter<MaterialEvent> for MaterialRegistry {
+    fn on<F>(&mut self, callback: F) -> EventListener
+    where
+        F: FnMut(&MaterialEvent) + 'static,
+    {
+        self.events.on(callback)
+    }
 }
 
 impl MaterialRegistry {
@@ -19,7 +28,7 @@ impl MaterialRegistry {
     pub fn new() -> Self {
         Self {
             materials: HashMap::new(),
-            events: EventEmitter::new(),
+            events: EventSource::new(),
         }
     }
 
@@ -84,14 +93,6 @@ impl MaterialRegistry {
         self.materials.remove(id)
     }
 
-    /// Subscribe to status change events
-    pub fn on<F>(&self, callback: F) -> EventListener
-    where
-        F: Fn(&MaterialEvent) + Send + Sync + 'static,
-    {
-        self.events.on(callback)
-    }
-
     /// Get all materials in the registry
     pub fn list_all(&self) -> Vec<Material> {
         self.materials
@@ -104,7 +105,7 @@ impl MaterialRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
+    use std::rc::Rc;
 
     // Test helpers
     fn setup() -> MaterialRegistry {
@@ -115,17 +116,14 @@ mod tests {
         Material::new(path.to_string())
     }
 
-    fn collect_events(registry: &MaterialRegistry) -> (RefCell<Vec<MaterialEvent>>, EventListener) {
-        let events = RefCell::new(Vec::new());
+    fn collect_events(registry: &mut MaterialRegistry) -> (Rc<RefCell<Vec<MaterialEvent>>>, EventListener) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let events_ref = events.clone();
+        
         let listener = registry.on(move |event| {
-            if let MaterialEvent::StatusChanged { material, old_status, error } = event {
-                events.borrow_mut().push(MaterialEvent::StatusChanged {
-                    material: material.clone(),
-                    old_status: old_status.clone(),
-                    error: error.clone(),
-                });
-            }
+            events_ref.borrow_mut().push(event.clone());
         });
+        
         (events, listener)
     }
 
@@ -179,7 +177,7 @@ mod tests {
     #[test]
     fn initial_discovery_emits_correct_event() {
         let mut registry = setup();
-        let (events, _listener) = collect_events(&registry);
+        let (events, _listener) = collect_events(&mut registry);
 
         let material = create_test_material("test/doc.md");
         registry.register(material).expect("Registration should succeed");
@@ -187,20 +185,19 @@ mod tests {
         let events = events.borrow();
         assert_eq!(events.len(), 1, "Should emit exactly one event");
         
-        if let MaterialEvent::StatusChanged { material, old_status, error } = &events[0] {
-            assert_eq!(material.status, MaterialStatus::Discovered, 
-                "New material should be in Discovered state");
-            assert!(old_status.is_none(), 
-                "Initial discovery should have no previous status");
-            assert!(error.is_none(), 
-                "Initial discovery should have no error");
-        }
+        let MaterialEvent::StatusChanged { material, old_status, error } = &events[0];
+        assert_eq!(material.status, MaterialStatus::Discovered, 
+            "New material should be in Discovered state");
+        assert!(old_status.is_none(), 
+            "Initial discovery should have no previous status");
+        assert!(error.is_none(), 
+            "Initial discovery should have no error");
     }
 
     #[test]
     fn successful_validation_emits_correct_event() {
         let mut registry = setup();
-        let (events, _listener) = collect_events(&registry);
+        let (events, _listener) = collect_events(&mut registry);
 
         // Register and validate
         let mut material = create_test_material("test/doc.md");
@@ -212,21 +209,20 @@ mod tests {
         let events = events.borrow();
         let validation_event = &events[1];  // Skip discovery event
 
-        if let MaterialEvent::StatusChanged { material, old_status, error } = validation_event {
-            assert_eq!(material.status, MaterialStatus::Valid, 
-                "Material should be marked as Valid");
-            assert_eq!(old_status.as_ref().expect("Should have previous status"), 
-                &MaterialStatus::Discovered,
-                "Previous status should be Discovered");
-            assert!(error.is_none(), 
-                "Successful validation should have no error");
-        }
+        let MaterialEvent::StatusChanged { material, old_status, error } = validation_event;
+        assert_eq!(material.status, MaterialStatus::Valid, 
+            "Material should be marked as Valid");
+        assert_eq!(old_status.as_ref().expect("Should have previous status"), 
+            &MaterialStatus::Discovered,
+            "Previous status should be Discovered");
+        assert!(error.is_none(), 
+            "Successful validation should have no error");
     }
 
     #[test]
     fn failed_validation_emits_correct_event() {
         let mut registry = setup();
-        let (events, _listener) = collect_events(&registry);
+        let (events, _listener) = collect_events(&mut registry);
 
         // Register and fail validation
         let mut material = create_test_material("test/doc.md");
@@ -239,16 +235,15 @@ mod tests {
         let events = events.borrow();
         let failure_event = &events[1];  // Skip discovery event
 
-        if let MaterialEvent::StatusChanged { material, old_status, error } = failure_event {
-            assert_eq!(material.status, MaterialStatus::Invalid, 
-                "Material should be marked as Invalid");
-            assert_eq!(old_status.as_ref().expect("Should have previous status"),
-                &MaterialStatus::Discovered,
-                "Previous status should be Discovered");
-            assert_eq!(error.as_ref().expect("Should have error message"),
-                "Invalid format",
-                "Should have correct error message");
-        }
+        let MaterialEvent::StatusChanged { material, old_status, error } = failure_event;
+        assert_eq!(material.status, MaterialStatus::Invalid, 
+            "Material should be marked as Invalid");
+        assert_eq!(old_status.as_ref().expect("Should have previous status"),
+            &MaterialStatus::Discovered,
+            "Previous status should be Discovered");
+        assert_eq!(error.as_ref().expect("Should have error message"),
+            "Invalid format",
+            "Should have correct error message");
     }
 
     #[test]
