@@ -2,12 +2,23 @@
 
 ## Phase 1: Core Material System
 
-### Step 1: Basic Material Types (1-2 days)
+### Step 1: Basic Material Types (1-2 days) ✅
 
-- [ ] Implement basic Material struct
-- [ ] Define MaterialStatus enum
-- [ ] Create MaterialFileType enum
-- [ ] Write unit tests for basic types
+- [x] Implement basic Material struct
+  - Using `time` for timestamps (modern alternative to chrono)
+  - Using `cuid2` for IDs (more readable, sortable alternative to UUID)
+  - Added constructor method `Material::new()`
+- [x] Define MaterialStatus enum
+  - Implemented states: Discovered, Valid, Invalid
+  - Added error message support for Invalid state
+- [x] Create MaterialFileType enum
+  - Currently supporting Markdown files
+  - Extensible for future file types
+- [x] Write unit tests for basic types
+  - Material creation tests
+  - Status transition tests
+  - CUID uniqueness tests
+  - Timestamp ordering tests
 
 ### Step 2: Material Registry (2-3 days)
 
@@ -64,7 +75,11 @@
 
 ### Starting Point
 
-We'll begin with Step 1, implementing the core types exactly as shown in the architecture document. This gives us the foundation to build upon.
+✅ Completed Step 1 with modern choices:
+
+- Using `time` instead of `chrono` for better timezone handling and type safety
+- Using `cuid2` instead of `uuid` for more readable, sortable IDs
+- Implemented with clean module structure in `src/materials/`
 
 ### Development Approach
 
@@ -82,20 +97,22 @@ We'll begin with Step 1, implementing the core types exactly as shown in the arc
 
 ### Dependencies
 
-We'll add dependencies gradually as needed, starting with the minimum required for each step:
+Current dependencies:
 
-Step 1:
+- cuid2 = "0.1.2" (for unique IDs)
+- time = { version = "0.3", features = ["serde", "macros"] } (for timestamps)
 
-- uuid
-- chrono
-
-Later steps will add:
+Future dependencies will be added as needed:
 
 - tokio (for async)
 - anyhow (for error handling)
 - notify (for file watching)
 - etc.
 
-### First Implementation Task
+### Next Implementation Task
 
-To get started, we'll implement the basic Material struct and its associated enums. This will give us a foundation to build upon and help you get familiar with Rust syntax and concepts.
+Moving on to Step 2: Material Registry
+
+- Will implement CRUD operations for materials
+- Need to decide on storage strategy (in-memory vs persistent)
+- Consider using a trait-based approach for storage backends

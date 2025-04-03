@@ -6,4 +6,8 @@ authors = ["Monday Romelfanger"]
 description = "A local-first, modular memory and context engine"
 
 [dependencies]
-# We'll add dependencies as we implement features 
+# Core dependencies
+cuid2 = "0.1.2"
+time = { version = "0.3", features = ["serde", "macros"] }
+
+# We'll add more dependencies as we implement features 

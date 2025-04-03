@@ -88,8 +88,8 @@ sequenceDiagram
 In Rust, we use traits to define the interfaces for our processing components. Below are the core type definitions and traits for our system.
 
 ```rust
-use chrono::{DateTime, Utc};
-use uuid::Uuid;
+use time::OffsetDateTime;
+use cuid2::cuid;
 
 /// Supported file types (currently only Markdown)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,23 +100,20 @@ pub enum MaterialFileType {
 /// The possible states of a material during ingestion
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MaterialStatus {
-    // Current states
     Discovered,
     Valid,
     Invalid,
-    // Future state for Phase 2
-    Swatched
 }
 
 /// A Material represents a Markdown file in Quilt
 #[derive(Debug, Clone)]
 pub struct Material {
-    pub id: Uuid,
+    pub id: String,          // CUID for unique identification
     pub file_path: String,
     pub file_type: MaterialFileType,
-    pub ingested_at: DateTime<Utc>,
+    pub ingested_at: OffsetDateTime,
     pub status: MaterialStatus,
-    pub error: Option<String>, // Populated if status is Invalid
+    pub error: Option<String>,
 }
 
 /// Events emitted during material processing
@@ -153,10 +150,6 @@ pub trait DirectoryIngestor {
     /// Returns a list of MaterialEvents (typically MaterialDiscovered events).
     fn ingest_directory(&self, directory_path: &str) -> Vec<MaterialEvent>;
 }
-
-/// (A placeholder implementation could iterate over files in the directory,
-/// filter for Markdown files, and for each, register the material in the
-/// Material Registry, emitting a MaterialDiscovered event.)
 
 ```
 
