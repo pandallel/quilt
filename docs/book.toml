@@ -3,12 +3,12 @@ authors = ["Monday Romelfanger"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Sidecar Documentation"
-description = "Documentation for Sidecar - A local-first, modular memory and context server"
+title = "Quilt Documentation"
+description = "Documentation for Quilt - A local-first, modular memory and context engine"
 
 [output.html]
-git-repository-url = "https://github.com/pandallel/sidecar"
-edit-url-template = "https://github.com/pandallel/sidecar/edit/main/docs/src/{path}"
+git-repository-url = "https://github.com/pandallel/quilt"
+edit-url-template = "https://github.com/pandallel/quilt/edit/main/docs/src/{path}"
 additional-css = ["./mdbook-admonish.css"]
 
 [preprocessor.admonish]

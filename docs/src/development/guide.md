@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide provides information for developers working on the Sidecar project.
+This guide provides information for developers working on the Quilt project.
 
 ## Documentation
 

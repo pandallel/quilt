@@ -1,18 +1,34 @@
-# Sidecar
+**Quilt** is a local-first, modular memory and context engine. It watches your work, fragments your documents into meaningful pieces (swatches), embeds them into a searchable memory (the swatch book), and assembles contextual spreads in response to queries.
 
-**Sidecar** is a local-first, modular memory and context server designed to work _alongside_ you. It watches your files, builds embeddings, and serves relevant context through a lightweight API—enabling LLM-based tools, assistants, or interfaces to collaborate with your own evolving knowledge.
+Use Quilt to power LLM tools with fast, structured, and evolving context—without relying on cloud infrastructure or leaking your knowledge.
 
-## Core Principles
+---
 
-- **Local-first**: All processing happens on your machine—no cloud, no leaks.
-- **Modular**: Chunking, embedding, search, and serving are separate and swappable.
-- **Collaborative**: Sidecar supports you and your tools—it doesn't replace or dictate.
-- **Future-facing**: Built for extensibility—CLI, chat UI, plugins, browser extensions.
+## ✨ Core Principles
 
-## What Sidecar Does
+- **Local-first** – Everything runs on your machine. No cloud, no leaks.
+- **Modular** – Watching, swatching, embedding, and querying are decoupled and swappable.
+- **Quiet** – You don’t interact with Quilt directly—it works behind the scenes to support other systems.
+- **Crafted** – Inspired by the precision, care, and reuse of quilting.
 
-- Watches one or more folders for files
-- Chunks documents into meaningful pieces
-- Embeds chunks using a local model (e.g. `llama.cpp`)
-- Stores them in a fast vector store
-- Exposes an HTTP API (MCP) for querying relevant context
+---
+
+## 🧠 Domain Concepts
+
+| Term            | Description                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| **Material**    | A raw document or file—notes, code, transcripts, etc.                                       |
+| **Swatch**      | A meaningful fragment cut from a Material                                                   |
+| **Swatch Book** | The searchable memory of embedded Swatches                                                  |
+| **Query**       | A prompt or task that triggers context retrieval                                            |
+| **Spread**      | A contextual bundle of Swatches and their source Material, assembled in response to a Query |
+
+---
+
+## 🧰 What Quilt Does
+
+- 📂 Watches one or more folders for new or updated Materials
+- ✂️ Cuts Materials into Swatches based on content structure
+- 🔢 Embeds Swatches using a local model (e.g. `llama.cpp`, `gguf`)
+- 📚 Stores them in a fast, local Swatch Book
+- 🧠 Responds to Queries by assembling contextual Spreads

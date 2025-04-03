@@ -1,9 +1,9 @@
 [package]
-name = "sidecar"
+name = "quilt"
 version = "0.1.0"
 edition = "2021"
 authors = ["Monday Romelfanger"]
-description = "A local-first, modular memory and context server"
+description = "A local-first, modular memory and context engine"
 
 [dependencies]
 # We'll add dependencies as we implement features 
