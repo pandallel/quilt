@@ -1,6 +1,6 @@
 # Material
 
-A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they’re where your content lives before it gets broken down and analyzed.
+A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they're where your content lives before it gets broken down and analyzed.
 
 ## Overview
 
@@ -10,26 +10,112 @@ Materials are the foundation of Quilt's memory system. When you tell Quilt to in
 
 Materials are:
 
-- Markdown files
+- Markdown files (currently the only supported type)
 - Stored in a folder you've chosen
-- Used as the source of truth — Quilt doesn’t change them
+- Used as the source of truth — Quilt doesn't change them
 - Structured or unstructured — both are fine
 
 ### Examples
 
-- `notes/project-overview.md`
+```rust
+use quilt::{Material, MaterialStatus};
+
+// Create a new material
+let material = Material::new("notes/project-overview.md".to_string());
+assert_eq!(material.status, MaterialStatus::Discovered);
+
+// Material starts in Discovered state
+assert_eq!(material.status, MaterialStatus::Discovered);
+assert!(material.error.is_none());
+
+// Material can be validated
+let mut validated = material;
+validated.status = MaterialStatus::Valid;
+assert_eq!(validated.status, MaterialStatus::Valid);
+
+// Or marked as invalid with an error
+let mut invalid = material;
+invalid.status = MaterialStatus::Invalid;
+invalid.error = Some("Missing required sections".to_string());
+```
 
 ## What Quilt Tracks About Each Material
 
-When Quilt picks up a file, it gathers just enough information to track it reliably — no full processing yet, just metadata:
+When Quilt picks up a file, it gathers just enough information to track it reliably:
 
-- **Material ID**: A unique internal name for this file
-- **File Path**: Where the file lives on your system
-- **File Type**: `.md`
-- **Ingested At**: The moment Quilt first saw it
-- **Status**: Whether it's ready, failed, or waiting to be processed
+```rust
+pub struct Material {
+    /// Unique identifier for the material (CUID)
+    pub id: String,
+    /// Path to the file on the filesystem
+    pub file_path: String,
+    /// Type of the material file (currently Markdown)
+    pub file_type: MaterialFileType,
+    /// Timestamp when the material was first ingested
+    pub ingested_at: OffsetDateTime,
+    /// Current status of the material
+    pub status: MaterialStatus,
+    /// Error message if status is Invalid
+    pub error: Option<String>,
+}
+```
 
-This minimal data lets Quilt stay lightweight until it actually needs to analyze the file in depth.
+## Material Status
+
+Materials can be in one of three states:
+
+```rust
+pub enum MaterialStatus {
+    /// Material has been discovered but not yet validated
+    Discovered,
+    /// Material has passed validation
+    Valid,
+    /// Material failed validation
+    Invalid,
+}
+```
+
+## Event System
+
+The Material Registry emits events when materials change status:
+
+```rust
+// Subscribe to material events
+registry.on(|event| {
+    if let MaterialEvent::StatusChanged { material, old_status, error } = event {
+        println!("Material {} changed status:", material.id);
+        println!("  From: {:?}", old_status);
+        println!("  To: {:?}", material.status);
+        if let Some(err) = error {
+            println!("  Error: {}", err);
+        }
+    }
+});
+```
+
+## Error Handling
+
+Quilt handles various material-related errors gracefully:
+
+```rust
+// Duplicate material registration
+let duplicate = Material::new("already/registered.md".to_string());
+assert!(registry.register(duplicate).is_none());
+
+// Invalid material update
+let unknown = Material::new("not/registered.md".to_string());
+assert!(registry.update(unknown).is_none());
+```
+
+## Implementation Status
+
+- ✅ Basic Material type with status tracking
+- ✅ Material Registry with CRUD operations
+- ✅ Event system for status changes
+- ✅ Error handling for common cases
+- 🚧 Directory scanning (coming soon)
+- 🚧 File watching (coming soon)
+- 🚧 Validation rules (coming soon)
 
 ## What Happens When You Add Files
 
@@ -41,7 +127,7 @@ Scenario: Adding Markdown Files
   When Quilt sees those files
   Then it recognizes them as valid Materials
   And adds them to the Material Registry
-  So they’re ready for downstream processing
+  So they're ready for downstream processing
 ```
 
 ## Handling Ingestion Issues
@@ -100,4 +186,4 @@ When you add a file, Quilt:
 4. **Marks it as ready** for deeper processing in the Swatch Pipeline
 5. **Keeps track** of changes if the file gets updated later
 
-You’ll always have a clear view of what was picked up, what wasn’t, and why.
+You'll always have a clear view of what was picked up, what wasn't, and why.

@@ -9,5 +9,6 @@ description = "A local-first, modular memory and context engine"
 # Core dependencies
 cuid2 = "0.1.2"
 time = { version = "0.3", features = ["serde", "macros"] }
+event-emitter = "0.1.1"
 
 # We'll add more dependencies as we implement features 

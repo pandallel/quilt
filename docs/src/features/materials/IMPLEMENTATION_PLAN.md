@@ -2,11 +2,11 @@
 
 ## Phase 1: Core Material System
 
-### Step 1: Basic Material Types (1-2 days) ✅
+### Step 1: Basic Material Types ✅
 
 - [x] Implement basic Material struct
-  - Using `time` for timestamps (modern alternative to chrono)
-  - Using `cuid2` for IDs (more readable, sortable alternative to UUID)
+  - Using `time` for timestamps
+  - Using `cuid2` for IDs
   - Added constructor method `Material::new()`
 - [x] Define MaterialStatus enum
   - Implemented states: Discovered, Valid, Invalid
@@ -20,99 +20,140 @@
   - CUID uniqueness tests
   - Timestamp ordering tests
 
-### Step 2: Material Registry (2-3 days)
+### Step 2: Material Registry ✅
 
-- [ ] Create MaterialRegistry struct
-- [ ] Implement basic CRUD operations for materials
-- [ ] Add in-memory storage for materials
-- [ ] Write tests for registry operations
+- [x] Create MaterialRegistry struct
+  - Implemented with HashMap storage
+  - Added event emission system
+- [x] Implement basic CRUD operations
+  - register: Add new materials
+  - get/get_by_path: Retrieve materials
+  - update: Modify existing materials
+  - remove: Delete materials
+  - list_all: Get all materials
+- [x] Add event system
+  - StatusChanged events
+  - Event subscription
+  - Event emission on state changes
+- [x] Write comprehensive tests
+  - CRUD operation tests
+  - Event emission tests
+  - Error handling tests
 
-### Step 3: Directory Scanner (2-3 days)
+### Step 3: Directory Scanner 🚧
 
 - [ ] Implement basic file system operations
+  - [ ] Path validation
+  - [ ] File existence checks
+  - [ ] Permission checks
 - [ ] Create directory scanning functionality
+  - [ ] Recursive directory traversal
+  - [ ] File filtering
+  - [ ] Error handling
 - [ ] Filter for markdown files
+  - [ ] Extension checking
+  - [ ] Basic file validation
 - [ ] Add tests for directory scanning
+  - [ ] Valid directory tests
+  - [ ] Invalid path tests
+  - [ ] Permission error tests
 
-### Step 4: Material Validation (2-3 days)
+### Step 4: Material Validation 🚧
 
 - [ ] Implement MaterialValidator trait
+  - [ ] Define validation interface
+  - [ ] Create basic validator
 - [ ] Create basic markdown validation rules
+  - [ ] File readability
+  - [ ] Basic markdown structure
+  - [ ] Required sections
 - [ ] Add validation status tracking
+  - [ ] Success/failure states
+  - [ ] Error messages
+  - [ ] Validation history
 - [ ] Write validation tests
-
-### Step 5: Event System (2-3 days)
-
-- [ ] Define MaterialEvent enum
-- [ ] Implement basic event emission
-- [ ] Create event subscribers
-- [ ] Add event handling tests
+  - [ ] Valid file tests
+  - [ ] Invalid file tests
+  - [ ] Edge case tests
 
 ## Phase 2: Enhanced Features
 
-### Step 6: Error Handling (1-2 days)
+### Step 5: Async Support 🚧
 
-- [ ] Implement custom error types
-- [ ] Add error recovery mechanisms
-- [ ] Improve error reporting
-- [ ] Write error handling tests
+- [ ] Add async trait implementations
+  - [ ] Async file operations
+  - [ ] Async validation
+- [ ] Implement tokio integration
+  - [ ] Async event handling
+  - [ ] Task management
+- [ ] Add concurrent processing
+  - [ ] Parallel validation
+  - [ ] Batch processing
+- [ ] Write async tests
+  - [ ] Concurrent operation tests
+  - [ ] Performance tests
 
-### Step 7: File Watching (2-3 days)
+### Step 6: File Watching 🚧
 
 - [ ] Add file system watching
+  - [ ] Real-time change detection
+  - [ ] Event debouncing
 - [ ] Implement change detection
+  - [ ] File modifications
+  - [ ] New files
+  - [ ] Deletions
 - [ ] Create update mechanisms
+  - [ ] Automatic revalidation
+  - [ ] Event emission
 - [ ] Add file watching tests
+  - [ ] Change detection tests
+  - [ ] Event handling tests
 
-### Step 8: Performance Optimization (2-3 days)
+### Step 7: Performance Optimization 🚧
 
-- [ ] Add async support
+- [ ] Add caching mechanisms
+  - [ ] Material cache
+  - [ ] Validation results cache
 - [ ] Implement batch processing
+  - [ ] Bulk operations
+  - [ ] Transaction support
 - [ ] Optimize file operations
+  - [ ] Buffered reading
+  - [ ] Async I/O
 - [ ] Write performance tests
+  - [ ] Throughput tests
+  - [ ] Latency tests
+  - [ ] Memory usage tests
 
-## Implementation Notes
+## Current Dependencies
 
-### Starting Point
+```toml
+[dependencies]
+# Core dependencies
+cuid2 = "0.1.2"
+time = { version = "0.3", features = ["serde", "macros"] }
+event-emitter = "0.1.1"
 
-✅ Completed Step 1 with modern choices:
+# Future dependencies
+tokio = { version = "1.0", features = ["full"] }  # For async support
+notify = "6.0"  # For file watching
+```
 
-- Using `time` instead of `chrono` for better timezone handling and type safety
-- Using `cuid2` instead of `uuid` for more readable, sortable IDs
-- Implemented with clean module structure in `src/materials/`
+## Next Steps
 
-### Development Approach
+1. Implement directory scanning
 
-1. Each step will follow Test-Driven Development (TDD)
-2. We'll implement the simplest working version first
-3. Each feature will be developed in isolation before integration
-4. Documentation will be written alongside code
+   - Basic file system operations
+   - Error handling
+   - Tests
 
-### Key Principles
+2. Add validation system
 
-- Keep it simple initially
-- Focus on correctness before optimization
-- Write clear, idiomatic Rust code
-- Maintain good test coverage
+   - MaterialValidator trait
+   - Basic markdown validation
+   - Validation tests
 
-### Dependencies
-
-Current dependencies:
-
-- cuid2 = "0.1.2" (for unique IDs)
-- time = { version = "0.3", features = ["serde", "macros"] } (for timestamps)
-
-Future dependencies will be added as needed:
-
-- tokio (for async)
-- anyhow (for error handling)
-- notify (for file watching)
-- etc.
-
-### Next Implementation Task
-
-Moving on to Step 2: Material Registry
-
-- Will implement CRUD operations for materials
-- Need to decide on storage strategy (in-memory vs persistent)
-- Consider using a trait-based approach for storage backends
+3. Begin async support
+   - Add tokio
+   - Convert to async operations
+   - Add concurrent processing

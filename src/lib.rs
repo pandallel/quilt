@@ -1,6 +1,6 @@
 pub mod materials;
 
-pub use materials::{Material, MaterialStatus, MaterialFileType};
+pub use materials::{Material, MaterialStatus, MaterialFileType, MaterialRegistry};
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

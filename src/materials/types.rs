@@ -18,6 +18,33 @@ pub enum MaterialStatus {
     Invalid,
 }
 
+/// Types of events that can be emitted
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventType {
+    StatusChanged,
+}
+
+/// Events emitted during material processing
+#[derive(Debug, Clone)]
+pub enum MaterialEvent {
+    /// Emitted when a material's status changes
+    /// old_status is None when the material is first discovered
+    StatusChanged {
+        material: Material,
+        old_status: Option<MaterialStatus>,
+        error: Option<String>,
+    },
+}
+
+impl MaterialEvent {
+    /// Get the type of this event
+    pub fn event_type(&self) -> EventType {
+        match self {
+            MaterialEvent::StatusChanged { .. } => EventType::StatusChanged,
+        }
+    }
+}
+
 /// A Material represents a Markdown file in Quilt
 #[derive(Debug, Clone)]
 pub struct Material {
