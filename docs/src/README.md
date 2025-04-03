@@ -20,7 +20,6 @@ Use Quilt to power LLM tools with fast, structured, and evolving context—witho
 | **Material**    | A raw document or file—notes, code, transcripts, etc.                                       |
 | **Swatch**      | A meaningful fragment cut from a Material                                                   |
 | **Swatch Book** | The searchable memory of embedded Swatches                                                  |
-| **Query**       | A prompt or task that triggers context retrieval                                            |
 | **Spread**      | A contextual bundle of Swatches and their source Material, assembled in response to a Query |
 
 ---
