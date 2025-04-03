@@ -9,7 +9,9 @@ description = "Documentation for Sidecar - A local-first, modular memory and con
 [output.html]
 git-repository-url = "https://github.com/pandallel/sidecar"
 edit-url-template = "https://github.com/pandallel/sidecar/edit/main/docs/src/{path}"
+additional-css = ["./mdbook-admonish.css"]
 
 [preprocessor.admonish]
 command = "mdbook-admonish"
-renderer = ["html"]
+renderers = ["html"]
+assets_version = "3.0.3" # do not edit: managed by `mdbook-admonish install`
