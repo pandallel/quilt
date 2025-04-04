@@ -34,6 +34,8 @@ pub struct DirectoryScanner<'a> {
     registry: &'a mut MaterialRegistry,
     /// Whether to ignore hidden files and directories
     ignore_hidden: bool,
+    /// Patterns to exclude from scanning
+    exclude_patterns: Vec<String>,
 }
 
 impl<'a> DirectoryScanner<'a> {
@@ -46,7 +48,8 @@ impl<'a> DirectoryScanner<'a> {
         Ok(Self { 
             base_dir, 
             registry,
-            ignore_hidden: true,  // Default to ignoring hidden files
+            ignore_hidden: true,
+            exclude_patterns: Vec::new(),
         })
     }
 
@@ -56,6 +59,22 @@ impl<'a> DirectoryScanner<'a> {
         self
     }
 
+    /// Add patterns to exclude from scanning
+    pub fn exclude<I, S>(mut self, patterns: I) -> Self 
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.exclude_patterns.extend(patterns.into_iter().map(Into::into));
+        self
+    }
+
+    /// Check if a path should be excluded based on exclude patterns
+    fn should_exclude(&self, entry: &walkdir::DirEntry) -> bool {
+        let path = entry.path().to_string_lossy();
+        self.exclude_patterns.iter().any(|pattern| path.contains(pattern))
+    }
+
     /// Scan the base directory for material files and register them
     pub fn scan(&mut self) -> ScanResult<ScanResults> {
         let mut results = ScanResults {
@@ -63,6 +82,9 @@ impl<'a> DirectoryScanner<'a> {
             failed: Vec::new(),
         };
 
+        // First collect all the files we want to process
+        let mut files_to_process = Vec::new();
+        
         let walker = WalkDir::new(&self.base_dir)
             .follow_links(true)
             .into_iter()
@@ -72,17 +94,22 @@ impl<'a> DirectoryScanner<'a> {
                     return true;
                 }
                 
-                // If we're not ignoring hidden files, allow everything
-                if !self.ignore_hidden {
-                    return true;
+                // Check exclude patterns
+                if self.should_exclude(e) {
+                    return false;
                 }
-                
-                // Only check if the current entry's name starts with a dot
-                !e.file_name()
-                    .to_str()
-                    .map_or(false, |s| s.starts_with('.'))
+
+                // Check for hidden files/directories if enabled
+                if self.ignore_hidden {
+                    !e.file_name()
+                        .to_str()
+                        .map_or(false, |s| s.starts_with('.'))
+                } else {
+                    true
+                }
             });
 
+        // Collect all valid files first
         for entry in walker.filter_map(Result::ok) {
             if !entry.file_type().is_file() {
                 continue;
@@ -93,8 +120,12 @@ impl<'a> DirectoryScanner<'a> {
                 .map(|p| p.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| entry.path().to_string_lossy().into_owned());
 
-            let material = Material::new(relative_path);
+            files_to_process.push(relative_path);
+        }
 
+        // Now process all the files
+        for path in files_to_process {
+            let material = Material::new(path);
             match self.registry.upsert(material.clone()) {
                 Some(registered) => results.registered.push(registered),
                 None => results.failed.push(material),
@@ -117,11 +148,12 @@ mod tests {
         // Create some test files
         fs::create_dir_all(temp_dir.path().join("docs")).unwrap();
         fs::create_dir_all(temp_dir.path().join("notes")).unwrap();
+        fs::create_dir_all(temp_dir.path().join("target/debug")).unwrap();
         
         File::create(temp_dir.path().join("docs/test1.md")).unwrap();
         File::create(temp_dir.path().join("docs/test2.md")).unwrap();
         File::create(temp_dir.path().join("notes/note.md")).unwrap();
-        File::create(temp_dir.path().join("not-markdown.txt")).unwrap();
+        File::create(temp_dir.path().join("target/debug/output.txt")).unwrap();
         
         temp_dir
     }
@@ -136,6 +168,36 @@ mod tests {
         
         assert_eq!(results.registered.len(), 4, "Should register all 4 files");
         assert!(results.failed.is_empty(), "Should have no failed registrations");
+    }
+
+    #[test]
+    fn test_exclude_patterns() {
+        let temp_dir = setup_test_dir();
+        let mut registry = MaterialRegistry::new();
+        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+            .unwrap()
+            .exclude(vec!["target/"]);
+        
+        let results = scanner.scan().unwrap();
+        
+        assert_eq!(results.registered.len(), 3, "Should only register non-excluded files");
+        assert!(results.registered.iter().all(|m| !m.file_path.contains("target/")), 
+            "Should not include files from excluded directory");
+    }
+
+    #[test]
+    fn test_multiple_exclude_patterns() {
+        let temp_dir = setup_test_dir();
+        let mut registry = MaterialRegistry::new();
+        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+            .unwrap()
+            .exclude(vec!["target/", "docs/"]);
+        
+        let results = scanner.scan().unwrap();
+        
+        assert_eq!(results.registered.len(), 1, "Should only register files not matching any exclude pattern");
+        assert!(results.registered.iter().all(|m| !m.file_path.contains("target/") && !m.file_path.contains("docs/")), 
+            "Should not include files from any excluded directory");
     }
 
     #[test]

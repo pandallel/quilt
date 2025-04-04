@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::cell::RefCell;
 use crate::events::{EventSource, EventListener, EventEmitter};
-use crate::materials::types::{Material, MaterialEvent, MaterialStatus};
+use crate::materials::types::{Material, MaterialEvent};
 
 /// A registry for storing and managing materials with event emission
 ///

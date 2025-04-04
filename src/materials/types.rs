@@ -1,6 +1,7 @@
 use time::OffsetDateTime;
 use cuid2::cuid;
 use std::path::Path;
+use std::fmt;
 
 /// Supported file types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +38,16 @@ pub enum MaterialStatus {
     Valid,
     /// Material failed validation
     Invalid,
+}
+
+impl fmt::Display for MaterialStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MaterialStatus::Discovered => write!(f, "Discovered"),
+            MaterialStatus::Valid => write!(f, "Valid"),
+            MaterialStatus::Invalid => write!(f, "Invalid"),
+        }
+    }
 }
 
 /// Types of events that can be emitted

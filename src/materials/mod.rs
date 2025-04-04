@@ -1,6 +1,6 @@
-mod types;
-mod registry;
-mod scanner;
+pub mod types;
+pub mod registry;
+pub mod scanner;
 
 pub use types::{Material, MaterialStatus, MaterialFileType};
 pub use registry::MaterialRegistry;

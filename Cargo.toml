@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Monday Romelfanger"]
 description = "A local-first, modular memory and context engine"
 
+[[bin]]
+name = "quilt"
+path = "src/main.rs"
+
 [dependencies]
 # Core dependencies
 cuid2 = "0.1.2"
