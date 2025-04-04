@@ -29,23 +29,23 @@ impl MaterialFileType {
     }
 }
 
-/// The possible states of a material during ingestion
+/// The possible states of a material during processing
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MaterialStatus {
-    /// Material has been discovered but not yet validated
+    /// Material has been discovered but not yet processed into Swatches
     Discovered,
-    /// Material has passed validation
-    Valid,
-    /// Material failed validation
-    Invalid,
+    /// Material has been successfully processed into Swatches
+    Swatched,
+    /// Material could not be processed into Swatches
+    Error,
 }
 
 impl fmt::Display for MaterialStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MaterialStatus::Discovered => write!(f, "Discovered"),
-            MaterialStatus::Valid => write!(f, "Valid"),
-            MaterialStatus::Invalid => write!(f, "Invalid"),
+            MaterialStatus::Swatched => write!(f, "Swatched"),
+            MaterialStatus::Error => write!(f, "Error"),
         }
     }
 }
@@ -90,7 +90,7 @@ pub struct Material {
     pub ingested_at: OffsetDateTime,
     /// Current status of the material
     pub status: MaterialStatus,
-    /// Error message if status is Invalid
+    /// Error message if Swatch creation failed
     pub error: Option<String>,
 }
 
@@ -135,15 +135,15 @@ mod tests {
     fn test_material_status_transitions() {
         let mut material = Material::new("test/path/doc.md".to_string());
 
-        // Test transition to Valid
-        material.status = MaterialStatus::Valid;
-        assert_eq!(material.status, MaterialStatus::Valid);
+        // Test transition to Swatched
+        material.status = MaterialStatus::Swatched;
+        assert_eq!(material.status, MaterialStatus::Swatched);
 
-        // Test transition to Invalid with error
-        material.status = MaterialStatus::Invalid;
-        material.error = Some(String::from("Validation failed"));
-        assert_eq!(material.status, MaterialStatus::Invalid);
-        assert_eq!(material.error.unwrap(), "Validation failed");
+        // Test transition to Error with error message
+        material.status = MaterialStatus::Error;
+        material.error = Some(String::from("Could not identify meaningful content boundaries"));
+        assert_eq!(material.status, MaterialStatus::Error);
+        assert_eq!(material.error.unwrap(), "Could not identify meaningful content boundaries");
     }
 
     #[test]

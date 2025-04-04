@@ -19,18 +19,18 @@ pub struct Material {
     pub ingested_at: OffsetDateTime,
     /// Current status of the material
     pub status: MaterialStatus,
-    /// Error message if material cannot be analyzed
+    /// Error message if Swatching failed
     pub error: Option<String>,
 }
 
 /// The possible states of a material
 pub enum MaterialStatus {
-    /// Material has been discovered but not yet processed
+    /// Material has been discovered but not yet processed into Swatches
     Discovered,
-    /// Material was successfully split into chunks [planned]
-    Split,
-    /// Material could not be split [planned]
-    Failed,
+    /// Material has been successfully processed into Swatches
+    Swatched,
+    /// Material could not be processed into Swatches
+    Error,
 }
 
 /// Events emitted during material processing
@@ -56,15 +56,15 @@ assert_eq!(material.status, MaterialStatus::Discovered);
 assert_eq!(material.status, MaterialStatus::Discovered);
 assert!(material.error.is_none());
 
-// Material can be split successfully [planned]
-let mut split = material;
-split.status = MaterialStatus::Split;
-assert_eq!(split.status, MaterialStatus::Split);
+// Material is successfully processed into Swatches
+let mut swatched = material;
+swatched.status = MaterialStatus::Swatched;
+assert_eq!(swatched.status, MaterialStatus::Swatched);
 
-// Or marked as failed with an error [planned]
+// Or marked as error if Swatching fails
 let mut failed = material;
-failed.status = MaterialStatus::Failed;
-failed.error = Some("Cannot split into meaningful chunks".to_string());
+failed.status = MaterialStatus::Error;
+failed.error = Some("Could not identify meaningful content boundaries".to_string());
 ```
 
 ## Component Architecture
@@ -151,17 +151,17 @@ self.events.emit(MaterialEvent::StatusChanged {
    - Initial status set to Discovered
    - Discovery event emitted
 
-3. **Analysis Check** [planned]
+3. **Swatch Creation** [planned]
 
-   - Content structure verification
-   - Chunk/split attempt
-   - Status updated to Analyzable/Unanalyzable
+   - Content passed to Swatch system for processing
+   - Status updated to Swatched on success
+   - Status updated to Error if Swatching fails
    - Status change event emitted
 
 4. **Updates** [planned]
    - File changes detected
-   - Analysis check re-run
-   - Status updated if needed
+   - Material marked as Discovered
+   - Swatch creation re-attempted
    - Events emitted for changes
 
 ## Error Handling
@@ -195,10 +195,10 @@ Events include:
 ```mermaid
 stateDiagram-v2
     [*] --> Discovered: Upsert (new)
-    Discovered --> Split: Split Success [planned]
-    Discovered --> Failed: Split Failure [planned]
-    Split --> Failed: Split Failure [planned]
-    Failed --> Split: Split Success [planned]
+    Discovered --> Swatched: Swatch Creation Success
+    Discovered --> Error: Swatch Creation Failure
+    Error --> Discovered: Retry
+    Swatched --> Discovered: File Changed
 ```
 
 ## Event Flow
@@ -208,6 +208,7 @@ sequenceDiagram
     participant Client
     participant Scanner
     participant Registry
+    participant SwatchSystem
     participant EventSystem
     participant Listener
 
@@ -217,6 +218,11 @@ sequenceDiagram
     EventSystem->>Listener: callback(event)
 
     Note over Scanner,Registry: For each file found
+
+    Registry->>SwatchSystem: create_swatches(material)
+    SwatchSystem-->>Registry: success/failure
+    Registry->>EventSystem: emit(StatusChanged)
+    EventSystem->>Listener: callback(event)
 ```
 
 ## Implementation Status
@@ -234,7 +240,7 @@ sequenceDiagram
 🚧 In Progress:
 
 - File watching support
-- Content analysis
+- Integration with Swatch system
 
 ## Future Enhancements
 
@@ -248,11 +254,11 @@ sequenceDiagram
    }
    ```
 
-2. **Content Analysis** [planned]
+2. **Swatch Integration** [planned]
 
    ```rust
-   pub trait ContentAnalyzer {
-       fn can_analyze(&self, material: &Material) -> AnalysisResult;
+   impl MaterialRegistry {
+       fn process_swatches(&mut self, material: &Material) -> Result<(), SwatchError>;
    }
    ```
 

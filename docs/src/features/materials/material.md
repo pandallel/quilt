@@ -1,10 +1,10 @@
 # Material
 
-A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they're where your content lives before it gets broken down into chunks.
+A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they represent the source files that will be processed into Swatches.
 
 ## Overview
 
-Materials are the foundation of Quilt's memory system. When you tell Quilt to ingest a specific directory, it scans for `.md` files and brings them in as Materials. From there, they get registered and made available for processing.
+Materials are the foundation of Quilt's memory system. When you tell Quilt to ingest a specific directory, it scans for `.md` files and brings them in as Materials. From there, they get registered and made available for Swatch creation.
 
 ## What Counts as a Material?
 
@@ -13,7 +13,7 @@ Materials are:
 - Markdown files (currently the only supported type)
 - Stored in a folder you've chosen
 - Used as the source of truth — Quilt doesn't change them
-- Structured or unstructured — both are fine
+- Tracked for changes and updates
 
 ## What Quilt Tracks
 
@@ -22,8 +22,8 @@ When Quilt picks up a file, it keeps track of:
 - A unique identifier for each file
 - The file's location on your system
 - When it was first discovered
-- Its current status (discovered, split, or failed)
-- Any errors or issues that come up
+- Its current status (discovered, swatched, or error)
+- Any errors or issues that come up during Swatch creation
 
 ## Lifecycle of a Material
 
@@ -31,17 +31,16 @@ When you add a file, Quilt:
 
 1. **Discovers it** in your folder
 2. **Registers it** in its internal system
-3. **Tries to split it** into meaningful chunks [planned]
-4. **Makes it ready** for deeper processing [planned]
-5. **Keeps track** of changes if the file gets updated later [planned]
+3. **Processes it** into Swatches [planned]
+4. **Tracks changes** if the file gets updated later [planned]
 
-You'll always have a clear view of what was picked up, what wasn't, and why.
+You'll always have a clear view of what was picked up, what was successfully processed into Swatches, and what had issues.
 
 ## Features
 
 ### Automatic Discovery
 
-Quilt automatically finds and processes your materials:
+Quilt automatically finds and tracks your materials:
 
 - Scans directories you specify
 - Picks up new files as they're added
@@ -50,13 +49,13 @@ Quilt automatically finds and processes your materials:
 
 ### Smart Error Handling
 
-Quilt does its best to quietly and reliably pick up your materials — but sometimes a file might not be usable right away. It could be too short to split into meaningful chunks, unreadable, or already registered.
+Quilt does its best to quietly and reliably pick up your materials — but sometimes a file might not be usable right away. It could be inaccessible, already registered, or unsuitable for Swatch creation.
 
 To help you stay informed, Quilt is designed to:
 
 - Detect and handle problematic files gracefully
-- Keep track of why certain files couldn't be split
-- Let you see the status and reason for any skipped or failed files
+- Keep track of why certain files couldn't be processed
+- Let you see the status and reason for any errors
 - Provide configuration options for hidden files and symlinks
 
 This ensures Quilt remains stable and trustworthy, while giving you visibility and control over your content.
@@ -69,8 +68,8 @@ This ensures Quilt remains stable and trustworthy, while giving you visibility a
 Scenario: Adding New Files
   Given you add new markdown files to a watched directory
   When Quilt scans the directory
-  Then it automatically discovers and processes them
-  And adds them to its system for further use
+  Then it automatically discovers and registers them
+  And marks them as ready for Swatch creation
 ```
 
 ### Handling Hidden Files
@@ -104,9 +103,9 @@ Scenario: Can't Access a File
   Given a file exists but can't be accessed
   When Quilt tries to process it
   Then it will:
-    * Skip the inaccessible file
-    * Continue processing other files
+    * Mark the file as Error
     * Record the access error
+    * Continue processing other files
     * Include this in its processing report
 
 Scenario: File System Issues
@@ -127,14 +126,14 @@ Scenario: File System Issues
 - ✅ Robust error handling
 - ✅ Status tracking
 - 🚧 File watching (coming soon)
-- 🚧 Content splitting (coming soon)
+- 🚧 Swatch creation integration (coming soon)
 
 ## Next Steps
 
 Quilt is continuously evolving. Coming soon:
 
 1. Real-time file watching
-2. Content splitting and chunking
+2. Integration with Swatch creation
 3. Support for more file types
 
 For technical implementation details, see the [Material Architecture](./material-architecture.md) document.
