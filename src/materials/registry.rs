@@ -32,44 +32,32 @@ impl MaterialRegistry {
         }
     }
 
-    /// Register a new material in the registry
-    /// Returns None if the material was already registered (based on file path)
-    pub fn register(&mut self, material: Material) -> Option<Material> {
-        // Check if material with same path exists
-        if self.materials.values().any(|m| m.file_path == material.file_path) {
-            return None;
-        }
-
-        let material_clone = material.clone();
-        self.materials.insert(material.id.clone(), material);
-        
-        // Emit status changed event with no old status (initial discovery)
-        self.events.emit(MaterialEvent::StatusChanged {
-            material: material_clone.clone(),
-            old_status: None,
-            error: None,
-        });
-        
-        Some(material_clone)
-    }
-
-    /// Get a material by its ID
-    pub fn get(&self, id: &str) -> Option<Material> {
-        self.materials.get(id).cloned()
-    }
-
-    /// Get a material by its file path
-    pub fn get_by_path(&self, file_path: &str) -> Option<Material> {
-        self.materials
-            .values()
-            .find(|m| m.file_path == file_path)
-            .cloned()
-    }
-
-    /// Update an existing material
-    /// Returns None if the material wasn't found
-    pub fn update(&mut self, material: Material) -> Option<Material> {
-        if let Some(old_material) = self.materials.get(&material.id) {
+    /// Upsert (insert or update) a material in the registry
+    /// If the material is new (no existing ID match), it will be registered
+    /// If the material exists (ID match), it will be updated
+    /// Returns None if a different material with the same file path exists
+    pub fn upsert(&mut self, material: Material) -> Option<Material> {
+        // Check for duplicate path only if this is a new material
+        if !self.materials.contains_key(&material.id) {
+            // For new materials, check if path is already registered
+            if self.materials.values().any(|m| m.file_path == material.file_path) {
+                return None;
+            }
+            
+            let material_clone = material.clone();
+            self.materials.insert(material.id.clone(), material);
+            
+            // Emit status changed event with no old status (initial discovery)
+            self.events.emit(MaterialEvent::StatusChanged {
+                material: material_clone.clone(),
+                old_status: None,
+                error: None,
+            });
+            
+            Some(material_clone)
+        } else {
+            // Updating existing material
+            let old_material = self.materials.get(&material.id).unwrap();
             let old_status = old_material.status.clone();
             
             // Only emit event if status changed
@@ -83,9 +71,20 @@ impl MaterialRegistry {
             
             self.materials.insert(material.id.clone(), material.clone());
             Some(material)
-        } else {
-            None
         }
+    }
+
+    /// Get a material by its ID
+    pub fn get(&self, id: &str) -> Option<Material> {
+        self.materials.get(id).cloned()
+    }
+
+    /// Get a material by its file path
+    pub fn get_by_path(&self, file_path: &str) -> Option<Material> {
+        self.materials
+            .values()
+            .find(|m| m.file_path == file_path)
+            .cloned()
     }
 
     /// Remove a material from the registry by its ID
@@ -133,7 +132,7 @@ mod tests {
         let material = create_test_material("test/doc.md");
         let material_id = material.id.clone();
 
-        let registered = registry.register(material)
+        let registered = registry.upsert(material)
             .expect("Should successfully register new material");
         assert_eq!(registered.id, material_id);
     }
@@ -142,10 +141,10 @@ mod tests {
     fn register_duplicate_path_fails() {
         let mut registry = setup();
         let material = create_test_material("test/doc.md");
-        registry.register(material).expect("First registration should succeed");
+        registry.upsert(material).expect("First registration should succeed");
 
         let duplicate = create_test_material("test/doc.md");
-        assert!(registry.register(duplicate).is_none(), "Should reject duplicate path");
+        assert!(registry.upsert(duplicate).is_none(), "Should reject duplicate path");
     }
 
     #[test]
@@ -154,7 +153,7 @@ mod tests {
         let material = create_test_material("test/doc.md");
         let material_id = material.id.clone();
 
-        registry.register(material).expect("Registration should succeed");
+        registry.upsert(material).expect("Registration should succeed");
 
         let retrieved = registry.get(&material_id)
             .expect("Should find material by ID");
@@ -167,7 +166,7 @@ mod tests {
         let material = create_test_material("test/doc.md");
         let material_id = material.id.clone();
 
-        registry.register(material).expect("Registration should succeed");
+        registry.upsert(material).expect("Registration should succeed");
 
         let by_path = registry.get_by_path("test/doc.md")
             .expect("Should find material by path");
@@ -180,7 +179,7 @@ mod tests {
         let (events, _listener) = collect_events(&mut registry);
 
         let material = create_test_material("test/doc.md");
-        registry.register(material).expect("Registration should succeed");
+        registry.upsert(material).expect("Registration should succeed");
 
         let events = events.borrow();
         assert_eq!(events.len(), 1, "Should emit exactly one event");
@@ -201,10 +200,10 @@ mod tests {
 
         // Register and validate
         let mut material = create_test_material("test/doc.md");
-        registry.register(material.clone()).expect("Registration should succeed");
+        registry.upsert(material.clone()).expect("Registration should succeed");
         
         material.status = MaterialStatus::Valid;
-        registry.update(material).expect("Update should succeed");
+        registry.upsert(material).expect("Update should succeed");
 
         let events = events.borrow();
         let validation_event = &events[1];  // Skip discovery event
@@ -226,11 +225,11 @@ mod tests {
 
         // Register and fail validation
         let mut material = create_test_material("test/doc.md");
-        registry.register(material.clone()).expect("Registration should succeed");
+        registry.upsert(material.clone()).expect("Registration should succeed");
         
         material.status = MaterialStatus::Invalid;
         material.error = Some("Invalid format".to_string());
-        registry.update(material).expect("Update should succeed");
+        registry.upsert(material).expect("Update should succeed");
 
         let events = events.borrow();
         let failure_event = &events[1];  // Skip discovery event
@@ -250,9 +249,9 @@ mod tests {
     fn list_all_returns_all_materials() {
         let mut registry = setup();
         
-        registry.register(create_test_material("test/doc1.md"))
+        registry.upsert(create_test_material("test/doc1.md"))
             .expect("First registration should succeed");
-        registry.register(create_test_material("test/doc2.md"))
+        registry.upsert(create_test_material("test/doc2.md"))
             .expect("Second registration should succeed");
         
         let all_materials = registry.list_all();

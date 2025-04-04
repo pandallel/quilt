@@ -1,10 +1,31 @@
 use time::OffsetDateTime;
 use cuid2::cuid;
+use std::path::Path;
 
-/// Supported file types (currently only Markdown)
+/// Supported file types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MaterialFileType {
+    /// Markdown files (.md)
     Markdown,
+    /// Text files (.txt)
+    Text,
+    /// Other file types
+    Other(String),
+}
+
+impl MaterialFileType {
+    /// Determine file type from file extension
+    pub fn from_path(path: &str) -> Self {
+        let path = Path::new(path);
+        match path.extension().and_then(|ext| ext.to_str()) {
+            Some(ext) => match ext.to_lowercase().as_str() {
+                "md" => Self::Markdown,
+                "txt" => Self::Text,
+                other => Self::Other(other.to_string()),
+            },
+            None => Self::Other("".to_string()),
+        }
+    }
 }
 
 /// The possible states of a material during ingestion
@@ -67,8 +88,8 @@ impl Material {
     pub fn new(file_path: String) -> Self {
         Self {
             id: cuid(),
-            file_path,
-            file_type: MaterialFileType::Markdown,
+            file_path: file_path.clone(),
+            file_type: MaterialFileType::from_path(&file_path),
             ingested_at: OffsetDateTime::now_utc(),
             status: MaterialStatus::Discovered,
             error: None,
@@ -89,6 +110,14 @@ mod tests {
         assert!(material.error.is_none());
         assert_eq!(material.id.len(), 24);
         assert!(material.ingested_at <= OffsetDateTime::now_utc());
+    }
+
+    #[test]
+    fn test_file_type_inference() {
+        assert_eq!(MaterialFileType::from_path("test.md"), MaterialFileType::Markdown);
+        assert_eq!(MaterialFileType::from_path("test.txt"), MaterialFileType::Text);
+        assert_eq!(MaterialFileType::from_path("test.rs"), MaterialFileType::Other("rs".to_string()));
+        assert_eq!(MaterialFileType::from_path("test"), MaterialFileType::Other("".to_string()));
     }
 
     #[test]

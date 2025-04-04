@@ -26,9 +26,8 @@
   - Implemented with HashMap storage
   - Added event emission system
 - [x] Implement basic CRUD operations
-  - register: Add new materials
+  - upsert: Add or update materials
   - get/get_by_path: Retrieve materials
-  - update: Modify existing materials
   - remove: Delete materials
   - list_all: Get all materials
 - [x] Add event system
@@ -40,23 +39,24 @@
   - Event emission tests
   - Error handling tests
 
-### Step 3: Directory Scanner 🚧
+### Step 3: Directory Scanner ✅
 
-- [ ] Implement basic file system operations
-  - [ ] Path validation
-  - [ ] File existence checks
-  - [ ] Permission checks
-- [ ] Create directory scanning functionality
-  - [ ] Recursive directory traversal
-  - [ ] File filtering
-  - [ ] Error handling
-- [ ] Filter for markdown files
-  - [ ] Extension checking
-  - [ ] Basic file validation
-- [ ] Add tests for directory scanning
-  - [ ] Valid directory tests
-  - [ ] Invalid path tests
-  - [ ] Permission error tests
+- [x] Implement basic file system operations
+  - [x] Path validation
+  - [x] File existence checks
+  - [x] Permission checks
+- [x] Create directory scanning functionality
+  - [x] Recursive directory traversal using WalkDir
+  - [x] File filtering
+  - [x] Error handling
+- [x] Add configuration options
+  - [x] Hidden file/directory handling
+  - [x] Symlink following
+- [x] Add tests for directory scanning
+  - [x] Valid directory tests
+  - [x] Invalid path tests
+  - [x] Hidden file tests
+  - [x] Duplicate file tests
 
 ### Step 4: Material Validation 🚧
 
