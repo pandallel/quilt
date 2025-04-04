@@ -1,6 +1,6 @@
 # Material
 
-A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they're where your content lives before it gets broken down and analyzed.
+A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they're where your content lives before it gets broken down into chunks.
 
 ## Overview
 
@@ -22,7 +22,7 @@ When Quilt picks up a file, it keeps track of:
 - A unique identifier for each file
 - The file's location on your system
 - When it was first discovered
-- Its current status (discovered, valid, or invalid)
+- Its current status (discovered, split, or failed)
 - Any errors or issues that come up
 
 ## Lifecycle of a Material
@@ -30,10 +30,10 @@ When Quilt picks up a file, it keeps track of:
 When you add a file, Quilt:
 
 1. **Discovers it** in your folder
-2. **Validates it** (file type, readability, etc.)
-3. **Registers it** in its internal system
-4. **Marks it as ready** for deeper processing
-5. **Keeps track** of changes if the file gets updated later
+2. **Registers it** in its internal system
+3. **Tries to split it** into meaningful chunks [planned]
+4. **Makes it ready** for deeper processing [planned]
+5. **Keeps track** of changes if the file gets updated later [planned]
 
 You'll always have a clear view of what was picked up, what wasn't, and why.
 
@@ -50,12 +50,12 @@ Quilt automatically finds and processes your materials:
 
 ### Smart Error Handling
 
-Quilt does its best to quietly and reliably pick up your materials — but sometimes a file might not be usable right away. It could be in the wrong format, unreadable, or already registered.
+Quilt does its best to quietly and reliably pick up your materials — but sometimes a file might not be usable right away. It could be too short to split into meaningful chunks, unreadable, or already registered.
 
 To help you stay informed, Quilt is designed to:
 
 - Detect and handle problematic files gracefully
-- Keep track of why certain files couldn't be ingested
+- Keep track of why certain files couldn't be split
 - Let you see the status and reason for any skipped or failed files
 - Provide configuration options for hidden files and symlinks
 
@@ -127,14 +127,14 @@ Scenario: File System Issues
 - ✅ Robust error handling
 - ✅ Status tracking
 - 🚧 File watching (coming soon)
-- 🚧 Advanced validation (coming soon)
+- 🚧 Content splitting (coming soon)
 
 ## Next Steps
 
 Quilt is continuously evolving. Coming soon:
 
 1. Real-time file watching
-2. Advanced validation rules
+2. Content splitting and chunking
 3. Support for more file types
 
 For technical implementation details, see the [Material Architecture](./material-architecture.md) document.

@@ -19,18 +19,18 @@ pub struct Material {
     pub ingested_at: OffsetDateTime,
     /// Current status of the material
     pub status: MaterialStatus,
-    /// Error message if status is Invalid
+    /// Error message if material cannot be analyzed
     pub error: Option<String>,
 }
 
 /// The possible states of a material
 pub enum MaterialStatus {
-    /// Material has been discovered but not yet validated
+    /// Material has been discovered but not yet processed
     Discovered,
-    /// Material has passed validation
-    Valid,
-    /// Material failed validation
-    Invalid,
+    /// Material was successfully split into chunks [planned]
+    Split,
+    /// Material could not be split [planned]
+    Failed,
 }
 
 /// Events emitted during material processing
@@ -56,15 +56,15 @@ assert_eq!(material.status, MaterialStatus::Discovered);
 assert_eq!(material.status, MaterialStatus::Discovered);
 assert!(material.error.is_none());
 
-// Material can be validated
-let mut validated = material;
-validated.status = MaterialStatus::Valid;
-assert_eq!(validated.status, MaterialStatus::Valid);
+// Material can be split successfully [planned]
+let mut split = material;
+split.status = MaterialStatus::Split;
+assert_eq!(split.status, MaterialStatus::Split);
 
-// Or marked as invalid with an error
-let mut invalid = material;
-invalid.status = MaterialStatus::Invalid;
-invalid.error = Some("Missing required sections".to_string());
+// Or marked as failed with an error [planned]
+let mut failed = material;
+failed.status = MaterialStatus::Failed;
+failed.error = Some("Cannot split into meaningful chunks".to_string());
 ```
 
 ## Component Architecture
@@ -151,16 +151,16 @@ self.events.emit(MaterialEvent::StatusChanged {
    - Initial status set to Discovered
    - Discovery event emitted
 
-3. **Validation**
+3. **Analysis Check** [planned]
 
-   - File type verification
-   - Content validation (if configured)
-   - Status updated to Valid/Invalid
+   - Content structure verification
+   - Chunk/split attempt
+   - Status updated to Analyzable/Unanalyzable
    - Status change event emitted
 
-4. **Updates**
+4. **Updates** [planned]
    - File changes detected
-   - Material re-validated
+   - Analysis check re-run
    - Status updated if needed
    - Events emitted for changes
 
@@ -195,10 +195,10 @@ Events include:
 ```mermaid
 stateDiagram-v2
     [*] --> Discovered: Upsert (new)
-    Discovered --> Valid: Validation Success
-    Discovered --> Invalid: Validation Failure
-    Valid --> Invalid: Validation Failure
-    Invalid --> Valid: Validation Success
+    Discovered --> Split: Split Success [planned]
+    Discovered --> Failed: Split Failure [planned]
+    Split --> Failed: Split Failure [planned]
+    Failed --> Split: Split Success [planned]
 ```
 
 ## Event Flow
@@ -233,8 +233,8 @@ sequenceDiagram
 
 🚧 In Progress:
 
-- Basic validation rules
 - File watching support
+- Content analysis
 
 ## Future Enhancements
 
@@ -248,11 +248,11 @@ sequenceDiagram
    }
    ```
 
-2. **Improved Validation**
+2. **Content Analysis** [planned]
 
    ```rust
-   pub trait MaterialValidator {
-       fn validate(&self, material: &Material) -> ValidationResult;
+   pub trait ContentAnalyzer {
+       fn can_analyze(&self, material: &Material) -> AnalysisResult;
    }
    ```
 
