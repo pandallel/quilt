@@ -8,8 +8,8 @@ pub mod actors;
 pub mod discovery;
 pub mod materials;
 
-// Keep only the material types and scanner exports
-pub use materials::scanner::DirectoryScanner;
+// Re-export the scanner and repository types
+pub use discovery::{DirectoryScanner, ScanError, ScanResult, ScanResults};
 pub use materials::{Material, MaterialFileType, MaterialStatus};
 pub use materials::{MaterialRepository, RepositoryError};
 
