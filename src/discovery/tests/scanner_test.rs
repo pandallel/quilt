@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod scanner_tests {
-    use crate::materials::scanner::DirectoryScanner;
+    use crate::discovery::scanner::DirectoryScanner;
     use std::fs::{self, File};
     use std::io::Write;
     use std::path::PathBuf;
@@ -88,4 +88,4 @@ mod scanner_tests {
         // Keep temp directory around until end of test
         drop(temp_dir);
     }
-}
+} 
