@@ -3,7 +3,6 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::materials::types::Material;
-use crate::materials::registry::MaterialRegistry;
 
 /// Errors that can occur during directory scanning
 #[derive(Error, Debug)]
@@ -20,34 +19,31 @@ pub type ScanResult<T> = Result<T, ScanError>;
 /// Results of a directory scan
 #[derive(Debug)]
 pub struct ScanResults {
-    /// Materials that were successfully registered
-    pub registered: Vec<Material>,
-    /// Materials that failed to register (e.g., duplicates)
+    /// Materials that were successfully found
+    pub found: Vec<Material>,
+    /// Materials that failed to process
     pub failed: Vec<Material>,
 }
 
 /// A scanner for discovering material files in directories
-pub struct DirectoryScanner<'a> {
+pub struct DirectoryScanner {
     /// Base directory to scan from
     base_dir: PathBuf,
-    /// Registry to register materials in
-    registry: &'a mut MaterialRegistry,
     /// Whether to ignore hidden files and directories
     ignore_hidden: bool,
     /// Patterns to exclude from scanning
     exclude_patterns: Vec<String>,
 }
 
-impl<'a> DirectoryScanner<'a> {
-    /// Create a new DirectoryScanner for the given base directory and registry
-    pub fn new<P: AsRef<Path>>(base_dir: P, registry: &'a mut MaterialRegistry) -> ScanResult<Self> {
+impl DirectoryScanner {
+    /// Create a new DirectoryScanner for the given base directory
+    pub fn new<P: AsRef<Path>>(base_dir: P) -> ScanResult<Self> {
         let base_dir = base_dir.as_ref().to_path_buf();
         if !base_dir.exists() {
             return Err(ScanError::PathNotFound(base_dir));
         }
         Ok(Self { 
             base_dir, 
-            registry,
             ignore_hidden: true,
             exclude_patterns: Vec::new(),
         })
@@ -75,10 +71,10 @@ impl<'a> DirectoryScanner<'a> {
         self.exclude_patterns.iter().any(|pattern| path.contains(pattern))
     }
 
-    /// Scan the base directory for material files and register them
-    pub fn scan(&mut self) -> ScanResult<ScanResults> {
+    /// Scan the base directory for material files
+    pub fn scan(&self) -> ScanResult<ScanResults> {
         let mut results = ScanResults {
-            registered: Vec::new(),
+            found: Vec::new(),
             failed: Vec::new(),
         };
 
@@ -123,13 +119,10 @@ impl<'a> DirectoryScanner<'a> {
             files_to_process.push(relative_path);
         }
 
-        // Now process all the files
+        // Now create Material instances for all the files
         for path in files_to_process {
             let material = Material::new(path);
-            match self.registry.upsert(material.clone()) {
-                Some(registered) => results.registered.push(registered),
-                None => results.failed.push(material),
-            }
+            results.found.push(material);
         }
 
         Ok(results)
@@ -159,51 +152,47 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_finds_and_registers_all_files() {
+    fn test_scan_finds_all_files() {
         let temp_dir = setup_test_dir();
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
+        let scanner = DirectoryScanner::new(temp_dir.path()).unwrap();
         
         let results = scanner.scan().unwrap();
         
-        assert_eq!(results.registered.len(), 4, "Should register all 4 files");
-        assert!(results.failed.is_empty(), "Should have no failed registrations");
+        assert_eq!(results.found.len(), 4, "Should find all 4 files");
+        assert!(results.failed.is_empty(), "Should have no failed files");
     }
 
     #[test]
     fn test_exclude_patterns() {
         let temp_dir = setup_test_dir();
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+        let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .exclude(vec!["target/"]);
         
         let results = scanner.scan().unwrap();
         
-        assert_eq!(results.registered.len(), 3, "Should only register non-excluded files");
-        assert!(results.registered.iter().all(|m| !m.file_path.contains("target/")), 
+        assert_eq!(results.found.len(), 3, "Should only find non-excluded files");
+        assert!(results.found.iter().all(|m| !m.file_path.contains("target/")), 
             "Should not include files from excluded directory");
     }
 
     #[test]
     fn test_multiple_exclude_patterns() {
         let temp_dir = setup_test_dir();
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+        let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .exclude(vec!["target/", "docs/"]);
         
         let results = scanner.scan().unwrap();
         
-        assert_eq!(results.registered.len(), 1, "Should only register files not matching any exclude pattern");
-        assert!(results.registered.iter().all(|m| !m.file_path.contains("target/") && !m.file_path.contains("docs/")), 
+        assert_eq!(results.found.len(), 1, "Should only find files not matching any exclude pattern");
+        assert!(results.found.iter().all(|m| !m.file_path.contains("target/") && !m.file_path.contains("docs/")), 
             "Should not include files from any excluded directory");
     }
 
     #[test]
     fn test_scan_nonexistent_directory() {
-        let mut registry = MaterialRegistry::new();
-        let scanner = DirectoryScanner::new("nonexistent", &mut registry);
+        let scanner = DirectoryScanner::new("nonexistent");
         
         assert!(matches!(scanner, Err(ScanError::PathNotFound(_))));
     }
@@ -213,14 +202,13 @@ mod tests {
         let temp_dir = setup_test_dir();
         File::create(temp_dir.path().join(".hidden.txt")).unwrap();
         
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+        let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .ignore_hidden(false);
 
         let results = scanner.scan().unwrap();
         
-        assert!(results.registered.iter().any(|m| m.file_path.contains(".hidden.txt")),
+        assert!(results.found.iter().any(|m| m.file_path.contains(".hidden.txt")),
             "Hidden files should be included when ignore_hidden is false");
     }
 
@@ -233,26 +221,24 @@ mod tests {
         fs::create_dir_all(temp_dir.path().join(".hidden_dir/visible_subdir")).unwrap();
         File::create(temp_dir.path().join(".hidden_dir/visible_subdir/file1.txt")).unwrap();
         
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry)
+        let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .ignore_hidden(false);
 
         let results = scanner.scan().unwrap();
         
-        assert!(results.registered.iter().any(|m| m.file_path.contains("file1.txt")),
+        assert!(results.found.iter().any(|m| m.file_path.contains("file1.txt")),
             "Files in hidden directories should be included when ignore_hidden is false");
     }
 
     #[test]
     fn test_relative_paths() {
         let temp_dir = setup_test_dir();
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
+        let scanner = DirectoryScanner::new(temp_dir.path()).unwrap();
         
         let results = scanner.scan().unwrap();
         
-        for material in results.registered {
+        for material in results.found {
             assert!(!material.file_path.starts_with('/'),
                 "Paths should be relative");
             assert!(Path::new(&material.file_path).is_relative(),
@@ -261,33 +247,16 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_registrations() {
-        let temp_dir = setup_test_dir();
-        let mut registry = MaterialRegistry::new();
-        
-        // First scan
-        let mut scanner1 = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
-        let results1 = scanner1.scan().unwrap();
-        assert_eq!(results1.registered.len(), 4, "Should register all 4 files initially");
-        assert!(results1.failed.is_empty(), "Should have no failures initially");
-
-        // Second scan
-        let mut scanner2 = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
-        let results2 = scanner2.scan().unwrap();
-        assert!(results2.registered.is_empty(), "Should not register any new files");
-        assert_eq!(results2.failed.len(), 4, "All files should fail as duplicates");
-    }
-
-    #[test]
     fn test_hidden_files_ignored() {
         let temp_dir = setup_test_dir();
         File::create(temp_dir.path().join(".hidden.txt")).unwrap();
         
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
+        let scanner = DirectoryScanner::new(temp_dir.path())
+            .unwrap()
+            .ignore_hidden(false);
         let results = scanner.scan().unwrap();
         
-        assert!(!results.registered.iter().any(|m| m.file_path.contains(".hidden.txt")),
+        assert!(!results.found.iter().any(|m| m.file_path.contains(".hidden.txt")),
             "Hidden files should be ignored");
     }
 
@@ -306,18 +275,19 @@ mod tests {
         File::create(temp_dir.path().join(".hidden_dir/.hidden_subdir/file2.txt")).unwrap();
         File::create(temp_dir.path().join("visible_dir/.hidden_subdir/file3.txt")).unwrap();
         
-        let mut registry = MaterialRegistry::new();
-        let mut scanner = DirectoryScanner::new(temp_dir.path(), &mut registry).unwrap();
+        let scanner = DirectoryScanner::new(temp_dir.path())
+            .unwrap()
+            .ignore_hidden(false);
         let results = scanner.scan().unwrap();
         
         // Files under a hidden directory should not be found, even in visible subdirectories
-        assert!(!results.registered.iter().any(|m| m.file_path.contains("file1.txt")),
+        assert!(!results.found.iter().any(|m| m.file_path.contains("file1.txt")),
             "Should not find files under hidden directories");
             
         // Files in hidden subdirectories should not be found
-        assert!(!results.registered.iter().any(|m| m.file_path.contains("file2.txt")),
+        assert!(!results.found.iter().any(|m| m.file_path.contains("file2.txt")),
             "Should not find files in hidden subdirectories of hidden directories");
-        assert!(!results.registered.iter().any(|m| m.file_path.contains("file3.txt")),
+        assert!(!results.found.iter().any(|m| m.file_path.contains("file3.txt")),
             "Should not find files in hidden subdirectories of visible directories");
     }
 } 

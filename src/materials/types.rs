@@ -32,11 +32,13 @@ impl MaterialFileType {
 /// The possible states of a material during processing
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MaterialStatus {
-    /// Material has been discovered but not yet processed into Swatches
+    /// Material has been discovered but not yet processed
     Discovered,
-    /// Material has been successfully processed into Swatches
+    /// Material has been cut into swatches but not yet embedded
+    Cut,
+    /// Material has been successfully processed into embeddings
     Swatched,
-    /// Material could not be processed into Swatches
+    /// Material could not be processed
     Error,
 }
 
@@ -44,40 +46,14 @@ impl fmt::Display for MaterialStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MaterialStatus::Discovered => write!(f, "Discovered"),
+            MaterialStatus::Cut => write!(f, "Cut"),
             MaterialStatus::Swatched => write!(f, "Swatched"),
             MaterialStatus::Error => write!(f, "Error"),
         }
     }
 }
 
-/// Types of events that can be emitted
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EventType {
-    StatusChanged,
-}
-
-/// Events emitted during material processing
-#[derive(Debug, Clone)]
-pub enum MaterialEvent {
-    /// Emitted when a material's status changes
-    /// old_status is None when the material is first discovered
-    StatusChanged {
-        material: Material,
-        old_status: Option<MaterialStatus>,
-        error: Option<String>,
-    },
-}
-
-impl MaterialEvent {
-    /// Get the type of this event
-    pub fn event_type(&self) -> EventType {
-        match self {
-            MaterialEvent::StatusChanged { .. } => EventType::StatusChanged,
-        }
-    }
-}
-
-/// A Material represents a Markdown file in Quilt
+/// A Material represents a document in Quilt
 #[derive(Debug, Clone)]
 pub struct Material {
     /// Unique identifier for the material
@@ -90,7 +66,7 @@ pub struct Material {
     pub ingested_at: OffsetDateTime,
     /// Current status of the material
     pub status: MaterialStatus,
-    /// Error message if Swatch creation failed
+    /// Error message if processing failed
     pub error: Option<String>,
 }
 
@@ -134,6 +110,10 @@ mod tests {
     #[test]
     fn test_material_status_transitions() {
         let mut material = Material::new("test/path/doc.md".to_string());
+
+        // Test transition to Cut
+        material.status = MaterialStatus::Cut;
+        assert_eq!(material.status, MaterialStatus::Cut);
 
         // Test transition to Swatched
         material.status = MaterialStatus::Swatched;
