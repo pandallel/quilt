@@ -1,2 +1,2 @@
 // Discovery module tests
-mod scanner_test; 
+mod scanner_test;

@@ -344,4 +344,4 @@ mod tests {
             "Should not find files in hidden subdirectories of visible directories"
         );
     }
-} 
+}

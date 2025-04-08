@@ -88,4 +88,4 @@ mod scanner_tests {
         // Keep temp directory around until end of test
         drop(temp_dir);
     }
-} 
+}
