@@ -290,7 +290,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
             };
 
             // Register the discovered materials using the dedicated method
-            let (found_count, failed_count, registered_count, total_materials) = 
+            let (found_count, failed_count, registered_count, total_materials) =
                 discovery_actor.register_materials(scan_results).await?;
 
             // Log the registration results

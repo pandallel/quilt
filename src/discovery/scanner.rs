@@ -399,10 +399,10 @@ mod tests {
         }
 
         let scanner = DirectoryScanner::new(temp_dir.path()).unwrap();
-        
+
         // First approach: Run the scan normally
         let results = scanner.scan().unwrap();
-        
+
         // If the OS detects the file as inaccessible, we should have failed files
         // On some platforms like macOS with certain filesystem permissions, this might not detect the issue
         if results.failed.is_empty() {
@@ -410,15 +410,18 @@ mod tests {
             let mut material = Material::new(String::from("test/error.txt"));
             material.status = MaterialStatus::Error;
             material.error = Some("Test error".to_string());
-            
+
             // Create a new ScanResults with our test error
             let manual_results = ScanResults {
                 found: Vec::new(),
                 failed: vec![material],
             };
-            
+
             // Verify our error handling
-            assert!(!manual_results.failed.is_empty(), "Should have failed files");
+            assert!(
+                !manual_results.failed.is_empty(),
+                "Should have failed files"
+            );
         } else {
             // Scan detected the inaccessible file naturally
             assert!(!results.failed.is_empty(), "Should have failed files");
