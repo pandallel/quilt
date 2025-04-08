@@ -21,9 +21,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: AI Code Reviewer
-        uses: anc95/ChatGPT-CodeReview@main
+        uses: villesau/ai-codereviewer@v2.7.0
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MODEL: "gpt-4o-mini" # You can also use gpt-4 for more comprehensive reviews
+          OPENAI_API_MODEL: "gpt-4o-mini" # Optional: defaults to "gpt-4"
           exclude: "**/*.json, **/*.md, Cargo.lock" # Exclude patterns for files that don't need review
