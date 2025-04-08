@@ -1,0 +1,8 @@
+cognitive-complexity-threshold = 20
+type-complexity-threshold = 500
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 200
+avoid-breaking-exported-api = true
+disallowed-methods = []
+disallowed-types = []
+msrv = "1.64.0" 

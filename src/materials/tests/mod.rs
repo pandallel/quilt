@@ -1,2 +1,3 @@
 // Integration tests for the materials module
-mod channel_integration_test; 
+mod channel_integration_test;
+mod scanner_test;

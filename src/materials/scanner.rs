@@ -42,8 +42,8 @@ impl DirectoryScanner {
         if !base_dir.exists() {
             return Err(ScanError::PathNotFound(base_dir));
         }
-        Ok(Self { 
-            base_dir, 
+        Ok(Self {
+            base_dir,
             ignore_hidden: true,
             exclude_patterns: Vec::new(),
         })
@@ -56,19 +56,22 @@ impl DirectoryScanner {
     }
 
     /// Add patterns to exclude from scanning
-    pub fn exclude<I, S>(mut self, patterns: I) -> Self 
+    pub fn exclude<I, S>(mut self, patterns: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.exclude_patterns.extend(patterns.into_iter().map(Into::into));
+        self.exclude_patterns
+            .extend(patterns.into_iter().map(Into::into));
         self
     }
 
     /// Check if a path should be excluded based on exclude patterns
     fn should_exclude(&self, entry: &walkdir::DirEntry) -> bool {
         let path = entry.path().to_string_lossy();
-        self.exclude_patterns.iter().any(|pattern| path.contains(pattern))
+        self.exclude_patterns
+            .iter()
+            .any(|pattern| path.contains(pattern))
     }
 
     /// Scan the base directory for material files
@@ -80,7 +83,7 @@ impl DirectoryScanner {
 
         // First collect all the files we want to process
         let mut files_to_process = Vec::new();
-        
+
         let walker = WalkDir::new(&self.base_dir)
             .follow_links(true)
             .into_iter()
@@ -89,7 +92,7 @@ impl DirectoryScanner {
                 if e.depth() == 0 {
                     return true;
                 }
-                
+
                 // Check exclude patterns
                 if self.should_exclude(e) {
                     return false;
@@ -97,9 +100,7 @@ impl DirectoryScanner {
 
                 // Check for hidden files/directories if enabled
                 if self.ignore_hidden {
-                    !e.file_name()
-                        .to_str()
-                        .map_or(false, |s| s.starts_with('.'))
+                    !e.file_name().to_str().map_or(false, |s| s.starts_with('.'))
                 } else {
                     true
                 }
@@ -111,7 +112,8 @@ impl DirectoryScanner {
                 continue;
             }
 
-            let relative_path = entry.path()
+            let relative_path = entry
+                .path()
                 .strip_prefix(&self.base_dir)
                 .map(|p| p.to_string_lossy().into_owned())
                 .unwrap_or_else(|_| entry.path().to_string_lossy().into_owned());
@@ -137,17 +139,17 @@ mod tests {
 
     fn setup_test_dir() -> TempDir {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create some test files
         fs::create_dir_all(temp_dir.path().join("docs")).unwrap();
         fs::create_dir_all(temp_dir.path().join("notes")).unwrap();
         fs::create_dir_all(temp_dir.path().join("target/debug")).unwrap();
-        
+
         File::create(temp_dir.path().join("docs/test1.md")).unwrap();
         File::create(temp_dir.path().join("docs/test2.md")).unwrap();
         File::create(temp_dir.path().join("notes/note.md")).unwrap();
         File::create(temp_dir.path().join("target/debug/output.txt")).unwrap();
-        
+
         temp_dir
     }
 
@@ -155,9 +157,9 @@ mod tests {
     fn test_scan_finds_all_files() {
         let temp_dir = setup_test_dir();
         let scanner = DirectoryScanner::new(temp_dir.path()).unwrap();
-        
+
         let results = scanner.scan().unwrap();
-        
+
         assert_eq!(results.found.len(), 4, "Should find all 4 files");
         assert!(results.failed.is_empty(), "Should have no failed files");
     }
@@ -168,12 +170,21 @@ mod tests {
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .exclude(vec!["target/"]);
-        
+
         let results = scanner.scan().unwrap();
-        
-        assert_eq!(results.found.len(), 3, "Should only find non-excluded files");
-        assert!(results.found.iter().all(|m| !m.file_path.contains("target/")), 
-            "Should not include files from excluded directory");
+
+        assert_eq!(
+            results.found.len(),
+            3,
+            "Should only find non-excluded files"
+        );
+        assert!(
+            results
+                .found
+                .iter()
+                .all(|m| !m.file_path.contains("target/")),
+            "Should not include files from excluded directory"
+        );
     }
 
     #[test]
@@ -182,18 +193,27 @@ mod tests {
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .exclude(vec!["target/", "docs/"]);
-        
+
         let results = scanner.scan().unwrap();
-        
-        assert_eq!(results.found.len(), 1, "Should only find files not matching any exclude pattern");
-        assert!(results.found.iter().all(|m| !m.file_path.contains("target/") && !m.file_path.contains("docs/")), 
-            "Should not include files from any excluded directory");
+
+        assert_eq!(
+            results.found.len(),
+            1,
+            "Should only find files not matching any exclude pattern"
+        );
+        assert!(
+            results
+                .found
+                .iter()
+                .all(|m| !m.file_path.contains("target/") && !m.file_path.contains("docs/")),
+            "Should not include files from any excluded directory"
+        );
     }
 
     #[test]
     fn test_scan_nonexistent_directory() {
         let scanner = DirectoryScanner::new("nonexistent");
-        
+
         assert!(matches!(scanner, Err(ScanError::PathNotFound(_))));
     }
 
@@ -201,48 +221,62 @@ mod tests {
     fn test_hidden_files_included_when_configured() {
         let temp_dir = setup_test_dir();
         File::create(temp_dir.path().join(".hidden.txt")).unwrap();
-        
+
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .ignore_hidden(false);
 
         let results = scanner.scan().unwrap();
-        
-        assert!(results.found.iter().any(|m| m.file_path.contains(".hidden.txt")),
-            "Hidden files should be included when ignore_hidden is false");
+
+        assert!(
+            results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains(".hidden.txt")),
+            "Hidden files should be included when ignore_hidden is false"
+        );
     }
 
     #[test]
     fn test_hidden_directories_included_when_configured() {
         let temp_dir = setup_test_dir();
-        
+
         // Create various directory structures
         fs::create_dir_all(temp_dir.path().join(".hidden_dir")).unwrap();
         fs::create_dir_all(temp_dir.path().join(".hidden_dir/visible_subdir")).unwrap();
         File::create(temp_dir.path().join(".hidden_dir/visible_subdir/file1.txt")).unwrap();
-        
+
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
             .ignore_hidden(false);
 
         let results = scanner.scan().unwrap();
-        
-        assert!(results.found.iter().any(|m| m.file_path.contains("file1.txt")),
-            "Files in hidden directories should be included when ignore_hidden is false");
+
+        assert!(
+            results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains("file1.txt")),
+            "Files in hidden directories should be included when ignore_hidden is false"
+        );
     }
 
     #[test]
     fn test_relative_paths() {
         let temp_dir = setup_test_dir();
         let scanner = DirectoryScanner::new(temp_dir.path()).unwrap();
-        
+
         let results = scanner.scan().unwrap();
-        
+
         for material in results.found {
-            assert!(!material.file_path.starts_with('/'),
-                "Paths should be relative");
-            assert!(Path::new(&material.file_path).is_relative(),
-                "Paths should be relative");
+            assert!(
+                !material.file_path.starts_with('/'),
+                "Paths should be relative"
+            );
+            assert!(
+                Path::new(&material.file_path).is_relative(),
+                "Paths should be relative"
+            );
         }
     }
 
@@ -250,44 +284,64 @@ mod tests {
     fn test_hidden_files_ignored() {
         let temp_dir = setup_test_dir();
         File::create(temp_dir.path().join(".hidden.txt")).unwrap();
-        
+
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
-            .ignore_hidden(false);
+            .ignore_hidden(true);
         let results = scanner.scan().unwrap();
-        
-        assert!(!results.found.iter().any(|m| m.file_path.contains(".hidden.txt")),
-            "Hidden files should be ignored");
+
+        assert!(
+            !results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains(".hidden.txt")),
+            "Hidden files should be ignored"
+        );
     }
 
     #[test]
     fn test_hidden_directories_are_skipped() {
         let temp_dir = setup_test_dir();
-        
+
         // Create various directory structures
         fs::create_dir_all(temp_dir.path().join(".hidden_dir")).unwrap();
         fs::create_dir_all(temp_dir.path().join(".hidden_dir/visible_subdir")).unwrap();
         fs::create_dir_all(temp_dir.path().join(".hidden_dir/.hidden_subdir")).unwrap();
         fs::create_dir_all(temp_dir.path().join("visible_dir/.hidden_subdir")).unwrap();
-        
+
         // Create some test files
         File::create(temp_dir.path().join(".hidden_dir/visible_subdir/file1.txt")).unwrap();
         File::create(temp_dir.path().join(".hidden_dir/.hidden_subdir/file2.txt")).unwrap();
         File::create(temp_dir.path().join("visible_dir/.hidden_subdir/file3.txt")).unwrap();
-        
+
         let scanner = DirectoryScanner::new(temp_dir.path())
             .unwrap()
-            .ignore_hidden(false);
+            .ignore_hidden(true);
         let results = scanner.scan().unwrap();
-        
+
         // Files under a hidden directory should not be found, even in visible subdirectories
-        assert!(!results.found.iter().any(|m| m.file_path.contains("file1.txt")),
-            "Should not find files under hidden directories");
-            
+        assert!(
+            !results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains("file1.txt")),
+            "Should not find files under hidden directories"
+        );
+
         // Files in hidden subdirectories should not be found
-        assert!(!results.found.iter().any(|m| m.file_path.contains("file2.txt")),
-            "Should not find files in hidden subdirectories of hidden directories");
-        assert!(!results.found.iter().any(|m| m.file_path.contains("file3.txt")),
-            "Should not find files in hidden subdirectories of visible directories");
+        assert!(
+            !results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains("file2.txt")),
+            "Should not find files in hidden subdirectories of hidden directories"
+        );
+        assert!(
+            !results
+                .found
+                .iter()
+                .any(|m| m.file_path.contains("file3.txt")),
+            "Should not find files in hidden subdirectories of visible directories"
+        );
     }
-} 
+}

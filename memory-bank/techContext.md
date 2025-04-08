@@ -8,6 +8,8 @@
 - **Async Runtime**: Tokio
 - **Documentation**: mdBook with admonish extension
 - **Build System**: Cargo (Rust's package manager)
+- **CI/CD**: GitHub Actions for PR validation
+- **Code Quality**: rustfmt, Clippy
 - **Rust Language** (Edition 2021): Primary programming language for the project
 - **Tokio** (v1.44.2): Async runtime, providing tasks, synchronization primitives, and channels
   - Features used: macros, rt, rt-multi-thread, sync, time
@@ -23,6 +25,11 @@
 - **Notify**: File system watching
 - **Local embedding models**: Using libraries like `llama.cpp` or similar for local embeddings
 - **Vector storage**: Implementation TBD (considering HNSW, LSH, or similar algorithms)
+
+### Development Dependencies
+
+- **tempfile** (v3.10.1): Creating temporary directories for testing
+- **futures** (v0.3): Future utilities for testing async code
 
 ## Development Environment
 
@@ -41,8 +48,14 @@ cargo build
 # Run tests
 cargo test
 
-# Run with specific features
-cargo run --features=feature-name
+# Check code formatting
+cargo fmt --all -- --check
+
+# Apply code formatting
+cargo fmt
+
+# Run Clippy linter
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Documentation server
 cd docs && mdbook serve
@@ -57,19 +70,25 @@ pkill -f "mdbook serve"
 quilt/
 ├── .cursor/     # Cursor IDE configuration
 ├── .git/        # Git repository
+├── .github/     # GitHub configuration
+│   └── workflows/ # GitHub Actions workflows
 ├── docs/        # Documentation
 │   ├── book/    # Generated documentation site
 │   ├── src/     # Documentation source
+│   │   └── development/ # Development docs
 │   └── book.toml # mdBook configuration
 ├── memory-bank/ # Memory Bank for Cursor
 ├── src/         # Source code
 │   ├── materials/ # Material processing components
+│   │   └── tests/ # Integration tests
 │   ├── lib.rs   # Library entry point
 │   └── main.rs  # Application entry point
 ├── target/      # Build artifacts
 ├── test_dir/    # Test directory for development
 ├── Cargo.toml   # Project manifest
 ├── Cargo.lock   # Dependency lock file
+├── rustfmt.toml # Formatting configuration
+├── .clippy.toml # Linting configuration
 └── README.md    # Project overview
 ```
 
@@ -136,13 +155,6 @@ The project follows an incremental implementation plan with clear milestones:
 - Cross-platform compatibility (Linux, macOS, Windows)
 - Modular, pluggable architecture
 
-## Technologies & Dependencies
-
-### Development Dependencies
-
-- **tempfile** (v3.10.1): Creating temporary directories for testing
-- **futures** (v0.3): Future utilities for testing async code
-
 ## Implementation Details
 
 ### Material Repository
@@ -200,3 +212,12 @@ The message system uses Tokio's MPSC channels with a carefully chosen capacity (
 - **Unit Testing**: Comprehensive tests for each component's behavior
 - **Integration Testing**: Tests for how components work together (e.g., message flow through channels)
 - **Async Testing**: Using Tokio's test utilities for async code
+- **CI/CD Pipeline**: GitHub Actions workflow for automatic PR validation
+- **Code Quality Tools**:
+  - rustfmt with custom configuration for code style
+  - Clippy with tailored rules for static analysis
+  - Documented standards in the development guide
+- **Test Organization**:
+  - Unit tests located alongside the code they test
+  - Integration tests in dedicated test modules
+  - Test utilities to simplify test creation
