@@ -5,6 +5,8 @@
 // Next steps: Implement the actor framework and message channel system.
 
 pub mod materials;
+pub mod actors;
+pub mod discovery;
 
 // Keep only the material types and scanner exports
 pub use materials::scanner::DirectoryScanner;
