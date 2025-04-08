@@ -32,28 +32,28 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 ## E2E Development Milestones
 
-### Milestone 1: "Actor System Logs Startup"
+### ✅ Milestone 1: "Actor System Logs Startup"
 
 **Goal:** Establish the basic actor framework with proper initialization
 **Implementation Time:** 2-3 days
+**Status:** Completed
 
-1. Setup actor framework foundation (1-2 days)
+1. ✅ Setup actor framework foundation (1-2 days)
 
-   - Define basic actor trait and message types ⚠️
-     - Challenge: Design message types balancing between passing full objects vs just IDs
-     - Consider memory usage implications for large message volumes
-     - Address thread safety and ownership in async context
-   - Create actor system initialization patterns
-   - Ensure proper Actix/Tokio runtime integration ⚠️
-     - Challenge: Prevent nested runtime errors between Actix and Tokio
-     - Actix system should be initialized first, with Tokio operations within its context
-     - Alternative: Run Actix in a dedicated thread managed by Tokio
+   - ✅ Define basic actor trait and message types
+     - ✅ Created common message types (Ping, Shutdown) in actors module
+     - ✅ Implemented actor-specific message types (StartDiscovery)
+     - ✅ Ensured thread safety and proper ownership in async context
+   - ✅ Create actor system initialization patterns
+   - ✅ Ensure proper Actix/Tokio runtime integration
+     - ✅ Used Actix runtime with #[actix::main] in main.rs
+     - ✅ Added proper async actor initialization and message handling
 
-2. Add logging infrastructure (1 day)
-   - Setup structured logging with context
-   - Create actor lifecycle logging
+2. ✅ Add logging infrastructure (1 day)
+   - ✅ Setup structured logging with env_logger
+   - ✅ Created actor lifecycle logging (start/stop/message events)
 
-**Demonstration:** Running `main` shows "Actor system started" with proper configuration in logs
+**Demonstration:** Running `main` shows "Actor system started" with proper configuration in logs, and the DiscoveryActor successfully handles messages.
 
 ### Milestone 2: "Discovery Actor Uses Scanner for Single Directory"
 

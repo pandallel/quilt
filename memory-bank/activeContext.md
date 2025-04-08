@@ -2,17 +2,34 @@
 
 ## Current Focus
 
-The project is currently in the initial implementation phase, focusing on the **Core Material Processing Pipeline** (Milestone 1). We've established the Material Repository and completed the message channel system. The next focus is implementing the worker components.
+The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner for Single Directory". We've successfully completed Milestone 1 with the actor system implementation and are now focusing on integrating the existing DirectoryScanner with the DiscoveryActor.
 
 ## Recent Changes
 
-1. **Architecture Documentation**:
+1. **Actor System Implementation**:
 
-   - Defined the simplified actor model with direct messaging between workers
-   - Established the role of the Material Repository as a separate thread-safe data store
-   - Documented the flow of messages and state transitions
+   - Integrated Actix as the actor framework for Quilt
+   - Created the base actor module with common message types (Ping, Shutdown)
+   - Implemented DiscoveryActor with proper lifecycle management
+   - Added structured logging with env_logger
+   - Set up proper Actix/Tokio runtime integration using #[actix::main]
+   - Created a modular actor organization with dedicated namespaces (src/actors, src/discovery)
+   - Successfully tested the actor system with basic message passing
 
-2. **Material Repository Implementation**:
+2. **Dependency Management**:
+
+   - Added Actix 0.13.1 to dependencies
+   - Set up logging infrastructure with log 0.4.20 and env_logger 0.11.8
+   - Updated thiserror to version 2.0.12
+   - Ensured compatibility between all dependencies
+
+3. **Architecture Documentation**:
+
+   - Updated implementation plan to mark Milestone 1 as completed
+   - Documented the actor system architecture
+   - Updated progress tracking in memory-bank
+
+4. **Material Repository Implementation**:
 
    - Completed the thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
    - Implemented material state tracking with validation (Discovered → Cut → Swatched, with Error transitions)
@@ -21,7 +38,7 @@ The project is currently in the initial implementation phase, focusing on the **
    - Integrated with Tokio's async runtime for better compatibility with the actor model
    - Added Default implementation for MaterialRepository to meet Clippy standards
 
-3. **Message Channel System Implementation**:
+5. **Message Channel System Implementation**:
 
    - Defined the `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
    - Implemented channel system with fixed capacity (100 messages) to provide natural backpressure
@@ -29,19 +46,6 @@ The project is currently in the initial implementation phase, focusing on the **
    - Added comprehensive test suite including integration tests for pipeline message flow
    - Added detailed documentation for the channel system architecture and usage patterns
    - Optimized message size by using only material IDs for Cut and Swatched messages
-
-4. **Material Data Structure**:
-
-   - Reviewed existing Material struct implementation and found it sufficient for current needs
-   - Deferred Swatch data structure implementation to a later milestone
-   - Updated implementation plan to reflect these decisions
-
-5. **Documentation System**:
-
-   - Set up mdBook for project documentation
-   - Added admonish extension for enhanced documentation features
-   - Created initial documentation structure and content
-   - Updated implementation plan to track progress
 
 6. **CI/CD and Quality Control**:
    - Implemented GitHub Actions workflow for PR validation
@@ -55,20 +59,23 @@ The project is currently in the initial implementation phase, focusing on the **
 
 ### Key Architectural Decisions
 
-- **Using direct actor-to-actor communication** via Tokio channels instead of a centralized dispatcher
+- **Using Actix for the actor system** to leverage its mature actor model implementation
+- **Organizing actors in dedicated modules** for better code organization and maintainability
+- **Using Tokio for async runtime** underlying the actor system
+- **Structured logging with env_logger** for better debugging and monitoring
+- **Using direct actor-to-actor communication** via message passing
 - **Treating the Repository as a standalone component** rather than an actor itself
 - **Planning for worker pools** in stages that require horizontal scaling (particularly Labeling)
 - **Using Tokio's async primitives** for thread-safe repository access and actor communication
-- **Deferring Swatch implementation** until we have more concrete requirements from the Cutting Worker
 - **Fixed channel capacity (100)** to balance memory usage and provide natural backpressure
 - **Minimizing message size** by passing only material IDs between stages when appropriate
 
 ### Open Questions
 
-1. **Worker Implementation**:
+1. **Discovery Actor Integration**:
 
-   - How to efficiently implement worker loops with proper error handling?
-   - What's the best approach for graceful shutdown propagation?
+   - How to efficiently integrate the DirectoryScanner with the DiscoveryActor?
+   - What's the best way to handle configuration for directory scanning?
 
 2. **Persistence Strategy**:
 
@@ -88,35 +95,32 @@ The project is currently in the initial implementation phase, focusing on the **
 
 ### Short-term Tasks (Current Sprint)
 
-1. Implement the minimal actor framework:
+1. Integrate DirectoryScanner with DiscoveryActor:
 
-   - Create the Discovery Worker with message handling loop
-   - Implement the Cutting Worker with basic processing
-   - Create the Labeling Worker skeleton
-   - Add graceful shutdown propagation
+   - Wrap DirectoryScanner in the actor interface
+   - Add configuration for target directory
+   - Implement material creation from scanned files
 
-2. Create the Discovery Worker:
+2. Add material processing logic:
 
-   - Implement basic file system watching
-   - Add material detection and registration
-   - Connect to the Material Repository
+   - Log discovered materials with metadata
+   - Implement material state tracking
 
-3. Begin work on the Cutting Worker:
+3. Connect to message channel system:
 
-   - Implement basic document fragmentation
-   - Define swatch content extraction
-   - Create state transitions from Discovered to Cut
+   - Utilize existing MaterialMessage enum types
+   - Configure Tokio mpsc channels
+   - Implement channel registration and connection
 
 4. Expand test coverage:
-   - Add more integration tests for worker components
-   - Implement property-based testing for critical components
+   - Add integration tests for DiscoveryActor with DirectoryScanner
+   - Test error handling scenarios
    - Ensure CI pipeline catches regressions
-   - Standardize test patterns across the codebase
 
 ### Medium-term Goals (Next Sprint)
 
-1. Complete the three worker implementations
-2. Add basic file monitoring for real document processing
-3. Implement intelligent document splitting strategies
+1. Implement the Cutting Actor to process discovered materials
+2. Create the Labeling Actor skeleton
+3. Add material processing pipeline with message passing
 4. Begin work on the vector storage component
 5. Revisit Swatch implementation with more concrete requirements

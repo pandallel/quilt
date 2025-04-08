@@ -53,7 +53,16 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
    - ✅ Documented the architecture and usage patterns
    - ✅ Optimized message passing by using IDs instead of full objects when appropriate
 
-7. **Testing and Quality Infrastructure**:
+7. **Actor System**:
+
+   - ✅ Added Actix integration for actor framework
+   - ✅ Created base actor module with common message types
+   - ✅ Implemented DiscoveryActor with proper lifecycle management
+   - ✅ Added structured logging with env_logger
+   - ✅ Set up proper Actix/Tokio runtime integration
+   - ✅ Created modular actor organization with dedicated namespaces
+
+8. **Testing and Quality Infrastructure**:
    - ✅ GitHub Actions workflow for PR validation
    - ✅ rustfmt configuration for consistent code style
    - ✅ Clippy configuration with custom rules
@@ -64,16 +73,16 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 ## What's In Progress
 
-1. **Worker Implementation**:
-   - Starting with the Discovery Worker
-   - Planning the Cutting Worker logic
-   - Designing the worker message handling loops
+1. **Discovery Actor Enhancement**:
+   - Integration with DirectoryScanner
+   - Implementing material creation from scanned files
+   - Adding directory monitoring capabilities
 
 ## What's Left to Build
 
 1. **Core Pipeline** (Milestone 1):
 
-   - Implement the three worker types (Discovery, Cutting, Labeling)
+   - Implement the remaining worker types (Cutting, Labeling)
    - Create message handling loops
    - Add graceful shutdown mechanism
 
@@ -117,4 +126,4 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 ## Next Major Milestone
 
-**Milestone 2: Basic File Monitoring and Processing** is targeted after completion of the core pipeline, estimated to begin in 3-4 weeks.
+**Milestone 2: Discovery Actor Uses Scanner for Single Directory** is our next focus, which will integrate the existing DirectoryScanner with the DiscoveryActor.

@@ -5,21 +5,26 @@
 ### Core Technologies
 
 - **Language**: Rust (stable channel)
+- **Actor Framework**: Actix
 - **Async Runtime**: Tokio
 - **Documentation**: mdBook with admonish extension
 - **Build System**: Cargo (Rust's package manager)
 - **CI/CD**: GitHub Actions for PR validation
 - **Code Quality**: rustfmt, Clippy
 - **Rust Language** (Edition 2021): Primary programming language for the project
+- **Actix** (v0.13.1): Actor framework for implementing message-based concurrency
 - **Tokio** (v1.44.2): Async runtime, providing tasks, synchronization primitives, and channels
   - Features used: macros, rt, rt-multi-thread, sync, time
-- **thiserror** (v1.0.57): Error handling with derive macros for custom error types
+- **thiserror** (v2.0.12): Error handling with derive macros for custom error types
 - **time** (v0.3): Date and time utilities with serde support
 - **walkdir** (v2.4.0): Filesystem traversal for material discovery
 - **cuid2** (v0.1.2): Collision-resistant IDs for materials and swatches
+- **log** (v0.4.20): Logging facade for Rust
+- **env_logger** (v0.11.8): Environment-based logging configuration
 
 ### Key Dependencies
 
+- **Actix**: Actor framework for message-based concurrency
 - **Tokio**: Async runtime and concurrency primitives
 - **Serde**: Serialization and deserialization
 - **Notify**: File system watching
@@ -79,6 +84,8 @@ quilt/
 │   └── book.toml # mdBook configuration
 ├── memory-bank/ # Memory Bank for Cursor
 ├── src/         # Source code
+│   ├── actors/  # Actor system components and common messages
+│   ├── discovery/ # Discovery actor module
 │   ├── materials/ # Material processing components
 │   │   └── tests/ # Integration tests
 │   ├── lib.rs   # Library entry point
@@ -98,46 +105,41 @@ quilt/
 
 The project follows an incremental implementation plan with clear milestones:
 
-1. **Core Material Processing Pipeline** (2-3 weeks)
+1. **Core Actor System** (1-2 weeks) ✅
 
-   - Material Repository setup
-   - Basic data structures
-   - Message channel system
-   - Minimal actor framework
+   - Set up Actix actor framework
+   - Implement basic message types
+   - Create discovery actor
+   - Add structured logging
 
-2. **Basic File Monitoring and Processing** (3-4 weeks)
+2. **Discovery Actor Enhancement** (2-3 weeks)
 
-   - Discovery Worker enhancement
-   - Cutting Worker implementation
-   - Basic storage
-   - Error handling and logging
+   - Integrate DirectoryScanner with DiscoveryActor
+   - Implement material creation from scanned files
+   - Connect to message channel system
 
-3. **Embedding and Semantic Search** (4-5 weeks)
+3. **Cutting Actor Implementation** (2-3 weeks)
 
-   - Embedding model integration
-   - Vector store implementation
-   - Query interface
-   - Spread generation
+   - Implement Cutting Actor
+   - Add document content extraction
+   - Create text fragmentation strategies
 
-4. **Concurrency and Scaling** (3-4 weeks)
+4. **Labeling Actor Implementation** (2-3 weeks)
 
-   - Worker pools
-   - Repository optimization
-   - Backpressure mechanisms
-   - Resource management
+   - Implement Labeling Actor
+   - Add metadata extraction
+   - Integrate with embedding models
 
-5. **User Experience and Integration** (4-6 weeks)
+5. **Query Interface** (2-3 weeks)
 
-   - CLI interface
-   - Simple web UI
-   - Integration APIs
-   - User configuration
+   - Implement basic search functionality
+   - Create query processing logic
+   - Add results formatting
 
-6. **Production Readiness** (3-5 weeks)
-   - Comprehensive testing
-   - Security features
-   - Stability and reliability
-   - Documentation and examples
+6. **Persistence** (2-3 weeks)
+   - Add persistence for repositories
+   - Implement startup/shutdown persistence
+   - Create consistency checks and error recovery
 
 ## Technical Constraints
 
@@ -156,6 +158,44 @@ The project follows an incremental implementation plan with clear milestones:
 - Modular, pluggable architecture
 
 ## Implementation Details
+
+### Actor System
+
+The actor system is implemented using the Actix framework:
+
+- **Actor Trait**: Base trait for all actors in the system
+- **Message Types**: Type-safe messages with defined response types
+- **Actor Lifecycle**: Proper handling of actor startup and shutdown
+- **Actor Organization**: Modular structure with actors in dedicated modules
+
+Example of an actor implementation:
+
+```rust
+pub struct DiscoveryActor {
+    name: String,
+}
+
+impl Actor for DiscoveryActor {
+    type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        info!("DiscoveryActor '{}' started", self.name);
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        info!("DiscoveryActor '{}' stopped", self.name);
+    }
+}
+
+impl Handler<Ping> for DiscoveryActor {
+    type Result = bool;
+
+    fn handle(&mut self, _msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("DiscoveryActor '{}' received ping", self.name);
+        true
+    }
+}
+```
 
 ### Material Repository
 
@@ -200,6 +240,14 @@ The message system uses Tokio's MPSC channels with a carefully chosen capacity (
       ChannelClosed,
   }
   ```
+
+### Logging System
+
+The logging system is implemented using the log crate with env_logger:
+
+- **Log Levels**: Different log levels for different types of information (debug, info, warn, error)
+- **Environment Configuration**: Configurable via environment variables (RUST_LOG)
+- **Structured Logging**: Includes timestamp, log level, and module path
 
 ### Type System
 
