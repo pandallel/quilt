@@ -30,7 +30,7 @@ impl MaterialFileType {
 }
 
 /// The possible states of a material during processing
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MaterialStatus {
     /// Material has been discovered but not yet processed
     Discovered,
