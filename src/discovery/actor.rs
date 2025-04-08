@@ -6,6 +6,10 @@ use log::{debug, error, info};
 use std::path::Path;
 
 /// Configuration for directory scanning
+///
+/// This configuration is passed to the DiscoveryActor to control how it scans directories
+/// for materials. It includes the directory path, whether to ignore hidden files, and
+/// patterns to exclude from scanning.
 #[derive(Debug, Clone)]
 pub struct DiscoveryConfig {
     /// Directory to scan
@@ -17,12 +21,18 @@ pub struct DiscoveryConfig {
 }
 
 /// Messages specific to the DiscoveryActor
+///
+/// This module contains all message types that can be sent to the DiscoveryActor
+/// to request operations and their respective response types.
 pub mod messages {
     use super::DiscoveryConfig;
     use actix::prelude::*;
     use thiserror::Error;
 
     /// Discovery operation errors
+    ///
+    /// These errors can occur during discovery operations and provide
+    /// detailed information about what went wrong.
     #[derive(Debug, Error)]
     pub enum DiscoveryError {
         /// Directory not found error
@@ -47,6 +57,9 @@ pub mod messages {
     }
 
     /// Command to start discovery using the provided configuration
+    ///
+    /// Send this message to a DiscoveryActor to begin the discovery process
+    /// in the specified directory with the given configuration options.
     #[derive(Message)]
     #[rtype(result = "Result<DiscoverySuccess, DiscoveryError>")]
     pub struct StartDiscovery {
@@ -54,7 +67,10 @@ pub mod messages {
         pub config: DiscoveryConfig,
     }
 
-    /// Simple success response for discovery operation
+    /// Success response for discovery operation
+    ///
+    /// This is returned when a discovery operation completes, whether
+    /// materials were found or not.
     #[derive(Debug)]
     pub struct DiscoverySuccess {
         /// Was the discovery operation successful
@@ -62,22 +78,45 @@ pub mod messages {
     }
 
     /// Response for operation completion status
+    ///
+    /// This message can be sent to interested parties to notify them
+    /// of the completion of an operation.
     #[derive(Message)]
     #[rtype(result = "()")]
     pub struct OperationComplete {
+        /// Whether the operation was successful
         pub success: bool,
+        /// Additional information about the operation
         pub message: String,
     }
 }
 
 /// Actor responsible for discovering materials in directories
+///
+/// The DiscoveryActor is responsible for scanning directories for materials,
+/// registering them with the MaterialRepository, and reporting the results.
+/// It handles validation of directory paths, scanning for files, and registering
+/// the discovered materials with the repository.
+///
+/// # Message Handlers
+///
+/// * `Ping` - Responds with `true` to indicate the actor is alive
+/// * `Shutdown` - Gracefully shuts down the actor
+/// * `StartDiscovery` - Begins the discovery process with the given configuration
 pub struct DiscoveryActor {
+    /// Name of this actor instance for logging
     name: String,
+    /// Repository to register discovered materials with
     repository: MaterialRepository,
 }
 
 impl DiscoveryActor {
-    /// Create a new DiscoveryActor with the given name
+    /// Create a new DiscoveryActor with the given name and repository
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name for this actor instance, used in logging
+    /// * `repository` - Repository to register discovered materials with
     pub fn new(name: &str, repository: MaterialRepository) -> Self {
         Self {
             name: name.to_string(),
@@ -86,6 +125,15 @@ impl DiscoveryActor {
     }
 
     /// Validate a directory path exists and is accessible
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The directory path to validate
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if the directory exists and is accessible
+    /// * `Err(DiscoveryError)` with a specific error if validation fails
     fn validate_directory(&self, path: &str) -> Result<(), messages::DiscoveryError> {
         let path = Path::new(path);
 
@@ -114,6 +162,15 @@ impl DiscoveryActor {
     }
 
     /// Register materials with the repository
+    ///
+    /// # Arguments
+    ///
+    /// * `scan_results` - Results from a directory scan
+    ///
+    /// # Returns
+    ///
+    /// * `Ok((found_count, failed_count, registered_count, total_materials))` if registration was successful
+    /// * `Err(DiscoveryError)` if registration failed
     async fn register_materials(
         &self,
         scan_results: ScanResults,
@@ -197,10 +254,10 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
         );
 
         // Capture actor fields for use in async block
-        let name = self.name.clone();
         let repository = self.repository.clone();
         let validate_fn = self.validate_directory(&msg.config.directory);
         let scan_config = msg.config;
+        let actor_name = self.name.clone();
 
         // Create async block for scanning and processing
         Box::pin(async move {
@@ -226,9 +283,14 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
                 scan_results.failed.len()
             );
 
-            // Register the discovered materials
-            let discovery_actor = DiscoveryActor { name, repository };
-            let (found_count, failed_count, registered_count, total_materials) =
+            // Create DiscoveryActor with the same repository to use its methods
+            let discovery_actor = DiscoveryActor {
+                name: actor_name,
+                repository,
+            };
+
+            // Register the discovered materials using the dedicated method
+            let (found_count, failed_count, registered_count, total_materials) = 
                 discovery_actor.register_materials(scan_results).await?;
 
             // Log the registration results

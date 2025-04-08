@@ -4,7 +4,7 @@
 
 use clap::Parser;
 use env_logger::Env;
-use log::info;
+use log::{error, info};
 use std::time::Duration;
 
 use orchestrator::{OrchestratorConfig, QuiltOrchestrator};
@@ -54,7 +54,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Run the orchestrator
-    QuiltOrchestrator::new().run(config).await?;
+    match QuiltOrchestrator::new().run(config).await {
+        Ok(_) => {
+            info!("Quilt application completed successfully");
+        }
+        Err(err) => {
+            error!("Quilt application error: {}", err);
+            return Err(Box::new(err) as Box<dyn std::error::Error>);
+        }
+    }
 
     info!("Quilt application shutdown complete");
 
