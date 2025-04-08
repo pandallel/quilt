@@ -24,11 +24,17 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ⏩ Swatch implementation deferred to a later milestone
 
 3. ✅ **Message Channel System**
+
    - ✅ Defined MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
    - ✅ Set up Tokio mpsc channels with appropriate capacity (100)
    - ✅ Implemented channel creation and utilities for connect stages
    - ✅ Added helper traits for sending/receiving with timeout capabilities
    - ✅ Created comprehensive tests for message passing and backpressure
+
+4. ✅ **Configuration and Logging Improvements**
+   - ✅ Renamed `ScanConfig` to `DiscoveryConfig` for better naming consistency
+   - ✅ Enhanced discovery logging to show total repository material count
+   - ✅ Updated actor framework to use current actix runtime
 
 ## E2E Development Milestones
 
@@ -55,22 +61,24 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Actor system started" with proper configuration in logs, and the DiscoveryActor successfully handles messages.
 
-### Milestone 2: "Discovery Actor Uses Scanner for Single Directory"
+### ✅ Milestone 2: "Discovery Actor Uses Scanner for Single Directory"
 
 **Goal:** Connect existing DirectoryScanner to the actor framework
 **Implementation Time:** 2-3 days
+**Status:** Completed
 
-1. Create DiscoveryActor using existing scanner (1-2 days)
+1. ✅ Create DiscoveryActor using existing scanner (1-2 days)
 
-   - Wrap DirectoryScanner in actor interface
-   - Add configuration for target directory
-   - Implement material creation from scanned files
+   - ✅ Wrap DirectoryScanner in actor interface
+   - ✅ Add configuration for target directory
+   - ✅ Implement material creation from scanned files
 
-2. Add basic material processing logic (1 day)
-   - Log discovered materials with metadata
-   - Implement material state tracking
+2. ✅ Add basic material processing logic (1 day)
+   - ✅ Log discovered materials with metadata
+   - ✅ Implement material state tracking
+   - ✅ Enhanced logging with repository statistics
 
-**Demonstration:** Running `main` shows list of materials found in the configured directory
+**Demonstration:** Running `main` shows list of materials found in the configured directory with repository statistics
 
 ### Milestone 3: "Discovery Actor Sends Material Messages"
 

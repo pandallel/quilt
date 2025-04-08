@@ -4,20 +4,47 @@
 // coordinating their startup, inter-communication, and shutdown.
 
 use actix::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::time::Duration;
+use thiserror::Error;
 use tokio::sync::oneshot;
+use tokio::time::timeout;
 
 use quilt::actors::{ActorError, Ping, Shutdown};
-use quilt::discovery::actor::messages::StartDiscovery;
+use quilt::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
+use quilt::discovery::actor::DiscoveryConfig;
 use quilt::discovery::DiscoveryActor;
+use quilt::materials::MaterialRepository;
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
     /// Directory to start discovery in
     pub discovery_dir: String,
+    /// Whether to ignore hidden files and directories
+    pub ignore_hidden: bool,
+    /// Patterns to exclude from scanning
+    pub exclude_patterns: Vec<String>,
     /// Timeout for actor operations
     pub actor_timeout: Duration,
+}
+
+/// Errors specific to orchestration
+#[derive(Error, Debug)]
+pub enum OrchestratorError {
+    #[error("Actor operation timed out after {0:?}")]
+    Timeout(Duration),
+
+    #[error("Actor error: {0}")]
+    ActorError(#[from] ActorError),
+
+    #[error("{0}")]
+    Other(Box<dyn std::error::Error>),
+}
+
+impl From<Box<dyn std::error::Error>> for OrchestratorError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        Self::Other(err)
+    }
 }
 
 /// Main orchestrator for the Quilt system
@@ -25,6 +52,7 @@ pub struct OrchestratorConfig {
 /// Manages actor lifecycle and coordinates the material processing pipeline
 pub struct QuiltOrchestrator {
     discovery: Option<Addr<DiscoveryActor>>,
+    repository: MaterialRepository,
     // Future actors:
     // cutting: Option<Addr<CuttingActor>>,
     // swatching: Option<Addr<SwatchingActor>>,
@@ -33,21 +61,35 @@ pub struct QuiltOrchestrator {
 impl QuiltOrchestrator {
     /// Create a new orchestrator
     pub fn new() -> Self {
-        Self { discovery: None }
+        Self {
+            discovery: None,
+            repository: MaterialRepository::new(),
+        }
     }
 
     /// Run the orchestrator with the given configuration
-    pub async fn run(
-        mut self,
-        config: OrchestratorConfig,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(mut self, config: OrchestratorConfig) -> Result<(), OrchestratorError> {
         info!("Actor system starting...");
 
         // Initialize actors
         self.initialize_actors()?;
 
-        // Start discovery process
-        self.start_discovery(&config.discovery_dir).await?;
+        // Start discovery process with timeout
+        let success = self
+            .start_discovery_with_timeout(
+                &config.discovery_dir,
+                config.ignore_hidden,
+                config.exclude_patterns.clone(),
+                config.actor_timeout,
+            )
+            .await?;
+
+        // Check success
+        if success.success {
+            info!("Discovery process completed successfully");
+        } else {
+            error!("Discovery process failed");
+        }
 
         // Run application logic
         let (tx, rx) = oneshot::channel::<()>();
@@ -59,68 +101,98 @@ impl QuiltOrchestrator {
                 info!("Work completed, initiating shutdown");
             }
             _ = tokio::time::sleep(config.actor_timeout) => {
-                error!("Operation timed out after {:?}, forcing shutdown", config.actor_timeout);
+                warn!("Operation timed out after {:?}, forcing shutdown", config.actor_timeout);
             }
         }
 
         // Shutdown actors
-        self.shutdown_actors().await;
+        self.shutdown_actors_with_timeout(config.actor_timeout)
+            .await;
 
         Ok(())
     }
 
     /// Initialize all actors in the system
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Create the discovery actor
-        self.discovery = Some(DiscoveryActor::new("main-discovery").start());
+        // Create the discovery actor with repository
+        self.discovery =
+            Some(DiscoveryActor::new("main-discovery", self.repository.clone()).start());
 
         // Future: Initialize other actors
-        // self.cutting = Some(CuttingActor::new().start());
-        // self.swatching = Some(SwatchingActor::new().start());
+        // self.cutting = Some(CuttingActor::new(self.repository.clone()).start());
+        // self.swatching = Some(SwatchingActor::new(self.repository.clone()).start());
 
         Ok(())
     }
 
-    /// Start the discovery process
-    async fn start_discovery(&self, directory: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let discovery = self.discovery.as_ref().ok_or_else(|| {
-            Box::<dyn std::error::Error>::from(ActorError::NotAvailable(
-                "Discovery actor not initialized".into(),
-            ))
-        })?;
+    /// Start the discovery process with a timeout
+    async fn start_discovery_with_timeout(
+        &self,
+        directory: &str,
+        ignore_hidden: bool,
+        exclude_patterns: Vec<String>,
+        timeout_duration: Duration,
+    ) -> Result<DiscoverySuccess, OrchestratorError> {
+        let discovery = self
+            .discovery
+            .as_ref()
+            .ok_or_else(|| ActorError::NotAvailable("Discovery actor not initialized".into()))?;
 
-        // Check if actor is ready
-        match discovery.send(Ping).await {
-            Ok(true) => {
-                debug!("Discovery actor is ready");
+        // Check if actor is ready with timeout
+        match timeout(timeout_duration, discovery.send(Ping)).await {
+            Ok(ping_result) => {
+                match ping_result {
+                    Ok(true) => {
+                        debug!("Discovery actor is ready");
 
-                // Start discovery
-                discovery
-                    .send(StartDiscovery {
-                        directory: directory.to_string(),
-                    })
-                    .await
-                    .map_err(|e| {
-                        Box::<dyn std::error::Error>::from(ActorError::MessageSendFailure(format!(
-                            "Failed to send StartDiscovery: {}",
+                        // Create scan configuration
+                        let scan_config = DiscoveryConfig {
+                            directory: directory.to_string(),
+                            ignore_hidden,
+                            exclude_patterns,
+                        };
+
+                        // Start discovery with timeout
+                        match timeout(
+                            timeout_duration,
+                            discovery.send(StartDiscovery {
+                                config: scan_config,
+                            }),
+                        )
+                        .await
+                        {
+                            Ok(send_result) => {
+                                let success = send_result
+                                    .map_err(|e| {
+                                        ActorError::MessageSendFailure(format!(
+                                            "Failed to send StartDiscovery: {}",
+                                            e
+                                        ))
+                                    })?
+                                    .map_err(|e| {
+                                        ActorError::OperationFailure(format!(
+                                            "Discovery operation failed: {}",
+                                            e
+                                        ))
+                                    })?;
+
+                                Ok(success)
+                            }
+                            Err(_) => Err(OrchestratorError::Timeout(timeout_duration)),
+                        }
+                    }
+                    Ok(false) => Err(OrchestratorError::ActorError(ActorError::NotAvailable(
+                        "Discovery actor is not ready".into(),
+                    ))),
+                    Err(e) => Err(OrchestratorError::ActorError(
+                        ActorError::MessageSendFailure(format!(
+                            "Failed to ping discovery actor: {}",
                             e
-                        )))
-                    })?
-                    .map_err(|e| {
-                        Box::<dyn std::error::Error>::from(ActorError::OperationFailure(format!(
-                            "Discovery operation failed: {}",
-                            e
-                        )))
-                    })?;
-
-                Ok(())
+                        )),
+                    )),
+                }
             }
-            Ok(false) => Err(Box::<dyn std::error::Error>::from(
-                ActorError::NotAvailable("Discovery actor is not ready".into()),
-            )),
-            Err(e) => Err(Box::<dyn std::error::Error>::from(
-                ActorError::MessageSendFailure(format!("Failed to ping discovery actor: {}", e)),
-            )),
+            Err(_) => Err(OrchestratorError::Timeout(timeout_duration)),
         }
     }
 
@@ -136,23 +208,28 @@ impl QuiltOrchestrator {
         });
     }
 
-    /// Shutdown all actors in the system
-    async fn shutdown_actors(&self) {
+    /// Shutdown all actors in the system with timeout
+    async fn shutdown_actors_with_timeout(&self, timeout_duration: Duration) {
         if let Some(discovery) = &self.discovery {
-            // Shutdown the discovery actor
-            match discovery.send(Shutdown).await {
-                Ok(_) => {
-                    info!("Shutdown message sent to discovery actor");
-                }
-                Err(e) => {
-                    error!("Failed to send shutdown message: {}", e);
+            // Shutdown the discovery actor with timeout
+            match timeout(timeout_duration, discovery.send(Shutdown)).await {
+                Ok(result) => match result {
+                    Ok(_) => {
+                        info!("Shutdown message sent to discovery actor");
+                    }
+                    Err(e) => {
+                        error!("Failed to send shutdown message: {}", e);
+                    }
+                },
+                Err(_) => {
+                    warn!("Timeout while shutting down discovery actor");
                 }
             }
         }
 
         // Future: Shutdown other actors
         // if let Some(cutting) = &self.cutting {
-        //     cutting.send(Shutdown).await.ok();
+        //     timeout(timeout_duration, cutting.send(Shutdown)).await.ok();
         // }
 
         // Wait for actor system to shut down

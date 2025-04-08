@@ -3,7 +3,6 @@ pub mod types;
 pub mod channels;
 pub mod messages;
 pub mod repository;
-pub mod scanner;
 
 #[cfg(test)]
 mod tests;
@@ -16,4 +15,3 @@ pub use channels::{
 };
 pub use messages::MaterialMessage;
 pub use repository::{MaterialRepository, RepositoryError};
-pub use scanner::{DirectoryScanner, ScanError, ScanResult, ScanResults};

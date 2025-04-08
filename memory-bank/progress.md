@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **early implementation stage** (Milestone 1: Core Material Processing Pipeline). We're establishing the foundational architecture and implementing the core components.
+The project is in the **early implementation stage** (Milestone 2: Discovery Actor Uses Scanner). We've established the foundational architecture, implemented the core components, and successfully integrated the DirectoryScanner with the DiscoveryActor.
 
 ## What Works
 
@@ -63,8 +63,18 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
    - ✅ Created modular actor organization with dedicated namespaces
    - ✅ Implemented QuiltOrchestrator for centralized actor management
    - ✅ Refactored main.rs to use QuiltOrchestrator with proper separation of concerns
+   - ✅ Fixed actix runtime usage with #[actix::main] instead of actix_rt
 
-8. **Testing and Quality Infrastructure**:
+8. **Discovery System**:
+
+   - ✅ Created DiscoveryConfig for scanner configuration
+   - ✅ Integrated DirectoryScanner with DiscoveryActor
+   - ✅ Implemented command-line argument parsing for discovery configuration
+   - ✅ Added material registration from discovered files
+   - ✅ Enhanced logging with repository statistics
+   - ✅ Added test coverage for discovery functionality
+
+9. **Testing and Quality Infrastructure**:
    - ✅ GitHub Actions workflow for PR validation
    - ✅ rustfmt configuration for consistent code style
    - ✅ Clippy configuration with custom rules
@@ -75,33 +85,33 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 ## What's In Progress
 
-1. **QuiltOrchestrator Enhancement**:
+1. **CuttingActor Implementation**:
 
-   - Adding support for additional actors (Cutting, Labeling)
-   - Implementing proper message channels between stages
-   - Adding configuration options for actor behavior control
+   - Initial implementation of the CuttingActor
+   - Adding document content extraction
+   - Creating basic document splitting strategies
 
-2. **Discovery Actor Enhancement**:
-   - Integration with DirectoryScanner
-   - Implementing material creation from scanned files
-   - Adding directory monitoring capabilities
+2. **Message Channel Integration**:
+   - Connecting DiscoveryActor to CuttingActor via channels
+   - Implementing message transformation
+   - Adding proper error handling with backpressure
 
 ## What's Left to Build
 
-1. **Core Pipeline** (Milestone 1):
+1. **Core Pipeline** (Milestone 3-4):
 
    - Implement the remaining worker types (Cutting, Labeling)
    - Create message handling loops
    - Add graceful shutdown mechanism
 
-2. **File Monitoring** (Milestone 2):
+2. **File Monitoring** (Milestone 5):
 
    - Implement file system watching
    - Add document content extraction
    - Create intelligent document splitting
    - Build basic persistence
 
-3. **Embedding and Search** (Milestone 3):
+3. **Embedding and Search** (Milestone 6-7):
 
    - Integrate local embedding models
    - Implement vector storage
@@ -134,4 +144,4 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 ## Next Major Milestone
 
-**Milestone 2: Discovery Actor Uses Scanner for Single Directory** is our next focus, which will integrate the existing DirectoryScanner with the DiscoveryActor.
+**Milestone 3: "Discovery Actor Sends Material Messages"** is our next focus, which will establish message passing between actors in the pipeline.
