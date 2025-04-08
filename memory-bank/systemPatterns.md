@@ -31,6 +31,14 @@ graph TB
 - **Direct Messaging**: Workers communicate directly via channels, without a central dispatcher
 - **Shared State**: Thread-safe repository provides consistent state management
 
+### Message Channel System
+
+- **Typed Messages**: `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
+- **Bounded Channels**: Fixed capacity (100 messages) to provide natural backpressure
+- **Extension Traits**: Helper methods for ergonomic message handling and error management
+- **Message Size Optimization**: Using only material IDs for Cut and Swatched messages to minimize payload size
+- **Error Handling**: Structured error types for different failure modes (SendError, ReceiveTimeout, ChannelClosed)
+
 ### Material Processing Pipeline
 
 1. **Discovery Stage**: Scans for new/updated materials, registers them in repository, sends discovery messages
@@ -91,12 +99,46 @@ classDiagram
     Spread --> "*" Material
 ```
 
+## Message Flow Patterns
+
+```mermaid
+sequenceDiagram
+    participant DiscoveryWorker
+    participant CuttingWorker
+    participant LabelingWorker
+    participant Repository
+
+    DiscoveryWorker->>Repository: Register material (status: Discovered)
+    DiscoveryWorker->>CuttingWorker: Send Discovered(Material)
+    CuttingWorker->>Repository: Get material if needed
+    CuttingWorker->>Repository: Update status to Cut
+    CuttingWorker->>LabelingWorker: Send Cut(material_id)
+    LabelingWorker->>Repository: Get material
+    LabelingWorker->>Repository: Update status to Swatched
+
+    alt Error occurs
+        CuttingWorker->>Repository: Update status to Error
+        CuttingWorker->>LabelingWorker: Send Error(material_id, error_message)
+    end
+
+    alt Shutdown requested
+        DiscoveryWorker->>CuttingWorker: Send Shutdown
+        CuttingWorker->>LabelingWorker: Send Shutdown
+    end
+```
+
 ## Technical Decisions
 
 ### Async Runtime: Tokio
 
 - **Rationale**: Provides robust async primitives, channels, and task management
 - **Benefits**: Well-established in the Rust ecosystem, excellent documentation and support
+
+### Messaging: Tokio MPSC Channels
+
+- **Channel Capacity**: Fixed at 100 messages to balance throughput and memory usage
+- **Backpressure**: Natural backpressure when channels fill up
+- **Error Handling**: Structured error types with extension traits for ergonomic handling
 
 ### State Management: In-memory with Persistence
 

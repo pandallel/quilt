@@ -20,11 +20,13 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ✅ Material struct with metadata already implemented
    - ⏩ Swatch implementation deferred to a later milestone
 
-3. Create the Message Channel System (2-3 days)
+3. ✅ Create the Message Channel System (2-3 days)
 
-   - Define MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
-   - Set up Tokio mpsc channels with appropriate capacity (100)
-   - Implement channel creation and connection between stages
+   - ✅ Defined MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
+   - ✅ Set up Tokio mpsc channels with appropriate capacity (100)
+   - ✅ Implemented channel creation and utilities for connect stages
+   - ✅ Added helper traits for sending/receiving with timeout capabilities
+   - ✅ Created comprehensive tests for message passing and backpressure
 
 4. Implement minimal actor framework (3-5 days)
    - Create Discovery, Cutting, and Labeling workers as Tokio tasks
