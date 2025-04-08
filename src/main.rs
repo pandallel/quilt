@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the discovery actor
     let discovery = DiscoveryActor::new("main-discovery").start();
-    
+
     // Use a oneshot channel for shutdown coordination
     let (tx, rx) = oneshot::channel::<()>();
     // No need to clone oneshot senders as they can only be used once
@@ -36,9 +36,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Start discovery in current directory
             let current_dir = std::env::current_dir()
-                .map_err(|e| Box::<dyn std::error::Error>::from(
-                    ActorError::OperationFailure(format!("Failed to get current directory: {}", e))
-                ))?
+                .map_err(|e| {
+                    Box::<dyn std::error::Error>::from(ActorError::OperationFailure(format!(
+                        "Failed to get current directory: {}",
+                        e
+                    )))
+                })?
                 .to_string_lossy()
                 .to_string();
 
@@ -48,38 +51,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     directory: current_dir,
                 })
                 .await
-                .map_err(|e| Box::<dyn std::error::Error>::from(
-                    ActorError::MessageSendFailure(format!("Failed to send StartDiscovery: {}", e))
-                ))?;
-            
+                .map_err(|e| {
+                    Box::<dyn std::error::Error>::from(ActorError::MessageSendFailure(format!(
+                        "Failed to send StartDiscovery: {}",
+                        e
+                    )))
+                })?;
+
             // Handle any errors from the discovery operation
             if let Err(e) = discovery_result {
                 error!("Discovery operation failed: {}", e);
                 return Err(Box::<dyn std::error::Error>::from(
-                    ActorError::OperationFailure(format!("Discovery operation failed: {}", e))
+                    ActorError::OperationFailure(format!("Discovery operation failed: {}", e)),
                 ));
             }
-                
+
             // Proceed with application logic
             // ...
-            
+
             // Example of scheduled shutdown after some work
             tokio::spawn(async move {
                 // Simulate some work
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                
+
                 // Signal we're done
                 let _ = tx.send(());
             });
         }
         Ok(false) => {
             return Err(Box::<dyn std::error::Error>::from(
-                ActorError::NotAvailable("Discovery actor is not ready".into())
+                ActorError::NotAvailable("Discovery actor is not ready".into()),
             ));
         }
         Err(e) => {
             return Err(Box::<dyn std::error::Error>::from(
-                ActorError::MessageSendFailure(format!("Failed to ping discovery actor: {}", e))
+                ActorError::MessageSendFailure(format!("Failed to ping discovery actor: {}", e)),
             ));
         }
     }
