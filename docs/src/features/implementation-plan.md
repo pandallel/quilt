@@ -15,11 +15,10 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ✅ Added comprehensive tests for all operations
    - ✅ Used Tokio's async synchronization primitives for better integration with the actor model
 
-2. Implement basic Material and Swatch data structures (2-3 days)
+2. ~~Implement basic Material and Swatch data structures (2-3 days)~~ SKIPPED - Material structure is sufficient, Swatch implementation deferred
 
-   - Define Material struct with metadata and content
-   - Define Swatch struct for document fragments
-   - Implement state transitions and validation
+   - ✅ Material struct with metadata already implemented
+   - ⏩ Swatch implementation deferred to a later milestone
 
 3. Create the Message Channel System (2-3 days)
 

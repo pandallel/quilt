@@ -20,7 +20,13 @@ The project is currently in the initial implementation phase, focusing on the **
    - Created comprehensive test suite for all repository functionality
    - Integrated with Tokio's async runtime for better compatibility with the actor model
 
-3. **Documentation System**:
+3. **Material Data Structure**:
+
+   - Reviewed existing Material struct implementation and found it sufficient for current needs
+   - Deferred Swatch data structure implementation to a later milestone
+   - Updated implementation plan to reflect these decisions
+
+4. **Documentation System**:
    - Set up mdBook for project documentation
    - Added admonish extension for enhanced documentation features
    - Created initial documentation structure and content
@@ -34,6 +40,7 @@ The project is currently in the initial implementation phase, focusing on the **
 - **Treating the Repository as a standalone component** rather than an actor itself
 - **Planning for worker pools** in stages that require horizontal scaling (particularly Labeling)
 - **Using Tokio's async primitives** for thread-safe repository access and actor communication
+- **Deferring Swatch implementation** until we have more concrete requirements from the Cutting Worker
 
 ### Open Questions
 
@@ -78,14 +85,10 @@ The project is currently in the initial implementation phase, focusing on the **
    - Define swatch content extraction
    - Create state transitions from Discovered to Cut
 
-4. Implement the Swatch data structure:
-   - Define the core model for document fragments
-   - Create metadata associations between swatches and materials
-   - Implement utilities for swatch creation and manipulation
-
 ### Medium-term Goals (Next Sprint)
 
 1. Complete the three worker implementations
 2. Add basic file monitoring for real document processing
 3. Implement intelligent document splitting strategies
 4. Begin work on the vector storage component
+5. Revisit Swatch implementation with more concrete requirements
