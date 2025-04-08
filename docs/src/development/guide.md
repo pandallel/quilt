@@ -30,6 +30,10 @@ cargo test
 cargo run --features=feature-name
 ```
 
+## Testing and Linting
+
+For detailed information about testing and linting procedures, see the [Testing and Linting Guide](testing_and_linting.md).
+
 ## Project Structure
 
 - `src/` - Source code

@@ -16,6 +16,10 @@ Use Quilt to power LLM tools with fast, structured, and evolving context—witho
 
 [Coming soon]
 
+## Development
+
+See the [Development Guide](docs/src/development/guide.md) for information on testing, linting, and contributing to Quilt.
+
 ## Documentation
 
 See the [documentation](docs/book) for detailed information about Quilt's architecture and usage.
