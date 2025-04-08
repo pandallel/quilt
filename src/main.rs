@@ -7,7 +7,7 @@ use log::info;
 use std::time::Duration;
 
 mod orchestrator;
-use orchestrator::{QuiltOrchestrator, OrchestratorConfig};
+use orchestrator::{OrchestratorConfig, QuiltOrchestrator};
 
 // Maximum wait time for actor operations
 const ACTOR_TIMEOUT: Duration = Duration::from_secs(5);
