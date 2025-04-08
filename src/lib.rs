@@ -7,8 +7,8 @@
 pub mod materials;
 
 // Keep only the material types and scanner exports
-pub use materials::{Material, MaterialStatus, MaterialFileType};
 pub use materials::scanner::DirectoryScanner;
+pub use materials::{Material, MaterialFileType, MaterialStatus};
 pub use materials::{MaterialRepository, RepositoryError};
 
 // This function is only here for testing and can be removed later

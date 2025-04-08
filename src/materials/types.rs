@@ -1,7 +1,7 @@
-use time::OffsetDateTime;
 use cuid2::cuid;
-use std::path::Path;
 use std::fmt;
+use std::path::Path;
+use time::OffsetDateTime;
 
 /// Supported file types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,10 +101,22 @@ mod tests {
 
     #[test]
     fn test_file_type_inference() {
-        assert_eq!(MaterialFileType::from_path("test.md"), MaterialFileType::Markdown);
-        assert_eq!(MaterialFileType::from_path("test.txt"), MaterialFileType::Text);
-        assert_eq!(MaterialFileType::from_path("test.rs"), MaterialFileType::Other("rs".to_string()));
-        assert_eq!(MaterialFileType::from_path("test"), MaterialFileType::Other("".to_string()));
+        assert_eq!(
+            MaterialFileType::from_path("test.md"),
+            MaterialFileType::Markdown
+        );
+        assert_eq!(
+            MaterialFileType::from_path("test.txt"),
+            MaterialFileType::Text
+        );
+        assert_eq!(
+            MaterialFileType::from_path("test.rs"),
+            MaterialFileType::Other("rs".to_string())
+        );
+        assert_eq!(
+            MaterialFileType::from_path("test"),
+            MaterialFileType::Other("".to_string())
+        );
     }
 
     #[test]
@@ -121,16 +133,21 @@ mod tests {
 
         // Test transition to Error with error message
         material.status = MaterialStatus::Error;
-        material.error = Some(String::from("Could not identify meaningful content boundaries"));
+        material.error = Some(String::from(
+            "Could not identify meaningful content boundaries",
+        ));
         assert_eq!(material.status, MaterialStatus::Error);
-        assert_eq!(material.error.unwrap(), "Could not identify meaningful content boundaries");
+        assert_eq!(
+            material.error.unwrap(),
+            "Could not identify meaningful content boundaries"
+        );
     }
 
     #[test]
     fn test_cuid_uniqueness() {
         let id1 = cuid();
         let id2 = cuid();
-        
+
         assert_ne!(id1, id2, "CUIDs should be unique");
         assert_eq!(id1.len(), 24, "CUID should be 24 characters");
         assert_eq!(id2.len(), 24, "CUID should be 24 characters");
@@ -145,4 +162,4 @@ mod tests {
         // Second material should have a later or equal timestamp
         assert!(material2.ingested_at >= material1.ingested_at);
     }
-} 
+}

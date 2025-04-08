@@ -6,4 +6,4 @@
 fn main() {
     println!("Quilt - Local-first, modular memory and context engine");
     println!("This is a placeholder. The actor-based implementation is in progress.");
-} 
+}
