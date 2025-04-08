@@ -3,11 +3,6 @@ description: Creating implementation plans
 globs: 
 alwaysApply: false
 ---
----
-description: Creating implementation plans
-globs: 
-alwaysApply: false
----
 # Implementation Planning Guidelines
 
 ## Feature-First, Incremental Approach
