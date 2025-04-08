@@ -54,7 +54,7 @@ impl fmt::Display for MaterialStatus {
 }
 
 /// A Material represents a document in Quilt
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     /// Unique identifier for the material
     pub id: String,
