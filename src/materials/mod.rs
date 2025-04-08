@@ -1,7 +1,7 @@
 pub mod types;
-pub mod registry;
+// registry module removed as it needs significant refactoring
 pub mod scanner;
 
 pub use types::{Material, MaterialStatus, MaterialFileType};
-pub use registry::MaterialRegistry;
+// Material registry will be reimplemented for actor model
 pub use scanner::{DirectoryScanner, ScanError, ScanResult, ScanResults}; 
