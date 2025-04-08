@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod scanner_tests {
-    use std::path::PathBuf;
+    use crate::materials::scanner::DirectoryScanner;
     use std::fs::{self, File};
     use std::io::Write;
+    use std::path::PathBuf;
     use tempfile::TempDir;
-    use crate::materials::scanner::DirectoryScanner;
 
     /// Creates a temporary directory with test files for scanning
     fn setup_test_directory() -> (TempDir, PathBuf) {

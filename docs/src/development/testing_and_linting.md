@@ -62,7 +62,7 @@ To automatically format your code:
 cargo fmt
 ```
 
-The project uses a custom `rustfmt.toml` configuration to ensure consistent formatting.
+The project uses a custom `rustfmt.toml` configuration to ensure consistent formatting. Note that our configuration only uses options available in stable Rust to ensure compatibility with CI/CD workflows.
 
 ### Clippy
 
@@ -90,3 +90,11 @@ This project uses GitHub Actions for PR validation, which includes:
 Pull requests must pass all validation checks before they can be merged.
 
 The workflow configuration can be found in `.github/workflows/pr_validation.yml`.
+
+### Troubleshooting CI Failures
+
+If you encounter formatting errors in CI:
+
+1. Ensure you're using the same rustfmt configuration as the CI pipeline
+2. Run `cargo fmt` locally before pushing changes
+3. If working with nightly Rust locally, verify your changes still format correctly with stable Rust
