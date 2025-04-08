@@ -4,4 +4,4 @@
 pub mod actor;
 
 // Re-export the actor for easy access
-pub use self::actor::DiscoveryActor; 
+pub use self::actor::DiscoveryActor;

@@ -1,11 +1,11 @@
+use crate::actors::{Ping, Shutdown};
 use actix::prelude::*;
 use log::{debug, info};
-use crate::actors::{Ping, Shutdown};
 
 /// Messages specific to the DiscoveryActor
 pub mod messages {
     use actix::prelude::*;
-    
+
     /// Command to start discovery in a directory
     #[derive(Message)]
     #[rtype(result = "()")]
@@ -30,11 +30,11 @@ impl DiscoveryActor {
 
 impl Actor for DiscoveryActor {
     type Context = Context<Self>;
-    
+
     fn started(&mut self, _ctx: &mut Self::Context) {
         info!("DiscoveryActor '{}' started", self.name);
     }
-    
+
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         info!("DiscoveryActor '{}' stopped", self.name);
     }
@@ -43,7 +43,7 @@ impl Actor for DiscoveryActor {
 /// Handler for Ping messages
 impl Handler<Ping> for DiscoveryActor {
     type Result = bool;
-    
+
     fn handle(&mut self, _msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
         debug!("DiscoveryActor '{}' received ping", self.name);
         true
@@ -53,7 +53,7 @@ impl Handler<Ping> for DiscoveryActor {
 /// Handler for Shutdown messages
 impl Handler<Shutdown> for DiscoveryActor {
     type Result = ();
-    
+
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         info!("DiscoveryActor '{}' shutting down", self.name);
         ctx.stop();
@@ -63,9 +63,12 @@ impl Handler<Shutdown> for DiscoveryActor {
 /// Handler for StartDiscovery messages
 impl Handler<messages::StartDiscovery> for DiscoveryActor {
     type Result = ();
-    
+
     fn handle(&mut self, msg: messages::StartDiscovery, _ctx: &mut Self::Context) -> Self::Result {
-        info!("DiscoveryActor '{}' starting discovery in '{}'", self.name, msg.directory);
+        info!(
+            "DiscoveryActor '{}' starting discovery in '{}'",
+            self.name, msg.directory
+        );
         println!("Discovery started in directory: {}", msg.directory);
     }
-} 
+}
