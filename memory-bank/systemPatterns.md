@@ -6,6 +6,8 @@ Quilt uses an **actor model architecture** implemented with Actix. The system pr
 
 ```mermaid
 graph TB
+    QO[QuiltOrchestrator]
+
     subgraph "Processing Actors"
         DA[Discovery Actor]
         CA[Cutting Actor]
@@ -13,6 +15,10 @@ graph TB
     end
 
     Repo[Material Repository]
+
+    QO -->|Manages| DA
+    QO -->|Manages| CA
+    QO -->|Manages| LA
 
     DA -->|Detect Material| Repo
     DA -->|Send Discovered Material| CA
@@ -22,6 +28,15 @@ graph TB
 ```
 
 ## Key Design Patterns
+
+### Orchestrator Pattern
+
+- **QuiltOrchestrator**: Central component responsible for actor lifecycle management
+- **Actor Initialization**: The orchestrator creates and initializes all actors in the system
+- **Message Flow Coordination**: Establishes connections between actors
+- **Graceful Shutdown**: Manages orderly shutdown of the actor system
+- **Error Handling**: Centralizes error handling logic for actor operations
+- **Configuration Management**: Handles actor-specific configuration settings
 
 ### Actor Model Implementation
 
@@ -36,6 +51,7 @@ graph TB
 - **Modular Structure**: Actors are organized in dedicated modules (e.g., src/discovery)
 - **Common Messaging**: Shared message types in a central actors module
 - **Actor-Specific Messages**: Custom messages defined in the actor's namespace
+- **Orchestrator**: Top-level component (src/orchestrator.rs) that coordinates the entire system
 
 ### Message Flow Patterns
 
@@ -121,6 +137,12 @@ classDiagram
 ```
 
 ## Technical Decisions
+
+### Actor System Organization: Orchestrator Pattern
+
+- **Rationale**: Centralizes actor management for cleaner code organization
+- **Benefits**: Improves maintainability, simplifies main.rs, and provides better separation of concerns
+- **Implementation**: QuiltOrchestrator manages actor creation, messaging, and shutdown
 
 ### Actor Framework: Actix
 

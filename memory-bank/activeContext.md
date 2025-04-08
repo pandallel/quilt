@@ -6,7 +6,15 @@ The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner
 
 ## Recent Changes
 
-1. **Actor System Implementation**:
+1. **Actor System Refactoring**:
+
+   - Refactored main.rs to use a dedicated QuiltOrchestrator for actor coordination
+   - Moved actor initialization, communication, and shutdown logic out of main.rs
+   - Created a modular approach for managing the actor lifecycle with clear separation of concerns
+   - Improved error handling and message flow management
+   - Better aligned implementation with the actor model's best practices
+
+2. **Actor System Implementation**:
 
    - Integrated Actix as the actor framework for Quilt
    - Created the base actor module with common message types (Ping, Shutdown)
@@ -16,20 +24,20 @@ The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner
    - Created a modular actor organization with dedicated namespaces (src/actors, src/discovery)
    - Successfully tested the actor system with basic message passing
 
-2. **Dependency Management**:
+3. **Dependency Management**:
 
    - Added Actix 0.13.1 to dependencies
    - Set up logging infrastructure with log 0.4.20 and env_logger 0.11.8
    - Updated thiserror to version 2.0.12
    - Ensured compatibility between all dependencies
 
-3. **Architecture Documentation**:
+4. **Architecture Documentation**:
 
    - Updated implementation plan to mark Milestone 1 as completed
    - Documented the actor system architecture
    - Updated progress tracking in memory-bank
 
-4. **Material Repository Implementation**:
+5. **Material Repository Implementation**:
 
    - Completed the thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
    - Implemented material state tracking with validation (Discovered → Cut → Swatched, with Error transitions)
@@ -38,7 +46,7 @@ The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner
    - Integrated with Tokio's async runtime for better compatibility with the actor model
    - Added Default implementation for MaterialRepository to meet Clippy standards
 
-5. **Message Channel System Implementation**:
+6. **Message Channel System Implementation**:
 
    - Defined the `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
    - Implemented channel system with fixed capacity (100 messages) to provide natural backpressure
@@ -47,7 +55,7 @@ The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner
    - Added detailed documentation for the channel system architecture and usage patterns
    - Optimized message size by using only material IDs for Cut and Swatched messages
 
-6. **CI/CD and Quality Control**:
+7. **CI/CD and Quality Control**:
    - Implemented GitHub Actions workflow for PR validation
    - Added rustfmt configuration for consistent code formatting
    - Configured Clippy for static code analysis with custom rules
@@ -95,25 +103,31 @@ The project is currently implementing Milestone 2: "Discovery Actor Uses Scanner
 
 ### Short-term Tasks (Current Sprint)
 
-1. Integrate DirectoryScanner with DiscoveryActor:
+1. Enhance the QuiltOrchestrator:
+
+   - Add support for additional actors (CuttingActor, LabelingActor)
+   - Implement proper actor messaging channels between stages
+   - Add configuration options for controlling the actor behavior
+
+2. Integrate DirectoryScanner with DiscoveryActor:
 
    - Wrap DirectoryScanner in the actor interface
    - Add configuration for target directory
    - Implement material creation from scanned files
 
-2. Add material processing logic:
+3. Add material processing logic:
 
    - Log discovered materials with metadata
    - Implement material state tracking
 
-3. Connect to message channel system:
+4. Connect to message channel system:
 
    - Utilize existing MaterialMessage enum types
    - Configure Tokio mpsc channels
    - Implement channel registration and connection
 
-4. Expand test coverage:
-   - Add integration tests for DiscoveryActor with DirectoryScanner
+5. Expand test coverage:
+   - Add integration tests for QuiltOrchestrator with multiple actors
    - Test error handling scenarios
    - Ensure CI pipeline catches regressions
 

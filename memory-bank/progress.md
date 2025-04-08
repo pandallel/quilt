@@ -61,6 +61,8 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
    - ✅ Added structured logging with env_logger
    - ✅ Set up proper Actix/Tokio runtime integration
    - ✅ Created modular actor organization with dedicated namespaces
+   - ✅ Implemented QuiltOrchestrator for centralized actor management
+   - ✅ Refactored main.rs to use QuiltOrchestrator with proper separation of concerns
 
 8. **Testing and Quality Infrastructure**:
    - ✅ GitHub Actions workflow for PR validation
@@ -73,7 +75,13 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 ## What's In Progress
 
-1. **Discovery Actor Enhancement**:
+1. **QuiltOrchestrator Enhancement**:
+
+   - Adding support for additional actors (Cutting, Labeling)
+   - Implementing proper message channels between stages
+   - Adding configuration options for actor behavior control
+
+2. **Discovery Actor Enhancement**:
    - Integration with DirectoryScanner
    - Implementing material creation from scanned files
    - Adding directory monitoring capabilities
