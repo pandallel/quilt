@@ -1,13 +1,16 @@
 # Quilt Implementation Plan
 
-This document outlines the incremental implementation plan for Quilt's core architecture, following a feature-first approach with clear milestones.
+This document outlines the incremental implementation plan for Quilt's core architecture, following a feature-first approach with clear observable milestones.
 
-## Milestone 1: Core Material Processing Pipeline
+## Legend
 
-**Goal:** Implement the basic three-stage processing pipeline with a functional in-memory repository.
-**Implementation Time:** 2-3 weeks
+- ✅ Task completed
+- ⚠️ Task requires special attention
+- ⏩ Task intentionally deferred
 
-1. ✅ Set up the Material Repository (3-4 days)
+## Completed Foundation Work
+
+1. ✅ **Material Repository Setup**
 
    - ✅ Implemented thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
    - ✅ Created material state tracking (Discovered, Cut, Swatched, Error)
@@ -15,172 +18,245 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ✅ Added comprehensive tests for all operations
    - ✅ Used Tokio's async synchronization primitives for better integration with the actor model
 
-2. ~~Implement basic Material and Swatch data structures (2-3 days)~~ SKIPPED - Material structure is sufficient, Swatch implementation deferred
+2. ✅ **Basic Material Data Structures**
 
-   - ✅ Material struct with metadata already implemented
+   - ✅ Material struct with metadata implemented
    - ⏩ Swatch implementation deferred to a later milestone
 
-3. ✅ Create the Message Channel System (2-3 days)
-
+3. ✅ **Message Channel System**
    - ✅ Defined MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
    - ✅ Set up Tokio mpsc channels with appropriate capacity (100)
    - ✅ Implemented channel creation and utilities for connect stages
    - ✅ Added helper traits for sending/receiving with timeout capabilities
    - ✅ Created comprehensive tests for message passing and backpressure
 
-4. Implement minimal actor framework (3-5 days)
-   - Create Discovery, Cutting, and Labeling workers as Tokio tasks
-   - Implement message handling loops for each actor
-   - Add graceful shutdown mechanism
+## E2E Development Milestones
 
-**Learning Outcome:** Validate the actor model architecture with direct messaging and verify state management with the repository.
+### Milestone 1: "Actor System Logs Startup"
 
-## Milestone 2: Basic File Monitoring and Processing
+**Goal:** Establish the basic actor framework with proper initialization
+**Implementation Time:** 2-3 days
 
-**Goal:** Process real documents from a watched directory with persistent storage of swatches.
-**Implementation Time:** 3-4 weeks
+1. Setup actor framework foundation (1-2 days)
 
-1. Enhance Discovery Worker (5-7 days)
+   - Define basic actor trait and message types ⚠️
+     - Challenge: Design message types balancing between passing full objects vs just IDs
+     - Consider memory usage implications for large message volumes
+     - Address thread safety and ownership in async context
+   - Create actor system initialization patterns
+   - Ensure proper Actix/Tokio runtime integration ⚠️
+     - Challenge: Prevent nested runtime errors between Actix and Tokio
+     - Actix system should be initialized first, with Tokio operations within its context
+     - Alternative: Run Actix in a dedicated thread managed by Tokio
 
-   - Implement proper file system watching with debouncing
-   - Add support for multiple file types/extensions
-   - Implement file content extraction
+2. Add logging infrastructure (1 day)
+   - Setup structured logging with context
+   - Create actor lifecycle logging
 
-2. Improve Cutting Worker (5-7 days)
+**Demonstration:** Running `main` shows "Actor system started" with proper configuration in logs
 
-   - Implement intelligent document splitting strategies
-   - Add metadata extraction from documents
-   - Optimize swatch size and overlap
+### Milestone 2: "Discovery Actor Uses Scanner for Single Directory"
 
-3. Implement Basic Storage (4-6 days)
+**Goal:** Connect existing DirectoryScanner to the actor framework
+**Implementation Time:** 2-3 days
 
-   - Add persistence layer for swatches and materials
-   - Implement simple recovery on startup
-   - Create basic querying capability
+1. Create DiscoveryActor using existing scanner (1-2 days)
 
-4. Add Error Handling and Logging (3-5 days)
-   - Implement comprehensive error handling
-   - Add structured logging across all components
-   - Create recovery mechanisms for failed processing
+   - Wrap DirectoryScanner in actor interface
+   - Add configuration for target directory
+   - Implement material creation from scanned files
 
-**Learning Outcome:** Understand real-world file processing patterns and refine the cutting strategies based on actual documents.
+2. Add basic material processing logic (1 day)
+   - Log discovered materials with metadata
+   - Implement material state tracking
 
-## Milestone 3: Embedding and Semantic Search
+**Demonstration:** Running `main` shows list of materials found in the configured directory
 
-**Goal:** Implement actual embedding and enable semantic search of swatches.
-**Implementation Time:** 4-5 weeks
+### Milestone 3: "Discovery Actor Sends Material Messages"
 
-1. Integrate Embedding Model (7-10 days)
+**Goal:** Establish message passing between actors
+**Implementation Time:** 2-3 days
 
-   - Add support for local embedding models
-   - Implement efficient batching of embedding requests
-   - Add caching of embeddings
+1. Connect to message channel system (1-2 days)
 
-2. Implement Vector Store (6-8 days)
+   - Utilize existing MaterialMessage enum types
+   - Configure Tokio mpsc channels
+   - Implement channel registration and connection
 
-   - Create or integrate a vector database
-   - Implement efficient similarity search
-   - Add persistence for embeddings
+2. Configure Discovery actor to send messages (1 day)
+   - Serialize materials into messages ⚠️
+     - Challenge: Balance between passing full objects vs just IDs
+     - Consider ownership transfer between components
+     - Address thread safety in async context
+   - Implement proper channel selection
+   - Add sending logic with logging
 
-3. Create Basic Query Interface (5-7 days)
+**Demonstration:** Running `main` logs "Sent X material messages to channel"
 
-   - Implement query parsing
-   - Create relevance ranking
-   - Add basic result formatting
+### Milestone 4: "Cutting Actor Creates Document Cuts"
 
-4. Create Spread Generation (5-7 days)
-   - Implement the assembly of relevant swatches into a spread
-   - Add source material reference resolution
-   - Create formatting options for different use cases
+**Goal:** Process materials into cuts
+**Implementation Time:** 3-4 days
 
-**Learning Outcome:** Evaluate embedding quality and performance, understand vector search requirements for our use case.
+1. Create CuttingActor implementation (1-2 days)
 
-## Milestone 4: Concurrency and Scaling
+   - Add message reception from Discovery
+   - Implement basic cut creation logic
+   - Add file content extraction ⚠️
+     - Challenge: CPU-intensive operations can block the async runtime
+     - Use `spawn_blocking` for long-running operations
+     - Implement async I/O operations where possible
 
-**Goal:** Optimize the system for concurrent processing and handle larger document sets.
-**Implementation Time:** 3-4 weeks
+2. Implement document splitting strategies (2 days)
+   - Create text extraction pipeline
+   - Implement basic cutting strategies (paragraphs, fixed size)
+   - Add metadata extraction for cuts
 
-1. Implement Worker Pools (5-7 days)
+**Demonstration:** Running `main` shows "Created X cuts from material Y" with cut details
 
-   - Add support for multiple workers per stage
-   - Implement work distribution strategies
-   - Add worker health monitoring
+### Milestone 5: "CutsRepository Stores Document Cuts"
 
-2. Optimize Repository for Concurrency (4-6 days)
+**Goal:** Store processed cuts for later retrieval
+**Implementation Time:** 2-3 days
 
-   - Refine locking strategies for better throughput
-   - Implement more granular locks
-   - Add performance metrics collection
+1. Implement CutsRepository (1-2 days)
 
-3. Implement Backpressure Mechanisms (3-5 days)
+   - Create in-memory storage with proper concurrency
+   - Implement CRUD operations for cuts
+   - Add indexing for efficient retrieval
 
-   - Add explicit backpressure handling
-   - Implement adaptive rate limiting
-   - Create monitoring for queue depths
+2. Connect CuttingActor to repository (1 day)
+   - Add repository interaction in actor ⚠️
+     - Challenge: Select appropriate repository methods (register_material vs add_material)
+     - Handle borrowed data that must not escape its scope
+     - Manage ownership transfer between components carefully
+   - Implement proper error handling
+   - Add logging for storage operations
 
-4. Add Resource Management (3-5 days)
-   - Implement resource usage monitoring
-   - Add adaptive worker scaling based on load
-   - Create shutdown and cleanup procedures
+**Demonstration:** Running `main` logs "Stored cut ID X from material Y" for each processed cut
 
-**Learning Outcome:** Understand scaling characteristics and bottlenecks in the system.
+### Milestone 6: "Cutting Actor Sends Cuts to Labeling"
 
-## Milestone 5: User Experience and Integration
+**Goal:** Complete the second stage of the pipeline
+**Implementation Time:** 2-3 days
 
-**Goal:** Create a usable end-to-end experience with simple user interfaces.
-**Implementation Time:** 4-6 weeks
+1. Set up channels between cutting and labeling (1 day)
 
-1. Implement CLI Interface (6-8 days)
+   - Create CutMessage types
+   - Implement channel connections
+   - Add proper error handling
 
-   - Create commands for managing the system
-   - Add query interface via CLI
-   - Implement configuration options
+2. Configure CuttingActor to forward cuts (1-2 days)
+   - Implement message transformation
+   - Add sending logic with backpressure handling
+   - Create comprehensive logging
 
-2. Create Simple Web UI (7-10 days)
+**Demonstration:** Running `main` logs "Sent X cuts to labeling channel"
 
-   - Add basic dashboard for system status
-   - Implement search interface
-   - Create visualization for swatch connections
+### Milestone 7: "Labeling Actor Creates Swatches from Cuts"
 
-3. Add Integration APIs (6-8 days)
+**Goal:** Implement the final stage of processing
+**Implementation Time:** 3-4 days
 
-   - Implement REST API for external access
-   - Add webhooks for processing events
-   - Create subscription mechanism for updates
+1. Create LabelingActor implementation (1-2 days)
 
-4. Implement User Configuration (5-7 days)
-   - Add customizable watch directories
-   - Create pluggable processing pipeline
-   - Implement user preferences
+   - Add message reception from Cutting
+   - Implement swatch creation logic
+   - Add metadata enrichment
 
-**Learning Outcome:** Gather user feedback on the overall experience and identify key improvement areas.
+2. Implement swatch creation strategies (2 days)
+   - Create metadata extraction and enhancement
+   - Implement content analysis features
+   - Add classification and tagging
 
-## Milestone 6: Production Readiness
+**Demonstration:** Running `main` shows "Created swatch from cut X" with swatch details
 
-**Goal:** Prepare the system for production use with stability and security features.
-**Implementation Time:** 3-5 weeks
+### Milestone 8: "SwatchRepository Stores Processed Swatches"
 
-1. Implement Comprehensive Testing (6-8 days)
+**Goal:** Complete the storage of final processed items
+**Implementation Time:** 2-3 days
 
-   - Add unit tests for all components
-   - Create integration test suite
-   - Implement performance benchmarks
+1. Implement SwatchRepository (1-2 days)
 
-2. Add Security Features (5-7 days)
+   - Create in-memory storage with proper concurrency
+   - Implement CRUD operations for swatches
+   - Add indexing for efficient retrieval
 
-   - Implement access controls for APIs
-   - Add encryption for sensitive data
-   - Create security audit logging
+2. Connect LabelingActor to repository (1 day)
+   - Add repository interaction in actor
+   - Implement proper error handling
+   - Add logging for storage operations
 
-3. Improve Stability and Reliability (5-7 days)
+**Demonstration:** Running `main` logs "Stored swatch ID X in repository"
 
-   - Add crash recovery mechanisms
-   - Implement automatic backup and restore
-   - Create health check system
+### Milestone 9: "Query Swatches by Content"
 
-4. Add Documentation and Examples (4-6 days)
-   - Create user documentation
-   - Add developer guides
-   - Implement example integrations
+**Goal:** Enable basic search functionality
+**Implementation Time:** 2-3 days
 
-**Learning Outcome:** Understand operational requirements and validate the system's readiness for production use.
+1. Implement basic text search (1-2 days)
+
+   - Add content indexing in repository
+   - Implement simple query interface
+   - Create results formatting
+
+2. Add search commands to main (1 day)
+   - Create simple query API
+   - Implement results display
+   - Add error handling
+
+**Demonstration:** Running `main` shows "Found X swatches matching query 'Z'"
+
+### Milestone 10: "Repositories Persist Data to Disk"
+
+**Goal:** Ensure data persists between application runs
+**Implementation Time:** 3-4 days
+
+1. Implement basic persistence for repositories (2 days)
+
+   - Add serialization for repository data
+   - Implement file-based storage ⚠️
+     - Challenge: I/O operations can block the async runtime
+     - Use async file I/O where possible
+     - Offload to dedicated threads for blocking operations
+   - Create consistent loading/saving
+
+2. Add startup/shutdown persistence (1-2 days)
+   - Implement startup loading
+   - Add shutdown saving
+   - Create consistency checks and error recovery
+
+**Demonstration:** Running `main` logs "Loaded X cuts and Y swatches from disk" on startup
+
+## Future Milestones
+
+Future milestones will focus on more advanced features:
+
+1. **Enhanced Text Processing**
+
+   - Language detection
+   - Text classification
+   - Entity extraction
+
+2. **Embedding and Vector Search**
+
+   - Integration with embedding models
+   - Vector storage for semantic search
+   - Similarity search implementation
+
+3. **Advanced Search and Queries**
+
+   - Query language development
+   - Search result ranking
+   - Filter and facet implementation
+
+4. **User Interfaces**
+
+   - Web-based dashboard
+   - Search interface
+   - Material management
+
+5. **Integration APIs**
+   - REST API for external access
+   - Webhooks for processing events
+   - Subscription mechanism for updates
