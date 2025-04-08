@@ -33,11 +33,11 @@ graph TB
 
 ### Message Channel System
 
-- **Typed Messages**: `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
-- **Bounded Channels**: Fixed capacity (100 messages) to provide natural backpressure
+- **Typed Messages**: Using a message enum with variants for different processing stages
+- **Bounded Channels**: Fixed capacity to provide natural backpressure
 - **Extension Traits**: Helper methods for ergonomic message handling and error management
-- **Message Size Optimization**: Using only material IDs for Cut and Swatched messages to minimize payload size
-- **Error Handling**: Structured error types for different failure modes (SendError, ReceiveTimeout, ChannelClosed)
+- **Message Size Optimization**: Using only IDs for most messages to minimize payload size
+- **Error Handling**: Structured error types for different failure modes
 
 ### Material Processing Pipeline
 
@@ -49,7 +49,7 @@ graph TB
 
 - **Bounded Channels**: Provide natural backpressure if downstream stages can't keep up
 - **Idempotent Processing**: Repository ensures each material is processed exactly once per stage
-- **Thread Safety**: Repository uses `Arc<RwLock<HashMap<...>>>` for concurrent access
+- **Thread Safety**: Repository uses thread-safe primitives for concurrent access
 
 ### Domain Model
 
@@ -142,7 +142,7 @@ sequenceDiagram
 
 ### State Management: In-memory with Persistence
 
-- **Initial Implementation**: In-memory repository with `Arc<RwLock<HashMap>>` for concurrent access
+- **Initial Implementation**: In-memory repository with thread-safe access for concurrent operations
 - **Future Evolution**: Add persistent storage and recovery mechanisms
 
 ### Modular Design
