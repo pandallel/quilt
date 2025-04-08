@@ -8,6 +8,13 @@
 - **Async Runtime**: Tokio
 - **Documentation**: mdBook with admonish extension
 - **Build System**: Cargo (Rust's package manager)
+- **Rust Language** (Edition 2021): Primary programming language for the project
+- **Tokio** (v1.44.2): Async runtime, providing tasks, synchronization primitives, and channels
+  - Features used: macros, rt, rt-multi-thread, sync, time
+- **thiserror** (v1.0.57): Error handling with derive macros for custom error types
+- **time** (v0.3): Date and time utilities with serde support
+- **walkdir** (v2.4.0): Filesystem traversal for material discovery
+- **cuid2** (v0.1.2): Collision-resistant IDs for materials and swatches
 
 ### Key Dependencies
 
@@ -128,3 +135,68 @@ The project follows an incremental implementation plan with clear milestones:
 - No cloud dependencies for core functionality
 - Cross-platform compatibility (Linux, macOS, Windows)
 - Modular, pluggable architecture
+
+## Technologies & Dependencies
+
+### Development Dependencies
+
+- **tempfile** (v3.10.1): Creating temporary directories for testing
+- **futures** (v0.3): Future utilities for testing async code
+
+## Implementation Details
+
+### Material Repository
+
+The repository is implemented as a thread-safe in-memory store using `Arc<RwLock<HashMap<String, Material>>>`. It provides CRUD operations with idempotence checks and state transition validation.
+
+### Message Channel System
+
+The message system uses Tokio's MPSC channels with a carefully chosen capacity (100 messages) that balances throughput with memory usage. It implements:
+
+- **MaterialMessage Enum**: Five message types representing the processing pipeline:
+
+  ```rust
+  pub enum MaterialMessage {
+      Discovered(Material),      // Full material for initial discovery
+      Cut(String),               // Just material ID to minimize size
+      Swatched(String),          // Just material ID to minimize size
+      Error(String, String),     // Material ID and error message
+      Shutdown,                  // Signal to stop processing
+  }
+  ```
+
+- **Channel Management**: Factory functions and helper methods for creating and using channels:
+
+  ```rust
+  // Creating channels
+  pub fn create_channel() -> ChannelPair { /* ... */ }
+
+  // Extension trait for sender
+  pub trait MaterialChannelExt {
+      async fn send_message(&self, message: MaterialMessage) -> Result<(), ChannelError>;
+      async fn try_send_message_timeout(&self, message: MaterialMessage,
+                                      timeout_duration: Duration) -> Result<(), ChannelError>;
+      async fn send_shutdown(&self) -> Result<(), ChannelError>;
+  }
+  ```
+
+- **Error Handling**: Structured error types for different failure scenarios:
+  ```rust
+  pub enum ChannelError {
+      SendError(String),
+      ReceiveTimeout(Duration),
+      ChannelClosed,
+  }
+  ```
+
+### Type System
+
+- **Material Struct**: Represents documents with metadata and state tracking
+- **MaterialStatus Enum**: Tracks the processing state (Discovered, Cut, Swatched, Error)
+- **MaterialFileType Enum**: Categorizes materials by file type (Markdown, Text, Other)
+
+### Testing Approach
+
+- **Unit Testing**: Comprehensive tests for each component's behavior
+- **Integration Testing**: Tests for how components work together (e.g., message flow through channels)
+- **Async Testing**: Using Tokio's test utilities for async code

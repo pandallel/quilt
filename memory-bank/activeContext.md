@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project is currently in the initial implementation phase, focusing on the **Core Material Processing Pipeline** (Milestone 1). We've established the Material Repository and are now moving to implement the message channel system and worker components.
+The project is currently in the initial implementation phase, focusing on the **Core Material Processing Pipeline** (Milestone 1). We've established the Material Repository and completed the message channel system. The next focus is implementing the worker components.
 
 ## Recent Changes
 
@@ -20,7 +20,22 @@ The project is currently in the initial implementation phase, focusing on the **
    - Created comprehensive test suite for all repository functionality
    - Integrated with Tokio's async runtime for better compatibility with the actor model
 
-3. **Documentation System**:
+3. **Message Channel System Implementation**:
+
+   - Defined the `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
+   - Implemented channel system with fixed capacity (100 messages) to provide natural backpressure
+   - Created extension traits for ergonomic message handling and error management
+   - Added comprehensive test suite including integration tests for pipeline message flow
+   - Added detailed documentation for the channel system architecture and usage patterns
+   - Optimized message size by using only material IDs for Cut and Swatched messages
+
+4. **Material Data Structure**:
+
+   - Reviewed existing Material struct implementation and found it sufficient for current needs
+   - Deferred Swatch data structure implementation to a later milestone
+   - Updated implementation plan to reflect these decisions
+
+5. **Documentation System**:
    - Set up mdBook for project documentation
    - Added admonish extension for enhanced documentation features
    - Created initial documentation structure and content
@@ -34,13 +49,16 @@ The project is currently in the initial implementation phase, focusing on the **
 - **Treating the Repository as a standalone component** rather than an actor itself
 - **Planning for worker pools** in stages that require horizontal scaling (particularly Labeling)
 - **Using Tokio's async primitives** for thread-safe repository access and actor communication
+- **Deferring Swatch implementation** until we have more concrete requirements from the Cutting Worker
+- **Fixed channel capacity (100)** to balance memory usage and provide natural backpressure
+- **Minimizing message size** by passing only material IDs between stages when appropriate
 
 ### Open Questions
 
-1. **Message Channel System**:
+1. **Worker Implementation**:
 
-   - What channel capacity is optimal for balancing memory usage and throughput?
-   - How should error handling in message processing be implemented?
+   - How to efficiently implement worker loops with proper error handling?
+   - What's the best approach for graceful shutdown propagation?
 
 2. **Persistence Strategy**:
 
@@ -60,11 +78,12 @@ The project is currently in the initial implementation phase, focusing on the **
 
 ### Short-term Tasks (Current Sprint)
 
-1. Implement the basic message channel system:
+1. Implement the minimal actor framework:
 
-   - Define the `MaterialMessage` enum with all necessary variants
-   - Set up Tokio channels between processing stages
-   - Implement channel creation and management
+   - Create the Discovery Worker with message handling loop
+   - Implement the Cutting Worker with basic processing
+   - Create the Labeling Worker skeleton
+   - Add graceful shutdown propagation
 
 2. Create the Discovery Worker:
 
@@ -78,14 +97,10 @@ The project is currently in the initial implementation phase, focusing on the **
    - Define swatch content extraction
    - Create state transitions from Discovered to Cut
 
-4. Implement the Swatch data structure:
-   - Define the core model for document fragments
-   - Create metadata associations between swatches and materials
-   - Implement utilities for swatch creation and manipulation
-
 ### Medium-term Goals (Next Sprint)
 
 1. Complete the three worker implementations
 2. Add basic file monitoring for real document processing
 3. Implement intelligent document splitting strategies
 4. Begin work on the vector storage component
+5. Revisit Swatch implementation with more concrete requirements
