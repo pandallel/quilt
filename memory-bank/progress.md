@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **early implementation stage** (Milestone 1: Core Material Processing Pipeline). We're establishing the foundational architecture and beginning to implement the core components.
+The project is in the **early implementation stage** (Milestone 1: Core Material Processing Pipeline). We're establishing the foundational architecture and implementing the core components.
 
 ## What Works
 
@@ -19,34 +19,40 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
    - Message flow established
 
 3. **Initial Documentation**:
+
    - Core domain concepts documented
    - Architecture diagrams created
    - Implementation plan outlined
 
+4. **Material Repository**:
+   - Implemented thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
+   - Created material state tracking with validation (Discovered, Cut, Swatched, Error)
+   - Added CRUD operations with proper state transition validation
+   - Completed test coverage for all repository functionality
+   - Integrated with Tokio's async runtime for better compatibility with the actor model
+
 ## What's In Progress
 
-1. **Material Repository**:
-
-   - Beginning implementation of thread-safe storage
-   - Defining material state transitions
-
-2. **Message System**:
+1. **Message System**:
 
    - Creating the message types and channels
    - Setting up the basic communication flow
 
-3. **Worker Implementation**:
+2. **Worker Implementation**:
    - Starting with the Discovery Worker
    - Planning the Cutting Worker implementation
+3. **Swatch Data Structure**:
+   - Defining the swatch representation for document fragments
+   - Planning the interfaces between cutting and swatching
 
 ## What's Left to Build
 
 1. **Core Pipeline** (Milestone 1):
 
-   - Complete all three worker implementations
-   - Implement message passing
-   - Create state management in the repository
-   - Add basic testing
+   - Complete the message channel system
+   - Implement the three worker types (Discovery, Cutting, Labeling)
+   - Create message passing between workers
+   - Add graceful shutdown mechanism
 
 2. **File Monitoring** (Milestone 2):
 
@@ -71,7 +77,7 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
 
 1. **Implementation Challenges**:
 
-   - Ensuring thread safety in the repository
+   - Ensuring thread safety in workers when sharing repository access
    - Handling potential race conditions in message processing
    - Managing resource usage for embedding operations
 
@@ -82,7 +88,7 @@ The project is in the **early implementation stage** (Milestone 1: Core Material
    - Efficient persistence mechanism
 
 3. **Technical Debt**:
-   - Need to establish comprehensive testing approach
+   - Need to establish comprehensive integration testing approach
    - Documentation needs to be kept in sync with implementation
 
 ## Next Major Milestone
