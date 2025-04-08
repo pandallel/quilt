@@ -3,6 +3,11 @@ description: Creating implementation plans
 globs: 
 alwaysApply: false
 ---
+---
+description: Creating implementation plans
+globs: 
+alwaysApply: false
+---
 # Implementation Planning Guidelines
 
 ## Feature-First, Incremental Approach
@@ -24,13 +29,15 @@ When planning new features or modules in Quilt, follow these guidelines to creat
 ## Milestone 1: [Short Feature Name]
 
 **Goal:** [One-sentence description of the user-visible feature]
-**Impementation Time:** [How long this might take to implement]
+**Implementation Time:** [How long this milestone might take to implement]
 
-1. [First concrete step]
-2. [Second step]
+1. [First concrete step] (X-Y days)
    - [Sub-step detail]
    - [Sub-step detail]
-3. [Third step]
+2. [Second step] (X-Y days)
+   - [Sub-step detail]
+   - [Sub-step detail]
+3. [Third step] (X-Y days)
 
 **Learning Outcome:** [What we expect to learn from this milestone]
 ```
@@ -42,7 +49,14 @@ When planning new features or modules in Quilt, follow these guidelines to creat
 - Place optional features later in the sequence
 - End with integration and performance optimizations
 
-#### 3. Include Learning Outcomes
+#### 3. Include Time Estimates
+
+- Add overall time estimate for each milestone
+- Include time estimates for individual tasks within each milestone
+- Be realistic and account for unexpected challenges
+- Consider dependencies and potential blockers
+
+#### 4. Include Learning Outcomes
 
 Every milestone should explicitly state what you expect to learn, such as:
 
@@ -64,22 +78,31 @@ Every milestone should explicitly state what you expect to learn, such as:
 # Feature X Implementation Plan
 
 ## Milestone 1: Basic Functionality
+**Implementation Time:** 2-3 weeks
+
+1. First step (3-4 days)
+   - Detail 1
+   - Detail 2
 
 ...
 
 ## Milestone 2: Core Use Case Support
+**Implementation Time:** 3-4 weeks
 
 ...
 
 ## Milestone 3: Error Handling & Edge Cases
+**Implementation Time:** 2-3 weeks
 
 ...
 
 ## Milestone 4: Configuration & Customization
+**Implementation Time:** 2-3 weeks
 
 ...
 
 ## Milestone 5: Performance Optimization
+**Implementation Time:** 1-2 weeks
 
 ...
 ```
