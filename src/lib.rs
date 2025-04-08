@@ -4,6 +4,8 @@
 // Current status: Basic structure with Material types, Directory Scanner, and Material Repository.
 // Next steps: Implement the actor framework and message channel system.
 
+pub mod actors;
+pub mod discovery;
 pub mod materials;
 
 // Keep only the material types and scanner exports

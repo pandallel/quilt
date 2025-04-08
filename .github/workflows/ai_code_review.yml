@@ -1,0 +1,29 @@
+name: AI Code Review
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: write-all
+
+jobs:
+  review:
+    # Only run when comment contains "/ai-review"
+    if: |
+      github.event.issue.pull_request && 
+      contains(github.event.comment.body, '/ai-review')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: AI Code Reviewer
+        uses: anc95/ChatGPT-CodeReview@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MODEL: "gpt-4o-mini" # You can also use gpt-4 for more comprehensive reviews
+          exclude: "**/*.json, **/*.md, Cargo.lock" # Exclude patterns for files that don't need review
