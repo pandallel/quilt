@@ -34,6 +34,10 @@ cargo run --features=feature-name
 
 For detailed information about testing and linting procedures, see the [Testing and Linting Guide](testing_and_linting.md).
 
+## Automated Code Review
+
+The project uses AI-powered code reviews for PRs. See the [Automated Code Review Guide](code_review.md) for details on how this works and how to set it up.
+
 ## Project Structure
 
 - `src/` - Source code

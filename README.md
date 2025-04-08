@@ -20,6 +20,16 @@ Use Quilt to power LLM tools with fast, structured, and evolving context—witho
 
 See the [Development Guide](docs/src/development/guide.md) for information on testing, linting, and contributing to Quilt.
 
+### Automated Code Review
+
+This repository uses OpenAI's GPT-4 for automated code reviews on pull requests created by the repository owner. To enable this functionality:
+
+1. Generate an OpenAI API key from [OpenAI's platform](https://platform.openai.com/api-keys)
+2. Add the API key as a repository secret named `OPENAI_API_KEY` in your GitHub repository settings
+   (Settings > Secrets and variables > Actions > New repository secret)
+
+The code review will automatically run on PRs and provide feedback as a comment.
+
 ## Documentation
 
 See the [documentation](docs/book) for detailed information about Quilt's architecture and usage.
