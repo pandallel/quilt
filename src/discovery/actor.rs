@@ -164,7 +164,7 @@ mod tests {
 
         // Check that the ping response is successful
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.unwrap());
     }
 
     #[actix::test]
@@ -237,11 +237,10 @@ mod tests {
         match inner_result {
             Err(messages::DiscoveryError::DirectoryNotFound(_)) => {
                 // This is the expected error type
-                assert!(true);
             }
             _ => {
                 // Unexpected error type
-                assert!(false, "Expected DirectoryNotFound error");
+                panic!("Expected DirectoryNotFound error");
             }
         }
     }
