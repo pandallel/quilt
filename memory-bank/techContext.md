@@ -129,14 +129,35 @@ impl Actor for DiscoveryActor {
 
 ### Message Channel System
 
-The message system uses Tokio's MPSC channels with capacity of 100 messages:
+The message system uses Tokio's MPSC channels with capacity of 100 messages for direct actor-to-actor communication.
 
-```rust
-pub enum MaterialMessage {
-    Discovered(Material),      // Full material for initial discovery
-    Cut(String),               // Just material ID to minimize size
-    Swatched(String),          // Just material ID to minimize size
-    Error(String, String),     // Material ID and error message
-    Shutdown,                  // Signal to stop processing
+### Message Types
+
+Each actor has its own specific message types for direct communication:
+
+pub struct MaterialDiscovered {
+pub material: Material, // Full material for initial registration
 }
-```
+
+pub struct CutMaterial {
+pub material_id: String, // Reference to original material
+pub cut_ids: Vec<String>, // IDs of the generated cuts
+}
+
+pub struct MaterialSwatched {
+pub material_id: String, // Reference to original material
+pub cut_id: String, // Reference to the cut that was processed
+pub swatch_id: String, // ID of the generated swatch
+}
+
+pub struct ProcessingError {
+pub material_id: String,
+pub stage: ProcessingStage,
+pub error: String,
+}
+
+pub enum ProcessingStage {
+Discovery,
+Cutting,
+Swatching,
+}

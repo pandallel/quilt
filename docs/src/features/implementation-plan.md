@@ -25,9 +25,9 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 3. ✅ **Message Channel System**
 
-   - ✅ Defined MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
+   - ✅ Defined actor-specific message types for direct communication
    - ✅ Set up Tokio mpsc channels with appropriate capacity (100)
-   - ✅ Implemented channel creation and utilities for connect stages
+   - ✅ Implemented channel creation and utilities for connecting stages
    - ✅ Added helper traits for sending/receiving with timeout capabilities
    - ✅ Created comprehensive tests for message passing and backpressure
 
