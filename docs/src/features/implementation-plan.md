@@ -91,12 +91,12 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - Implement message handlers in both actors
    - Set up actor references in the orchestrator
 
-2. Configure Discovery actor to send materials (1 day)
+2. Configure Discovery Actor to send materials (1 day)
    - Implement message creation from discovered materials
    - Add proper error handling and logging
    - Configure backpressure through Actix mailbox limits
 
-**Demonstration:** Running `main` logs "Sent X material messages to CuttingActor"
+**Demonstration:** Running `main` logs "Sent X material messages to Cutting Actor"
 
 ### Milestone 4: "Cutting Actor Creates Document Cuts"
 
@@ -105,7 +105,7 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 1. Create CuttingActor implementation (1-2 days)
 
-   - Add message reception from Discovery
+   - Add message reception from Discovery Actor
    - Implement basic cut creation logic
    - Add file content extraction ⚠️
      - Challenge: CPU-intensive operations can block the async runtime
@@ -140,39 +140,39 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` logs "Stored cut ID X from material Y" for each processed cut
 
-### Milestone 6: "Cutting Actor Sends Cuts to Labeling"
+### Milestone 6: "Cutting Actor Sends Cuts to Swatching"
 
 **Goal:** Complete the second stage of the pipeline
 **Implementation Time:** 2-3 days
 
-1. Set up channels between cutting and labeling (1 day)
+1. Set up direct messaging between cutting and swatching (1 day)
 
-   - Create CutMessage types
-   - Implement channel connections
+   - Create message types for cut materials
+   - Implement direct channel connection
    - Add proper error handling
 
 2. Configure CuttingActor to forward cuts (1-2 days)
-   - Implement message transformation
+   - Implement message transformation (using material_id and cut_ids)
    - Add sending logic with backpressure handling
    - Create comprehensive logging
 
-**Demonstration:** Running `main` logs "Sent X cuts to labeling channel"
+**Demonstration:** Running `main` logs "Sent cut X to Swatching Actor"
 
-### Milestone 7: "Labeling Actor Creates Swatches from Cuts"
+### Milestone 7: "Swatching Actor Creates Swatches"
 
 **Goal:** Implement the final stage of processing
 **Implementation Time:** 3-4 days
 
-1. Create LabelingActor implementation (1-2 days)
+1. Create SwatchingActor implementation (1-2 days)
 
-   - Add message reception from Cutting
+   - Add message reception from Cutting Actor
    - Implement swatch creation logic
-   - Add metadata enrichment
+   - Add metadata enrichment and embedding generation
 
 2. Implement swatch creation strategies (2 days)
    - Create metadata extraction and enhancement
    - Implement content analysis features
-   - Add classification and tagging
+   - Add embedding generation and storage
 
 **Demonstration:** Running `main` shows "Created swatch from cut X" with swatch details
 
@@ -187,7 +187,7 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - Implement CRUD operations for swatches
    - Add indexing for efficient retrieval
 
-2. Connect LabelingActor to repository (1 day)
+2. Connect SwatchingActor to repository (1 day)
    - Add repository interaction in actor
    - Implement proper error handling
    - Add logging for storage operations
@@ -237,31 +237,41 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 Future milestones will focus on more advanced features:
 
-1. **Enhanced Text Processing**
+1. **Scaling and Performance**
+
+   - Swatching Router implementation for dynamic actor scaling
+     - Router actor for managing multiple Swatching Actors
+     - Queue length monitoring and health checks
+     - Dynamic actor pool management
+   - Enhanced caching strategies
+   - Load balancing and monitoring
+   - Performance optimization based on usage patterns
+
+2. **Enhanced Text Processing**
 
    - Language detection
    - Text classification
    - Entity extraction
 
-2. **Embedding and Vector Search**
+3. **Embedding and Vector Search**
 
    - Integration with embedding models
    - Vector storage for semantic search
    - Similarity search implementation
 
-3. **Advanced Search and Queries**
+4. **Advanced Search and Queries**
 
    - Query language development
    - Search result ranking
    - Filter and facet implementation
 
-4. **User Interfaces**
+5. **User Interfaces**
 
    - Web-based dashboard
    - Search interface
    - Material management
 
-5. **Integration APIs**
+6. **Integration APIs**
    - REST API for external access
    - Webhooks for processing events
    - Subscription mechanism for updates
