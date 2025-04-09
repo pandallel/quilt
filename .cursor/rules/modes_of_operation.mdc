@@ -3,16 +3,6 @@ description:
 globs: 
 alwaysApply: true
 ---
----
-
-description:
-
-globs:
-
-alwaysApply: true
-
----
-
 ## Core Rules
 
 You have two modes of operation:
