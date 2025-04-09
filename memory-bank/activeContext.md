@@ -23,10 +23,10 @@ The codebase currently has these key components implemented:
 
 3. **Message System**:
 
-   - `MaterialMessage` enum with five variants (Discovered, Cut, Swatched, Error, Shutdown)
-   - Channel system with capacity of 100 messages for backpressure
-   - Helper traits for sending/receiving with timeout capabilities
-   - Channel type aliases for different pipeline stages (CuttingChannel, LabelingChannel)
+   - Actor-specific message types for clear communication contracts
+   - Typed message response handling with proper error types
+   - Leveraging Actix's built-in mailbox and message handling
+   - Direct actor-to-actor communication pattern
 
 4. **Discovery System**:
    - DirectoryScanner that finds files in configured directories
@@ -62,9 +62,9 @@ The codebase currently has these key components implemented:
 
 1. **Message Passing Implementation**:
 
-   - How to efficiently connect DiscoveryActor to CuttingActor
-   - Best approach for handling backpressure between stages
-   - How to properly serialize/deserialize materials between actors
+   - How to efficiently design message types between actors
+   - Best approach for handling backpressure between actor stages
+   - How to properly handle long-running operations in actors
 
 2. **Persistence & Embedding**:
    - Persistence mechanism for the Material Repository
@@ -77,9 +77,9 @@ The codebase currently has these key components implemented:
 
 1. Implement message passing from DiscoveryActor to CuttingActor:
 
-   - Connect DiscoveryActor to the message channel system
-   - Add message serialization and sending logic
-   - Handle backpressure and error cases
+   - Define proper message types for actor communication
+   - Add message handling in the CuttingActor
+   - Update the orchestrator to manage both actors
 
 2. Begin CuttingActor implementation:
    - Create basic structure with message handling

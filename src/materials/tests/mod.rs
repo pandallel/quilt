@@ -1,2 +1,2 @@
 // Integration tests for the materials module
-mod channel_integration_test;
+// Tests have been moved to actor-based implementation

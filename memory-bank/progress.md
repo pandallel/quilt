@@ -20,12 +20,12 @@ The project is in the **early implementation stage**, transitioning from Milesto
    - Command-line parameter handling for directory, exclusions
    - Basic material registration workflow
 
-3. **Message Types and Channel System**:
+3. **Message System**:
 
-   - MaterialMessage enum with all pipeline message variants
-   - Channel system with fixed capacity (100) for backpressure control
-   - Helper traits for timeout-aware message passing
-   - Channel type aliases for different pipeline stages
+   - Actor-specific message types for direct communication
+   - Clear separation of concerns with dedicated message types per actor
+   - Strongly typed message responses with proper error handling
+   - Actix mailbox system for message queuing and backpressure
 
 4. **Supporting Infrastructure**:
    - Structured logging with severity levels and actor details
@@ -35,11 +35,11 @@ The project is in the **early implementation stage**, transitioning from Milesto
 
 ## In Progress
 
-1. **Pipeline Connectivity**:
+1. **Actor Communication**:
 
-   - Connecting DiscoveryActor to the message channel system
-   - Implementing message serialization and error handling
-   - Ensuring proper backpressure management
+   - Implementing direct actor-to-actor message passing
+   - Creating appropriate message types for DiscoveryActor and CuttingActor
+   - Setting up actor supervision in the orchestrator
 
 2. **CuttingActor Design**:
    - Planning implementation of material processing

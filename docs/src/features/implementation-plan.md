@@ -85,21 +85,18 @@ This document outlines the incremental implementation plan for Quilt's core arch
 **Goal:** Establish message passing between actors
 **Implementation Time:** 2-3 days
 
-1. Connect to message channel system (1-2 days)
+1. Connect DiscoveryActor to CuttingActor (1-2 days)
 
-   - Utilize existing MaterialMessage enum types
-   - Configure Tokio mpsc channels
-   - Implement channel registration and connection
+   - Define proper message types for actor communication
+   - Implement message handlers in both actors
+   - Set up actor references in the orchestrator
 
-2. Configure Discovery actor to send messages (1 day)
-   - Serialize materials into messages ⚠️
-     - Challenge: Balance between passing full objects vs just IDs
-     - Consider ownership transfer between components
-     - Address thread safety in async context
-   - Implement proper channel selection
-   - Add sending logic with logging
+2. Configure Discovery actor to send materials (1 day)
+   - Implement message creation from discovered materials
+   - Add proper error handling and logging
+   - Configure backpressure through Actix mailbox limits
 
-**Demonstration:** Running `main` logs "Sent X material messages to channel"
+**Demonstration:** Running `main` logs "Sent X material messages to CuttingActor"
 
 ### Milestone 4: "Cutting Actor Creates Document Cuts"
 
