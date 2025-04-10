@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 2: "Discovery Actor Uses Scanner for Single Directory" and is now transitioning to Milestone 3: "Event Bus and Material Registry Foundation" to establish the core event-driven communication infrastructure.
+The project has completed Milestone 3: "Event Bus and Material Registry Foundation" and is now working on Milestone 4: "Discovery Actor Publishes Events" to integrate the Discovery Actor with the event-driven communication infrastructure.
 
 ## Current Implementation Status
 
@@ -21,14 +21,22 @@ The codebase currently has these key components implemented:
    - Material state tracking with proper validation (Discovered → Cut → Swatched → Error)
    - CRUD operations with idempotence and state transition validation
 
-3. **Message System**:
+3. **Event System**:
+
+   - Event Bus implemented using `tokio::sync::broadcast` channels
+   - Material Registry coordinating state management and event publishing
+   - Event types defined for material and system events
+   - Comprehensive test coverage for event publishing and subscription
+   - Clear error handling for event operations
+
+4. **Message System**:
 
    - Actor-specific message types for clear communication contracts
    - Typed message response handling with proper error types
    - Leveraging Actix's built-in mailbox and message handling
    - Direct actor-to-actor communication pattern
 
-4. **Discovery System**:
+5. **Discovery System**:
    - DirectoryScanner that finds files in configured directories
    - DiscoveryActor that wraps the scanner in the actor interface
    - DiscoveryConfig for scanner parameters
@@ -36,17 +44,25 @@ The codebase currently has these key components implemented:
 
 ## Recent Changes
 
-1. **Architecture Refinement**:
+1. **Event Bus Implementation**:
 
-   - Updated architecture to use an event-driven approach with a Material Registry
-   - Separated Material Registry (state management) from Material Repository (persistence)
-   - Defined an Event Bus using Tokio broadcast channels
-   - Created a clearer separation of concerns throughout the architecture
+   - Implemented EventBus using tokio::sync::broadcast channels
+   - Created event types for MaterialDiscovered and System events
+   - Added error handling and logging for event operations
+   - Implemented comprehensive tests for event bus functionality
 
-2. **Implementation Plan Adjustments**:
-   - Restructured implementation plan to build the event-driven architecture incrementally
-   - Created focused milestones with clear demonstrations for validation
-   - Separated actor creation from processing logic for more tangible progress
+2. **Material Registry Creation**:
+
+   - Created MaterialRegistry to coordinate state and events
+   - Integrated registry with the existing repository system
+   - Implemented event publishing for material operations
+   - Added tests verifying registry and event bus integration
+
+3. **Architecture Updates**:
+   - Removed the old channels implementation in favor of the Event Bus
+   - Updated the lib.rs exports to include the new event types
+   - Enhanced error handling throughout the system
+   - Improved documentation reflecting the event-driven architecture
 
 ## Active Decisions and Considerations
 
@@ -88,15 +104,15 @@ The codebase currently has these key components implemented:
 
 ### Short-term Tasks (Current Sprint)
 
-1. Implement basic Event Bus:
+1. Update Discovery Actor to publish events:
 
-   - Create central event bus using `tokio::sync::broadcast` channels
-   - Implement simple event types (MaterialDiscovered event only)
-   - Add logging for event publishing and subscription
-   - Create basic tests that verify event transmission
+   - Add event publishing for discovered materials
+   - Keep existing direct interactions for compatibility
+   - Add logging to show event publishing
+   - Create simple test harness for validation
 
-2. Create Material Registry prototype:
-   - Implement basic registry that works alongside existing Repository
-   - Add minimal event publishing for material discovery
-   - Create simple validation of events using logging
-   - Keep the existing Repository functionality intact
+2. Add event monitoring:
+   - Implement simple event listener in the main application
+   - Log all published events with timestamps
+   - Display event counts in logs
+   - Add basic metrics for event flow

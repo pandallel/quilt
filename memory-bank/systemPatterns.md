@@ -155,10 +155,14 @@ classDiagram
 
 ### Event Bus Implementation
 
-- **Tokio Broadcast Channels**: Using `tokio::sync::broadcast` for event distribution
-- **Multiple Consumers**: Allowing multiple actors to subscribe to the same events
-- **Backpressure**: Configurable channel capacity for handling backpressure
-- **Subscription Management**: Using `resubscribe()` for independent channel receivers
+- **Tokio Broadcast Channels**: Using `tokio::sync::broadcast` for event distribution with a default capacity of 128
+- **Multiple Consumers**: Supporting multiple subscribers with independent receivers
+- **Event Types**: Implemented MaterialDiscovered and System events (Shutdown, HealthCheck)
+- **Error Handling**: Comprehensive error handling with EventBusError and detailed logging
+- **Subscription Management**: Simple subscribe() method returning a Receiver
+- **Event Publishing**: Publish method with receiver count logging and error propagation
+- **EventSubscriber Trait**: Helper trait for processing events from a receiver
+- **Comprehensive Tests**: Test coverage for publishing, multiple subscribers, and event processing
 
 ### Actor Implementation
 

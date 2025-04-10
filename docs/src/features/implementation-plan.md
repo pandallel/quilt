@@ -80,23 +80,24 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows list of materials found in the configured directory with repository statistics
 
-### Milestone 3: "Event Bus and Material Registry Foundation"
+### ✅ Milestone 3: "Event Bus and Material Registry Foundation"
 
 **Goal:** Establish the core communication infrastructure
 **Implementation Time:** 2-3 days
+**Status:** Completed
 
-1. Implement basic Event Bus (1 day)
+1. ✅ Implement basic Event Bus (1 day)
 
-   - Create central event bus using `tokio::sync::broadcast` channels
-   - Implement simple event types (MaterialDiscovered event only)
-   - Add logging for event publishing and subscription
-   - Create basic tests that verify event transmission
+   - ✅ Create central event bus using `tokio::sync::broadcast` channels
+   - ✅ Implement simple event types (MaterialDiscovered event only)
+   - ✅ Add logging for event publishing and subscription
+   - ✅ Create basic tests that verify event transmission
 
-2. Create Material Registry prototype (1-2 days)
-   - Implement basic registry that works alongside existing Repository
-   - Add minimal event publishing for material discovery
-   - Create simple validation of events using logging
-   - Keep the existing Repository functionality intact
+2. ✅ Create Material Registry prototype (1-2 days)
+   - ✅ Implement basic registry that works alongside existing Repository
+   - ✅ Add minimal event publishing for material discovery
+   - ✅ Create simple validation of events using logging
+   - ✅ Keep the existing Repository functionality intact
 
 **Demonstration:** Running `main` shows "Event Bus initialized" in logs and demonstrates events flowing with log messages
 
