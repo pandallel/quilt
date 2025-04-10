@@ -1,24 +1,21 @@
-name: AI Code Review
+name: Automatic AI Code Review
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request:
+    types: [opened]
 
 permissions: write-all
 
 jobs:
   review:
-    # Only run when comment contains "/ai-review"
-    if: |
-      github.event.issue.pull_request && 
-      contains(github.event.comment.body, '/ai-review')
+    # Skip this job if the PR author is dependabot
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: AI Code Reviewer
         uses: villesau/ai-codereviewer@v2.7.0

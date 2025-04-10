@@ -13,7 +13,7 @@ When conducting a code review, follow these structured steps to ensure a thoroug
 When a user requests a code review without additional context:
 1. Automatically compare against main branch
 2. Execute `git diff --stat main` to identify changes
-3. Review ALL changed files without waiting for further input
+3. Review ALL changed files without waiting for further input using `git diff main -- [filename]`
 4. Present findings following the structure below
 
 If the user provides specific files or scope, override this default behavior and review only the specified scope.

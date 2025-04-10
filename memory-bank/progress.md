@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**, transitioning from Milestone 3 to Milestone 4. The foundation architecture has been established with the actor framework, material repository, discovery system, event bus, and material registry. The architecture follows an event-driven approach with a Material Registry acting as the central coordinator.
+The project is in the **implementation stage**, transitioning from Milestone 4 to Milestone 5. The event-driven architecture is now complete with the Discovery Actor fully integrated with the Material Registry and event system. The focus is now on implementing the Cutting Actor to process discovered materials.
 
 ## What Works
 
@@ -10,15 +10,15 @@ The project is in the **implementation stage**, transitioning from Milestone 3 t
 
    - QuiltOrchestrator coordinates actor lifecycle and communication
    - Actor model implemented with Actix and proper message types
-   - Thread-safe Material Repository with state management
-   - Basic message types for actor communication
+   - Thread-safe Material Registry with state management and event publishing
+   - Event-driven communication between components
 
 2. **Discovery System**:
 
    - DirectoryScanner scans directories for materials
    - DiscoveryActor manages discovery lifecycle
    - Command-line parameter handling for directory, exclusions
-   - Basic material registration workflow
+   - Material registration with event publishing
 
 3. **Message System**:
 
@@ -32,6 +32,8 @@ The project is in the **implementation stage**, transitioning from Milestone 3 t
    - Event Bus implemented using Tokio broadcast channels
    - Material Registry coordinating state and events
    - Event types defined for system communication
+   - Event monitoring in QuiltOrchestrator
+   - Proper log levels for events (debug for routine events)
    - Comprehensive test coverage for event publishing and subscription
 
 5. **Supporting Infrastructure**:
@@ -39,51 +41,52 @@ The project is in the **implementation stage**, transitioning from Milestone 3 t
    - Comprehensive error types for each component
    - Command-line interface with flexible configurations
    - Robust test coverage across components
+   - Improved error handling for event-related operations
 
 ## In Progress
 
-1. **Discovery Actor Event Integration**:
+1. **Cutting Actor Development**:
 
-   - Updating Discovery Actor to publish events via Material Registry
-   - Implementing event monitoring in the main application
-   - Adding metrics for event flow
-   - Creating testing infrastructure for event validation
-
-2. **Cutting Actor Development**:
    - Designing Cutting Actor that subscribes to MaterialDiscovered events
    - Planning document processing strategies
    - Implementing basic event handling before processing logic
+   - Creating actor monitoring infrastructure
+
+2. **Processing Pipeline Setup**:
+   - Defining the material processing workflow
+   - Planning the state transition workflow
+   - Designing the Cut data structure
+   - Preparing for CutsRepository implementation
 
 ## Next Major Milestone
 
-**Milestone 4: "Discovery Actor Publishes Events"** - The current focus is making the Discovery Actor use the Event Bus for material discovery operations.
+**Milestone 5: "Basic Cutting Actor Creation"** - The current focus is creating a minimal Cutting Actor that listens for MaterialDiscovered events.
 
 ## Upcoming Work
 
-1. **Discovery Actor Event Integration** (Milestone 4):
-
-   - Update Discovery Actor to publish events
-   - Add event monitoring and metrics
-   - Keep existing direct interactions for compatibility
-   - Create test harness for validation
-
-2. **Processing Pipeline** (Milestones 5-7):
+1. **Cutting Actor Skeleton** (Milestone 5):
 
    - Create Cutting Actor with event subscription
+   - Implement actor lifecycle (start/stop)
+   - Set up event monitoring for the actor
+   - Add metrics and health checks
+
+2. **Processing Pipeline** (Milestones 6-7):
+
    - Implement document cutting functionality
-   - Create Swatching Actor with event subscription
-   - Develop repositories for cuts and swatches
+   - Create state transitions for cut materials
+   - Develop repository for cuts
+   - Implement MaterialCut event publishing
 
 3. **Pipeline Completion** (Milestones 8-10):
 
+   - Create Swatching Actor with event subscription
    - Complete event flow through all actors
    - Implement query capabilities
    - Add persistence and recovery mechanisms
-   - Validate the end-to-end pipeline
 
-4. **Open Questions to Address**:
-   - Actor recovery and supervision strategies
-   - Event ordering and consistency mechanisms
-   - Backpressure handling approaches
-   - State recovery after system crashes
-   - Performance optimization for large datasets
+4. **Recent Improvements**:
+   - Improved error message extraction in debug logging
+   - Changed event monitoring log level from info to debug for better production usage
+   - Simplified test code for better readability and maintainability
+   - Fully transitioned from direct Repository use to Registry pattern
