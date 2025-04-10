@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
+use crate::cutting::CuttingActor;
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
@@ -54,22 +55,23 @@ impl From<Box<dyn std::error::Error>> for OrchestratorError {
 /// Manages actor lifecycle and coordinates the material processing pipeline
 pub struct QuiltOrchestrator {
     discovery: Option<Addr<DiscoveryActor>>,
+    cutting: Option<Addr<CuttingActor>>,
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
     // Future actors:
-    // cutting: Option<Addr<CuttingActor>>,
     // swatching: Option<Addr<SwatchingActor>>,
 }
 
 impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
-        let repository = MaterialRepository::new();
         let event_bus = Arc::new(EventBus::new());
+        let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
 
         Self {
             discovery: None,
+            cutting: None,
             registry,
             event_bus,
         }
@@ -140,9 +142,11 @@ impl QuiltOrchestrator {
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create the discovery actor with registry
         self.discovery = Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
+        
+        // Initialize cutting actor
+        self.cutting = Some(CuttingActor::new("main-cutting", self.registry.clone()).start());
 
         // Future: Initialize other actors
-        // self.cutting = Some(CuttingActor::new(self.registry.clone()).start());
         // self.swatching = Some(SwatchingActor::new(self.registry.clone()).start());
 
         Ok(())
@@ -231,34 +235,32 @@ impl QuiltOrchestrator {
         });
     }
 
-    /// Shutdown all actors in the system with timeout
+    /// Shutdown all actors in the system with a timeout
     async fn shutdown_actors_with_timeout(&self, timeout_duration: Duration) {
+        info!("Shutting down actors...");
+
+        // Shutdown discovery actor
         if let Some(discovery) = &self.discovery {
-            // Shutdown the discovery actor with timeout
             match timeout(timeout_duration, discovery.send(Shutdown)).await {
-                Ok(result) => match result {
-                    Ok(_) => {
-                        info!("Shutdown message sent to discovery actor");
-                    }
-                    Err(e) => {
-                        error!("Failed to send shutdown message: {}", e);
-                    }
-                },
-                Err(_) => {
-                    warn!("Timeout while shutting down discovery actor");
-                }
+                Ok(Ok(_)) => info!("Discovery actor shut down successfully"),
+                Ok(Err(e)) => error!("Failed to send shutdown to discovery actor: {}", e),
+                Err(_) => error!("Timeout shutting down discovery actor"),
+            }
+        }
+
+        // Shutdown cutting actor
+        if let Some(cutting) = &self.cutting {
+            match timeout(timeout_duration, cutting.send(Shutdown)).await {
+                Ok(Ok(_)) => info!("Cutting actor shut down successfully"),
+                Ok(Err(e)) => error!("Failed to send shutdown to cutting actor: {}", e),
+                Err(_) => error!("Timeout shutting down cutting actor"),
             }
         }
 
         // Future: Shutdown other actors
-        // if let Some(cutting) = &self.cutting {
-        //     timeout(timeout_duration, cutting.send(Shutdown)).await.ok();
-        // }
+        // if let Some(swatching) = &self.swatching { ... }
 
-        // Wait for actor system to shut down
-        System::current().stop();
-
-        info!("Actor system shutdown complete");
+        info!("All actors shut down");
     }
 }
 
