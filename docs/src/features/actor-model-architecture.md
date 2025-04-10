@@ -185,21 +185,24 @@ This approach provides a clean separation of concerns while maintaining data con
 The system uses domain events for communication:
 
 ```rust
+/// Material ID type for improved type safety
+pub struct MaterialId(String);
+
 /// Events for material lifecycle
 pub enum MaterialEvent {
     /// Emitted when a new material is discovered and persisted
     Discovered {
-        material_id: String,
+        material_id: MaterialId,
         file_path: String,
     },
     /// Emitted when a material is cut and persisted
     Cut {
-        material_id: String,
+        material_id: MaterialId,
         cut_ids: Vec<String>,
     },
     /// Emitted when a material is swatched and persisted
     Swatched {
-        material_id: String,
+        material_id: MaterialId,
         swatch_id: String,
     },
 }
@@ -216,13 +219,13 @@ pub enum SystemEvent {
 pub enum ErrorEvent {
     /// Processing errors
     ProcessingFailed {
-        material_id: String,
+        material_id: MaterialId,
         stage: ProcessingStage,
         error: String,
     },
     /// Persistence errors
     PersistenceFailed {
-        material_id: String,
+        material_id: MaterialId,
         operation: String,
         error: String,
     },

@@ -1,4 +1,5 @@
 use crate::actors::{Ping, Shutdown};
+use crate::events::types::{MaterialId, ProcessingStage};
 use crate::events::QuiltEvent;
 use crate::materials::MaterialRegistry;
 use actix::prelude::*;
@@ -10,6 +11,7 @@ use tokio::sync::broadcast;
 /// This module contains all message types that can be sent to the CuttingActor
 /// to request operations and their respective response types.
 pub mod messages {
+    use crate::events::types::MaterialId;
     use actix::prelude::*;
     use thiserror::Error;
 
@@ -21,7 +23,7 @@ pub mod messages {
     pub enum CuttingError {
         /// Material not found error
         #[error("Material not found: {0}")]
-        MaterialNotFound(String),
+        MaterialNotFound(MaterialId),
 
         /// Generic cutting error
         #[error("Cutting operation failed: {0}")]
@@ -97,11 +99,14 @@ impl Actor for CuttingActor {
                 // Process events until error or shutdown
                 while let Ok(event) = receiver.recv().await {
                     if let QuiltEvent::MaterialDiscovered(evt) = event {
-                        debug!("Received MaterialDiscovered event: {}", evt.material_id);
+                        debug!(
+                            "Received MaterialDiscovered event: {}",
+                            evt.material_id.as_str()
+                        );
 
                         // Send a message to self to process the event
                         addr.do_send(ProcessDiscoveredMaterial {
-                            material_id: evt.material_id.clone(),
+                            material_id: evt.material_id,
                             file_path: evt.file_path.clone(),
                         });
                     }
@@ -143,7 +148,7 @@ impl Handler<Shutdown> for CuttingActor {
 #[rtype(result = "()")]
 struct ProcessDiscoveredMaterial {
     /// ID of the discovered material
-    material_id: String,
+    material_id: MaterialId,
     /// File path of the discovered material
     file_path: String,
 }
@@ -155,7 +160,8 @@ impl Handler<ProcessDiscoveredMaterial> for CuttingActor {
         let name = self.name.clone();
         debug!(
             "{}: Processing discovered material '{}'",
-            name, msg.material_id
+            name,
+            msg.material_id.as_str()
         );
 
         // Use message data directly and access self methods without cloning the actor
@@ -185,20 +191,24 @@ impl Handler<ProcessDiscoveredMaterial> for CuttingActor {
 async fn process_discovered_material(
     actor_name: &str,
     registry: &MaterialRegistry,
-    material_id: String,
+    material_id: MaterialId,
     file_path: String,
 ) {
     info!(
         "{}: Processing discovered material '{}' at path '{}'",
-        actor_name, material_id, file_path
+        actor_name,
+        material_id.as_str(),
+        file_path
     );
 
     // Check if the material exists in the repository
-    match registry.get_material(&material_id).await {
+    match registry.get_material(material_id.as_str()).await {
         Some(material) => {
             debug!(
                 "{}: Found material '{}' in repository with state '{:?}'",
-                actor_name, material_id, material.status
+                actor_name,
+                material_id.as_str(),
+                material.status
             );
             // TODO: Implement actual cutting logic in Milestone 6
             // This will include:
@@ -210,20 +220,26 @@ async fn process_discovered_material(
         None => {
             error!(
                 "{}: Failed to retrieve material '{}': Not found",
-                actor_name, material_id
+                actor_name,
+                material_id.as_str()
             );
 
             // Publish error event
-            let error_event = QuiltEvent::processing_error(
-                &material_id,
-                "cutting",
-                &format!("Material not found during cutting stage: {}", material_id),
+            let error_event = QuiltEvent::create_processing_error_event(
+                material_id.as_str(),
+                ProcessingStage::Cutting,
+                &format!(
+                    "Material not found during cutting stage: {}",
+                    material_id.as_str()
+                ),
             );
 
             if let Err(e) = registry.event_bus().publish(error_event) {
                 warn!(
                     "{}: Failed to publish error event for material '{}': {}",
-                    actor_name, material_id, e
+                    actor_name,
+                    material_id.as_str(),
+                    e
                 );
             }
         }

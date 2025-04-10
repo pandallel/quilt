@@ -102,17 +102,20 @@ pub trait MaterialRepository: Send + Sync + 'static {
 The system uses domain events for communication:
 
 ```rust
+// Strongly typed material identifier
+pub struct MaterialId(String);
+
 pub enum MaterialEvent {
     Discovered {
-        material_id: String,
+        material_id: MaterialId,
         file_path: String,
     },
     Cut {
-        material_id: String,
+        material_id: MaterialId,
         cut_ids: Vec<String>,
     },
     Swatched {
-        material_id: String,
+        material_id: MaterialId,
         swatch_id: String,
     },
 }
@@ -124,12 +127,12 @@ pub enum SystemEvent {
 
 pub enum ErrorEvent {
     ProcessingFailed {
-        material_id: String,
+        material_id: MaterialId,
         stage: ProcessingStage,
         error: String,
     },
     PersistenceFailed {
-        material_id: String,
+        material_id: MaterialId,
         operation: String,
         error: String,
     },

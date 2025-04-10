@@ -1,5 +1,6 @@
 use crate::actors::Ping;
 use crate::cutting::CuttingActor;
+use crate::events::types::ProcessingStage;
 use crate::events::EventBus;
 use crate::events::QuiltEvent;
 use crate::materials::types::Material;
@@ -92,7 +93,9 @@ async fn test_cutting_actor_handles_missing_material() {
             Ok(Ok(event)) => {
                 // Check if it's an error event related to our material
                 if let QuiltEvent::ProcessingError(evt) = event {
-                    if evt.material_id == non_existent_material_id && evt.stage == "cutting" {
+                    if evt.material_id.as_str() == non_existent_material_id
+                        && evt.stage == ProcessingStage::Cutting
+                    {
                         error_received = true;
                         break;
                     }

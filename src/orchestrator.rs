@@ -142,10 +142,22 @@ impl QuiltOrchestrator {
     /// Initialize all actors in the system
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create the discovery actor with registry
-        self.discovery = Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
+        let discovery_actor = DiscoveryActor::new("main-discovery", self.registry.clone());
+        self.discovery = Some(discovery_actor.start());
+
+        // Verify discovery actor is running
+        if let Some(_discovery) = &self.discovery {
+            debug!("Initialized discovery actor, verifying it's running...");
+            // Don't wait for verification here - we'll check before using it
+        } else {
+            return Err("Failed to start discovery actor".into());
+        }
 
         // Initialize cutting actor
-        self.cutting = Some(CuttingActor::new("main-cutting", self.registry.clone()).start());
+        let cutting_actor = CuttingActor::new("main-cutting", self.registry.clone());
+        let cutting_addr = cutting_actor.start();
+        debug!("Initialized cutting actor");
+        self.cutting = Some(cutting_addr);
 
         // Future: Initialize other actors
         // self.swatching = Some(SwatchingActor::new(self.registry.clone()).start());

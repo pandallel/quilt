@@ -29,7 +29,7 @@ async fn test_registry_event_integration() {
     let event = rx.recv().await.unwrap();
     match event {
         QuiltEvent::MaterialDiscovered(evt) => {
-            assert_eq!(evt.material_id, material_id);
+            assert_eq!(evt.material_id.as_str(), material_id);
             assert_eq!(evt.file_path, "test/integration.md");
         }
         _ => panic!("Expected MaterialDiscovered event"),
@@ -62,7 +62,11 @@ async fn test_multiple_materials_with_events() {
     for _ in 0..3 {
         match rx.recv().await.unwrap() {
             QuiltEvent::MaterialDiscovered(evt) => {
-                assert!(evt.material_id == id1 || evt.material_id == id2 || evt.material_id == id3);
+                assert!(
+                    evt.material_id.as_str() == id1
+                        || evt.material_id.as_str() == id2
+                        || evt.material_id.as_str() == id3
+                );
             }
             _ => panic!("Expected MaterialDiscovered event"),
         }
@@ -90,7 +94,7 @@ async fn test_event_processing_with_multiple_subscribers() {
     for rx in [&mut rx1, &mut rx2, &mut rx3].iter_mut() {
         match rx.recv().await.unwrap() {
             QuiltEvent::MaterialDiscovered(evt) => {
-                assert_eq!(evt.material_id, material_id);
+                assert_eq!(evt.material_id.as_str(), material_id);
                 assert_eq!(evt.file_path, "test/multi-subscriber.md");
             }
             _ => panic!("Expected MaterialDiscovered event"),

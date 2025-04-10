@@ -113,7 +113,7 @@ mod tests {
         // Check that an event was published
         let event = receiver.recv().await.unwrap();
         if let QuiltEvent::MaterialDiscovered(evt) = event {
-            assert_eq!(evt.material_id, material_id);
+            assert_eq!(evt.material_id.as_str(), material_id);
         } else {
             panic!("Expected MaterialDiscovered event");
         }

@@ -108,7 +108,7 @@ mod tests {
 
         // Verify the received event
         if let QuiltEvent::MaterialDiscovered(evt) = received {
-            assert_eq!(evt.material_id, material.id);
+            assert_eq!(evt.material_id.as_str(), material.id);
         } else {
             panic!("Received wrong event type");
         }
@@ -134,13 +134,13 @@ mod tests {
         let received2 = receiver2.recv().await.unwrap();
 
         if let QuiltEvent::MaterialDiscovered(evt) = received1 {
-            assert_eq!(evt.material_id, material.id);
+            assert_eq!(evt.material_id.as_str(), material.id);
         } else {
             panic!("Receiver 1 got wrong event type");
         }
 
         if let QuiltEvent::MaterialDiscovered(evt) = received2 {
-            assert_eq!(evt.material_id, material.id);
+            assert_eq!(evt.material_id.as_str(), material.id);
         } else {
             panic!("Receiver 2 got wrong event type");
         }
@@ -160,7 +160,7 @@ mod tests {
             let mut receiver = receiver;
             while let Ok(event) = receiver.recv().await {
                 if let QuiltEvent::MaterialDiscovered(evt) = event {
-                    tx.send(evt.material_id.clone()).await.unwrap();
+                    tx.send(evt.material_id.as_str().to_string()).await.unwrap();
                 }
             }
         });
