@@ -10,8 +10,12 @@ description = "Documentation for Quilt - A local-first, modular memory and conte
 git-repository-url = "https://github.com/pandallel/quilt"
 edit-url-template = "https://github.com/pandallel/quilt/edit/main/docs/src/{path}"
 additional-css = ["./mdbook-admonish.css"]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [preprocessor.admonish]
 command = "mdbook-admonish"
 renderers = ["html"]
 assets_version = "3.0.3" # do not edit: managed by `mdbook-admonish install`
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
