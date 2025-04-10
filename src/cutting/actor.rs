@@ -2,7 +2,7 @@ use crate::actors::{Ping, Shutdown};
 use crate::events::QuiltEvent;
 use crate::materials::MaterialRegistry;
 use actix::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use tokio::sync::broadcast;
 
 /// Messages specific to the CuttingActor
@@ -74,38 +74,6 @@ impl CuttingActor {
             event_receiver: None,
         }
     }
-
-    /// Process a MaterialDiscovered event
-    ///
-    /// For now, this just logs the event and checks the material repository
-    /// for the material.
-    ///
-    /// # Arguments
-    ///
-    /// * `material_id` - ID of the discovered material
-    /// * `file_path` - File path of the discovered material
-    async fn process_material_discovered(&self, material_id: String, file_path: String) {
-        info!(
-            "{}: Processing discovered material '{}' at path '{}'",
-            self.name, material_id, file_path
-        );
-
-        // Check if the material exists in the repository
-        match self.registry.get_material(&material_id).await {
-            Some(material) => {
-                debug!(
-                    "{}: Found material '{}' in repository with state '{:?}'",
-                    self.name, material_id, material.status
-                );
-            }
-            None => {
-                error!(
-                    "{}: Failed to retrieve material '{}': Not found",
-                    self.name, material_id
-                );
-            }
-        }
-    }
 }
 
 impl Actor for CuttingActor {
@@ -115,19 +83,22 @@ impl Actor for CuttingActor {
         info!("{}: Started", self.name);
 
         // Subscribe to events via the registry
-        let mut event_receiver = self.registry.event_bus().subscribe();
+        let event_receiver = self.registry.event_bus().subscribe();
+        // Store the receiver in the actor state
+        self.event_receiver = Some(event_receiver.resubscribe());
         let addr = ctx.address();
 
         // Process events in a separate task
         ctx.spawn(
             async move {
                 info!("Started listening for material events");
+                let mut receiver = event_receiver;
 
                 // Process events until error or shutdown
-                while let Ok(event) = event_receiver.recv().await {
+                while let Ok(event) = receiver.recv().await {
                     if let QuiltEvent::MaterialDiscovered(evt) = event {
                         debug!("Received MaterialDiscovered event: {}", evt.material_id);
-                        
+
                         // Send a message to self to process the event
                         addr.do_send(ProcessDiscoveredMaterial {
                             material_id: evt.material_id.clone(),
@@ -144,6 +115,8 @@ impl Actor for CuttingActor {
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         info!("{}: Stopped", self.name);
+        // Clear the event receiver on shutdown
+        self.event_receiver = None;
     }
 }
 
@@ -178,35 +151,81 @@ struct ProcessDiscoveredMaterial {
 impl Handler<ProcessDiscoveredMaterial> for CuttingActor {
     type Result = ResponseFuture<()>;
 
-    fn handle(
-        &mut self,
-        msg: ProcessDiscoveredMaterial,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: ProcessDiscoveredMaterial, _ctx: &mut Self::Context) -> Self::Result {
         let name = self.name.clone();
         debug!(
             "{}: Processing discovered material '{}'",
             name, msg.material_id
         );
 
-        // Clone the values to avoid reference issues
+        // Use message data directly and access self methods without cloning the actor
         let material_id = msg.material_id;
         let file_path = msg.file_path;
-        let this = self.clone();
-        
+        let registry = self.registry.clone();
+        let actor_name = self.name.clone();
+
         Box::pin(async move {
-            this.process_material_discovered(material_id, file_path).await;
+            // Process the discovered material using the cloned registry instead of the actor instance
+            process_discovered_material(&actor_name, &registry, material_id, file_path).await;
         })
     }
 }
 
-// Implement Clone for CuttingActor to allow cloning in the handler
-impl Clone for CuttingActor {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            registry: self.registry.clone(),
-            event_receiver: None, // Not cloning the receiver
+/// Process a MaterialDiscovered event
+///
+/// For now, this just logs the event and checks the material repository
+/// for the material.
+///
+/// # Arguments
+///
+/// * `actor_name` - Name of the actor for logging
+/// * `registry` - Registry to retrieve materials
+/// * `material_id` - ID of the discovered material
+/// * `file_path` - File path of the discovered material
+async fn process_discovered_material(
+    actor_name: &str,
+    registry: &MaterialRegistry,
+    material_id: String,
+    file_path: String,
+) {
+    info!(
+        "{}: Processing discovered material '{}' at path '{}'",
+        actor_name, material_id, file_path
+    );
+
+    // Check if the material exists in the repository
+    match registry.get_material(&material_id).await {
+        Some(material) => {
+            debug!(
+                "{}: Found material '{}' in repository with state '{:?}'",
+                actor_name, material_id, material.status
+            );
+            // TODO: Implement actual cutting logic in Milestone 6
+            // This will include:
+            // - Document parsing and text extraction
+            // - Content splitting strategies
+            // - Cut creation and storage
+            // - Error handling and recovery
+        }
+        None => {
+            error!(
+                "{}: Failed to retrieve material '{}': Not found",
+                actor_name, material_id
+            );
+
+            // Publish error event
+            let error_event = QuiltEvent::processing_error(
+                &material_id,
+                "cutting",
+                &format!("Material not found during cutting stage: {}", material_id),
+            );
+
+            if let Err(e) = registry.event_bus().publish(error_event) {
+                warn!(
+                    "{}: Failed to publish error event for material '{}': {}",
+                    actor_name, material_id, e
+                );
+            }
         }
     }
 }
@@ -215,7 +234,7 @@ impl Clone for CuttingActor {
 mod tests {
     use super::*;
     use crate::events::EventBus;
-    use crate::materials::types::{Material, MaterialStatus};
+    use crate::materials::types::Material;
     use crate::materials::MaterialRepository;
     use std::sync::Arc;
     use std::time::Duration;
@@ -281,7 +300,7 @@ mod tests {
 
         // Create and start actor
         let cutting_actor = CuttingActor::new("TestCuttingActor", registry.clone()).start();
-        
+
         // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -292,10 +311,10 @@ mod tests {
 
         // Retrieve the material to ensure it's registered
         let material = registry.get_material(&material_id).await.unwrap();
-        
+
         // Create and publish a test event directly
         let event = QuiltEvent::material_discovered(&material);
-        
+
         // Try to publish the event with error handling
         match event_bus.publish(event) {
             Ok(_) => {
@@ -313,4 +332,4 @@ mod tests {
         assert!(ping_result.is_ok());
         assert!(ping_result.unwrap());
     }
-} 
+}

@@ -12,9 +12,9 @@ pub mod materials;
 pub mod orchestrator;
 
 // Re-export the scanner and repository types
+pub use cutting::CuttingActor;
 pub use discovery::{DirectoryScanner, ScanError, ScanResult, ScanResults};
 pub use events::{EventBus, QuiltEvent};
 pub use materials::{Material, MaterialFileType, MaterialStatus};
 pub use materials::{MaterialRegistry, RegistryError};
 pub use materials::{MaterialRepository, RepositoryError};
-pub use cutting::CuttingActor;

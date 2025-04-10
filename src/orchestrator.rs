@@ -3,6 +3,7 @@
 // The QuiltOrchestrator manages the lifecycle of all actors in the system,
 // coordinating their startup, inter-communication, and shutdown.
 
+use actix::dev::ToEnvelope;
 use actix::prelude::*;
 use log::{debug, error, info, warn};
 use std::sync::Arc;
@@ -142,7 +143,7 @@ impl QuiltOrchestrator {
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create the discovery actor with registry
         self.discovery = Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
-        
+
         // Initialize cutting actor
         self.cutting = Some(CuttingActor::new("main-cutting", self.registry.clone()).start());
 
@@ -239,28 +240,38 @@ impl QuiltOrchestrator {
     async fn shutdown_actors_with_timeout(&self, timeout_duration: Duration) {
         info!("Shutting down actors...");
 
-        // Shutdown discovery actor
-        if let Some(discovery) = &self.discovery {
-            match timeout(timeout_duration, discovery.send(Shutdown)).await {
-                Ok(Ok(_)) => info!("Discovery actor shut down successfully"),
-                Ok(Err(e)) => error!("Failed to send shutdown to discovery actor: {}", e),
-                Err(_) => error!("Timeout shutting down discovery actor"),
+        // Helper function to shutdown an actor with consistent error handling
+        async fn shutdown_actor_with_timeout<A>(
+            actor_name: &str,
+            actor_addr: &Option<Addr<A>>,
+            timeout_duration: Duration,
+        ) where
+            A: Actor,
+            A: Handler<Shutdown>,
+            <A as Actor>::Context: ToEnvelope<A, Shutdown>,
+        {
+            if let Some(addr) = actor_addr {
+                match timeout(timeout_duration, addr.send(Shutdown)).await {
+                    Ok(Ok(_)) => info!("{} actor shut down successfully", actor_name),
+                    Ok(Err(e)) => error!("Failed to send shutdown to {} actor: {}", actor_name, e),
+                    Err(_) => error!("Timeout shutting down {} actor", actor_name),
+                }
             }
         }
+
+        // Shutdown discovery actor
+        shutdown_actor_with_timeout("Discovery", &self.discovery, timeout_duration).await;
 
         // Shutdown cutting actor
-        if let Some(cutting) = &self.cutting {
-            match timeout(timeout_duration, cutting.send(Shutdown)).await {
-                Ok(Ok(_)) => info!("Cutting actor shut down successfully"),
-                Ok(Err(e)) => error!("Failed to send shutdown to cutting actor: {}", e),
-                Err(_) => error!("Timeout shutting down cutting actor"),
-            }
-        }
+        shutdown_actor_with_timeout("Cutting", &self.cutting, timeout_duration).await;
 
-        // Future: Shutdown other actors
-        // if let Some(swatching) = &self.swatching { ... }
+        // Future: Add other actors here using the same pattern
+        // shutdown_actor_with_timeout("Swatching", &self.swatching, timeout_duration).await;
 
         info!("All actors shut down");
+
+        // Optionally stop the entire actor system
+        // System::current().stop();
     }
 }
 

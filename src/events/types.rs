@@ -13,6 +13,19 @@ pub struct MaterialDiscoveredEvent {
     pub file_path: String,
 }
 
+/// Processing error event
+#[derive(Debug, Clone)]
+pub struct ProcessingErrorEvent {
+    /// ID of the material that had a processing error
+    pub material_id: String,
+    /// Timestamp when the error occurred
+    pub timestamp: OffsetDateTime,
+    /// Processing stage where the error occurred
+    pub stage: String,
+    /// Error message
+    pub message: String,
+}
+
 /// Represents an event in the Quilt system
 #[derive(Debug, Clone)]
 pub enum QuiltEvent {
@@ -20,6 +33,8 @@ pub enum QuiltEvent {
     MaterialDiscovered(MaterialDiscoveredEvent),
     /// System event for shutdown or health check
     System(SystemEvent),
+    /// Processing error occurred
+    ProcessingError(ProcessingErrorEvent),
 }
 
 /// System-wide events
@@ -51,6 +66,16 @@ impl QuiltEvent {
     pub fn health_check() -> Self {
         Self::System(SystemEvent::HealthCheck)
     }
+
+    /// Create a ProcessingError event
+    pub fn processing_error(material_id: &str, stage: &str, message: &str) -> Self {
+        Self::ProcessingError(ProcessingErrorEvent {
+            material_id: material_id.to_string(),
+            timestamp: OffsetDateTime::now_utc(),
+            stage: stage.to_string(),
+            message: message.to_string(),
+        })
+    }
 }
 
 impl fmt::Display for QuiltEvent {
@@ -63,6 +88,11 @@ impl fmt::Display for QuiltEvent {
             ),
             Self::System(SystemEvent::Shutdown) => write!(f, "System.Shutdown"),
             Self::System(SystemEvent::HealthCheck) => write!(f, "System.HealthCheck"),
+            Self::ProcessingError(evt) => write!(
+                f,
+                "ProcessingError {{ material_id: {}, stage: {}, message: {} }}",
+                evt.material_id, evt.stage, evt.message
+            ),
         }
     }
 }

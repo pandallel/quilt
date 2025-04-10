@@ -3,8 +3,8 @@
 
 pub mod actor;
 
-pub use actor::CuttingActor;
 pub use actor::messages;
+pub use actor::CuttingActor;
 
 #[cfg(test)]
-mod tests; 
+mod tests;
