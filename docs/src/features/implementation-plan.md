@@ -144,25 +144,32 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Cutting Actor received X MaterialDiscovered events" in logs without processing them
 
-### Milestone 6: "Cutting Actor Processes Materials"
+### Milestone 6: "Material Text Cutting Implementation"
 
-**Goal:** Implement actual processing in the Cutting Actor
+**Goal:** Implement the text-based document cutting functionality that transforms discovered materials into meaningful cuts
 **Implementation Time:** 3-4 days
 
-1. Add document cutting functionality (2 days)
+1. Integrate text-splitter crate (1 day)
 
-   - Implement text extraction and processing logic
-   - Create document splitting strategies
-   - Add cut creation from materials
-   - Keep detailed metrics of processing
+   - Add text-splitter dependency to Cargo.toml
+   - Create TextCutter implementation using TextSplitter
+   - Configure with default token sizes (target: 300, min: 150, max: 800)
 
-2. Implement Cut event publishing (1-2 days)
-   - Add MaterialCut event publishing
-   - Create proper state transitions in Registry
-   - Add validation through logging
-   - Implement recovery for failed cuts
+2. Implement basic cutting process (1-2 days)
 
-**Demonstration:** Running `main` shows "Created X cuts from Y materials" with detailed metrics in logs
+   - Add text extraction from materials
+   - Integrate with TextSplitter for content chunking
+   - Create MaterialCut model from text-splitter chunks
+   - Implement error handling with fallback strategy
+
+3. Implement Cut event publishing (1 day)
+
+   - Add MaterialCut event creation and publishing
+   - Update material status in registry (Processing → Cut)
+   - Implement error reporting for failed cuts
+   - Add metrics for cut creation (count, size distribution)
+
+**Demonstration:** Running `main` shows "Created X cuts from Y materials using TextSplitter" with detailed metrics in logs
 
 ### Milestone 7: "Cuts Repository Implementation"
 
@@ -316,13 +323,25 @@ Future milestones will focus on more advanced features:
    - Search result ranking
    - Filter and facet implementation
 
-5. **User Interfaces**
+5. **Enhanced Cutting Strategies**
+
+   - Markdown content cutting
+     - MarkdownCutter implementation using MarkdownSplitter
+     - Format detection for Markdown content
+     - Fallback to TextCutter on errors
+   - Source code cutting
+     - CodeCutter implementation using CodeSplitter
+     - Language detection for code content
+     - Specialized semantic boundary handling for code structures
+   - Format-specific optimizations including language-specific tokenization and semantic boundary recognition
+
+6. **User Interfaces**
 
    - Web-based dashboard
    - Search interface
    - Material management
 
-6. **Integration APIs**
+7. **Integration APIs**
    - REST API for external access
    - Webhooks for processing events
    - Subscription mechanism for updates

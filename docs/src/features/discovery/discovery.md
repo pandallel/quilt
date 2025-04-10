@@ -1,4 +1,4 @@
-# Material
+# Discovery
 
 A Material is any text or markdown file that Quilt can read and work with. These files are the starting point for everything Quilt does — they represent the source files that will be processed into Swatches.
 
@@ -135,5 +135,3 @@ Quilt is continuously evolving. Coming soon:
 1. Real-time file watching
 2. Integration with Swatch creation
 3. Support for more file types
-
-For technical implementation details, see the [Material Architecture](./material-architecture.md) document.
