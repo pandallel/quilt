@@ -5,6 +5,7 @@
 
 use actix::prelude::*;
 use log::{debug, error, info, warn};
+use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::oneshot;
@@ -14,7 +15,8 @@ use crate::actors::{ActorError, Ping, Shutdown};
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
-use crate::materials::MaterialRepository;
+use crate::events::EventBus;
+use crate::materials::{MaterialRegistry, MaterialRepository};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -52,7 +54,8 @@ impl From<Box<dyn std::error::Error>> for OrchestratorError {
 /// Manages actor lifecycle and coordinates the material processing pipeline
 pub struct QuiltOrchestrator {
     discovery: Option<Addr<DiscoveryActor>>,
-    repository: MaterialRepository,
+    registry: MaterialRegistry,
+    event_bus: Arc<EventBus>,
     // Future actors:
     // cutting: Option<Addr<CuttingActor>>,
     // swatching: Option<Addr<SwatchingActor>>,
@@ -61,15 +64,23 @@ pub struct QuiltOrchestrator {
 impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
+        let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        let registry = MaterialRegistry::new(repository, event_bus.clone());
+        
         Self {
             discovery: None,
-            repository: MaterialRepository::new(),
+            registry,
+            event_bus,
         }
     }
 
     /// Run the orchestrator with the given configuration
     pub async fn run(mut self, config: OrchestratorConfig) -> Result<(), OrchestratorError> {
         info!("Actor system starting...");
+
+        // Set up event monitoring
+        self.setup_event_monitoring();
 
         // Initialize actors
         self.initialize_actors()?;
@@ -112,15 +123,28 @@ impl QuiltOrchestrator {
         Ok(())
     }
 
+    /// Set up monitoring for the event bus
+    fn setup_event_monitoring(&self) {
+        // Create a subscriber to the event bus
+        let mut subscriber = self.event_bus.subscribe();
+        
+        // Spawn a task to monitor events
+        tokio::spawn(async move {
+            while let Ok(event) = subscriber.recv().await {
+                info!("Event received: {}", event);
+            }
+        });
+    }
+
     /// Initialize all actors in the system
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // Create the discovery actor with repository
+        // Create the discovery actor with registry
         self.discovery =
-            Some(DiscoveryActor::new("main-discovery", self.repository.clone()).start());
+            Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
 
         // Future: Initialize other actors
-        // self.cutting = Some(CuttingActor::new(self.repository.clone()).start());
-        // self.swatching = Some(SwatchingActor::new(self.repository.clone()).start());
+        // self.cutting = Some(CuttingActor::new(self.registry.clone()).start());
+        // self.swatching = Some(SwatchingActor::new(self.registry.clone()).start());
 
         Ok(())
     }

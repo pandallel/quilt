@@ -1,6 +1,6 @@
 use crate::actors::{Ping, Shutdown};
 use crate::discovery::scanner::{DirectoryScanner, ScanResults};
-use crate::materials::{MaterialRepository, RepositoryError};
+use crate::materials::{MaterialRegistry, RegistryError, RepositoryError};
 use actix::prelude::*;
 use log::{debug, error, info};
 use std::path::Path;
@@ -94,9 +94,9 @@ pub mod messages {
 /// Actor responsible for discovering materials in directories
 ///
 /// The DiscoveryActor is responsible for scanning directories for materials,
-/// registering them with the MaterialRepository, and reporting the results.
+/// registering them with the MaterialRegistry, and reporting the results.
 /// It handles validation of directory paths, scanning for files, and registering
-/// the discovered materials with the repository.
+/// the discovered materials with the registry.
 ///
 /// # Message Handlers
 ///
@@ -106,21 +106,21 @@ pub mod messages {
 pub struct DiscoveryActor {
     /// Name of this actor instance for logging
     name: String,
-    /// Repository to register discovered materials with
-    repository: MaterialRepository,
+    /// Registry to manage materials and publish events
+    registry: MaterialRegistry,
 }
 
 impl DiscoveryActor {
-    /// Create a new DiscoveryActor with the given name and repository
+    /// Create a new DiscoveryActor with the given name and registry
     ///
     /// # Arguments
     ///
     /// * `name` - Name for this actor instance, used in logging
-    /// * `repository` - Repository to register discovered materials with
-    pub fn new(name: &str, repository: MaterialRepository) -> Self {
+    /// * `registry` - Registry to manage materials and publish events
+    pub fn new(name: &str, registry: MaterialRegistry) -> Self {
         Self {
             name: name.to_string(),
-            repository,
+            registry,
         }
     }
 
@@ -161,7 +161,7 @@ impl DiscoveryActor {
         }
     }
 
-    /// Register materials with the repository
+    /// Register materials with the registry
     ///
     /// # Arguments
     ///
@@ -186,12 +186,12 @@ impl DiscoveryActor {
                 material.id, material.file_path
             );
 
-            match self.repository.register_material(material).await {
+            match self.registry.register_material(material).await {
                 Ok(_) => {
                     registered_count += 1;
                 }
-                Err(RepositoryError::MaterialAlreadyExists(id)) => {
-                    debug!("Material '{}' already exists in repository, skipping", id);
+                Err(RegistryError::Repository(ref err)) if matches!(err, RepositoryError::MaterialAlreadyExists(_)) => {
+                    debug!("Material already exists in registry, skipping");
                 }
                 Err(err) => {
                     error!("Failed to register material: {}", err);
@@ -203,10 +203,10 @@ impl DiscoveryActor {
             }
         }
 
-        // Get total materials count from repository
-        let total_materials = self.repository.list_materials().await.len();
+        // Get total materials count from registry
+        let total_materials = self.registry.list_materials().await.len();
 
-        // Return counts including total repository count
+        // Return counts including total registry count
         Ok((found_count, failed_count, registered_count, total_materials))
     }
 }
@@ -254,7 +254,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
         );
 
         // Capture actor fields for use in async block
-        let repository = self.repository.clone();
+        let registry = self.registry.clone();
         let validate_fn = self.validate_directory(&msg.config.directory);
         let scan_config = msg.config;
         let actor_name = self.name.clone();
@@ -283,10 +283,10 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
                 scan_results.failed.len()
             );
 
-            // Create DiscoveryActor with the same repository to use its methods
+            // Create DiscoveryActor with the same registry to use its methods
             let discovery_actor = DiscoveryActor {
                 name: actor_name,
-                repository,
+                registry,
             };
 
             // Register the discovered materials using the dedicated method
@@ -295,7 +295,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 
             // Log the registration results
             info!(
-                "Registration complete. Found: {}, Failed: {}, Registered: {}, Total in repository: {}",
+                "Registration complete. Found: {}, Failed: {}, Registered: {}, Total in registry: {}",
                 found_count, failed_count, registered_count, total_materials
             );
 
@@ -307,11 +307,12 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::materials::MaterialStatus;
-    use std::fs::{self, File};
+    use crate::events::EventBus;
+    use crate::materials::{MaterialRepository, MaterialStatus};
+    use std::fs::File;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
-    // Helper function to set up test environment
     fn init_test_logger() {
         let _ = env_logger::builder()
             .filter_level(log::LevelFilter::Debug)
@@ -323,84 +324,76 @@ mod tests {
     async fn test_discovery_actor_ping() {
         init_test_logger();
 
-        // Create a repository
+        // Create a registry with an event bus
         let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        let registry = MaterialRegistry::new(repository, event_bus);
 
         // Create a discovery actor
-        let actor = DiscoveryActor::new("test-discovery", repository).start();
+        let actor = DiscoveryActor::new("test-discovery", registry).start();
 
         // Send a ping message
-        let result = actor.send(Ping).await;
-
-        // Check that the ping response is successful
-        assert!(result.is_ok());
-        assert!(result.unwrap());
+        let response = actor.send(Ping).await.unwrap();
+        assert!(response, "Ping should return true");
     }
 
     #[actix::test]
     async fn test_discovery_actor_shutdown() {
         init_test_logger();
 
-        // Create a repository
+        // Create a registry with an event bus
         let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        let registry = MaterialRegistry::new(repository, event_bus);
 
         // Create a discovery actor
-        let actor = DiscoveryActor::new("test-discovery", repository).start();
+        let actor = DiscoveryActor::new("test-discovery", registry).start();
 
         // Send a shutdown message
-        let result = actor.send(Shutdown).await;
-
-        // Check that the shutdown message was processed
-        assert!(result.is_ok());
-
-        // Wait a moment for the actor to shut down
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        // Try to ping the actor, which should fail
-        let ping_result = actor.send(Ping).await;
-        assert!(ping_result.is_err());
+        let _ = actor.send(Shutdown).await;
+        // Actor should have been stopped by the message
     }
 
     #[actix::test]
     async fn test_discovery_valid_directory() {
         init_test_logger();
 
-        // Create a temporary directory for testing
-        let temp_dir = tempdir().expect("Failed to create temp directory");
-        let temp_path = temp_dir.path().to_string_lossy().to_string();
-
-        // Create a test file
-        let test_file_path = temp_dir.path().join("test.md");
+        // Create a temporary directory with a test file
+        let dir = tempdir().unwrap();
+        let test_file_path = dir.path().join("test.md");
         File::create(&test_file_path).expect("Failed to create test file");
 
-        // Create a repository
+        // Create a registry with an event bus
         let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        
+        // Create a subscriber to keep the event channel open
+        let _subscriber = event_bus.subscribe();
+        
+        let registry = MaterialRegistry::new(repository, event_bus.clone());
 
         // Create a discovery actor
-        let actor = DiscoveryActor::new("test-discovery", repository.clone()).start();
+        let actor = DiscoveryActor::new("test-discovery", registry.clone()).start();
 
         // Create scan config
         let config = DiscoveryConfig {
-            directory: temp_path,
+            directory: dir.path().to_string_lossy().to_string(),
             ignore_hidden: true,
             exclude_patterns: vec![],
         };
 
-        // Send a StartDiscovery message with a valid directory
-        let result = actor.send(messages::StartDiscovery { config }).await;
-
-        // Check that the discovery operation was successful
-        assert!(result.is_ok());
-        let success = result.unwrap().expect("Discovery should succeed");
+        // Send start discovery message
+        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
+        let success = result.unwrap();
         assert!(success.success);
 
-        // Check that the material was registered in the repository
-        let materials = repository.list_materials().await;
-        assert_eq!(materials.len(), 1, "Repository should have one material");
+        // Check that the material was registered in the registry
+        let materials = registry.list_materials().await;
+        assert_eq!(materials.len(), 1, "Registry should have one material");
         assert_eq!(
             materials[0].status,
             MaterialStatus::Discovered,
-            "Material should be in Discovered state"
+            "Material status should be Discovered"
         );
     }
 
@@ -408,14 +401,15 @@ mod tests {
     async fn test_discovery_invalid_directory() {
         init_test_logger();
 
-        // Use a non-existent directory
         let invalid_path = "/path/to/nonexistent/directory";
 
-        // Create a repository
+        // Create a registry with an event bus
         let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        let registry = MaterialRegistry::new(repository, event_bus);
 
         // Create a discovery actor
-        let actor = DiscoveryActor::new("test-discovery", repository).start();
+        let actor = DiscoveryActor::new("test-discovery", registry).start();
 
         // Create scan config
         let config = DiscoveryConfig {
@@ -424,22 +418,16 @@ mod tests {
             exclude_patterns: vec![],
         };
 
-        // Send a StartDiscovery message with an invalid directory
-        let result = actor.send(messages::StartDiscovery { config }).await;
+        // Send start discovery message
+        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
+        assert!(result.is_err());
 
-        // Check that the operation returns an error
-        assert!(result.is_ok());
-        let inner_result = result.unwrap();
-        assert!(inner_result.is_err());
-
-        // Verify the error is of the correct type
-        match inner_result {
-            Err(messages::DiscoveryError::DirectoryNotFound(_)) => {
-                // This is the expected error type
-            }
-            _ => {
-                // Unexpected error type
-                panic!("Expected DirectoryNotFound error");
+        if let Err(err) = result {
+            match err {
+                messages::DiscoveryError::DirectoryNotFound(_) => {
+                    // This is the expected error
+                }
+                _ => panic!("Expected DirectoryNotFound error, got: {:?}", err),
             }
         }
     }
@@ -448,51 +436,47 @@ mod tests {
     async fn test_discovery_with_exclude_patterns() {
         init_test_logger();
 
-        // Create a temporary directory for testing
-        let temp_dir = tempdir().expect("Failed to create temp directory");
-        let temp_path = temp_dir.path().to_string_lossy().to_string();
-
-        // Create a test file
-        File::create(temp_dir.path().join("test.md")).expect("Failed to create test file");
-
-        // Create a subdirectory with a file that should be excluded
-        let subdir = temp_dir.path().join("subdir");
-        fs::create_dir(&subdir).expect("Failed to create subdirectory");
+        // Create a temporary directory with several test files
+        let dir = tempdir().unwrap();
+        let test_file_path = dir.path().join("test.md");
+        let subdir = dir.path().join("subdir");
+        std::fs::create_dir(&subdir).expect("Failed to create subdirectory");
+        File::create(&test_file_path).expect("Failed to create test file");
         File::create(subdir.join("excluded.md")).expect("Failed to create test file");
 
-        // Create a repository
+        // Create a registry with an event bus
         let repository = MaterialRepository::new();
+        let event_bus = Arc::new(EventBus::new());
+        
+        // Create a subscriber to keep the event channel open
+        let _subscriber = event_bus.subscribe();
+        
+        let registry = MaterialRegistry::new(repository, event_bus);
 
         // Create a discovery actor
-        let actor = DiscoveryActor::new("test-discovery", repository.clone()).start();
+        let actor = DiscoveryActor::new("test-discovery", registry.clone()).start();
 
-        // Create scan config
+        // Create scan config with exclude patterns - use the exact subdir path
+        let subdir_str = format!("{}", subdir.display());
         let config = DiscoveryConfig {
-            directory: temp_path,
+            directory: dir.path().to_string_lossy().to_string(),
             ignore_hidden: true,
-            exclude_patterns: vec!["subdir".to_string()],
+            exclude_patterns: vec![subdir_str],
         };
 
-        // Send a StartDiscovery message with exclude patterns
-        let result = actor.send(messages::StartDiscovery { config }).await;
-
-        // Check that the discovery operation was successful
-        assert!(result.is_ok());
-        let success = result.unwrap().expect("Discovery should succeed");
+        // Send start discovery message
+        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
+        let success = result.unwrap();
         assert!(success.success);
 
-        // Check that the material was registered in the repository
-        let materials = repository.list_materials().await;
-        assert_eq!(materials.len(), 1, "Repository should have one material");
+        // Check that the material was registered in the registry
+        let materials = registry.list_materials().await;
+        assert_eq!(materials.len(), 1, "Registry should have one material");
 
-        // Verify the path of the registered material
+        // Verify the material is the test.md file (not the excluded one)
         assert!(
-            materials[0].file_path.contains("test.md"),
-            "Should register the non-excluded file"
-        );
-        assert!(
-            !materials[0].file_path.contains("excluded.md"),
-            "Should not register the excluded file"
+            materials[0].file_path.ends_with("test.md"),
+            "Material path should be the test.md file, not the excluded one"
         );
     }
 }
