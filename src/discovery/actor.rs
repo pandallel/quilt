@@ -190,7 +190,9 @@ impl DiscoveryActor {
                 Ok(_) => {
                     registered_count += 1;
                 }
-                Err(RegistryError::Repository(ref err)) if matches!(err, RepositoryError::MaterialAlreadyExists(_)) => {
+                Err(RegistryError::Repository(ref err))
+                    if matches!(err, RepositoryError::MaterialAlreadyExists(_)) =>
+                {
                     // Extract the material ID if possible
                     let id = if let RepositoryError::MaterialAlreadyExists(id) = err {
                         id
@@ -372,10 +374,10 @@ mod tests {
         // Create a registry with an event bus
         let repository = MaterialRepository::new();
         let event_bus = Arc::new(EventBus::new());
-        
+
         // Create a subscriber to keep the event channel open
         let _subscriber = event_bus.subscribe();
-        
+
         let registry = MaterialRegistry::new(repository, event_bus.clone());
 
         // Create a discovery actor
@@ -389,7 +391,10 @@ mod tests {
         };
 
         // Send start discovery message
-        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
+        let result = actor
+            .send(messages::StartDiscovery { config })
+            .await
+            .unwrap();
         let success = result.unwrap();
         assert!(success.success);
 
@@ -425,13 +430,19 @@ mod tests {
         };
 
         // Send start discovery message and check for the expected error
-        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
-        
+        let result = actor
+            .send(messages::StartDiscovery { config })
+            .await
+            .unwrap();
+
         match result {
             Ok(_) => panic!("Expected an error for invalid directory"),
             Err(err) => {
-                assert!(matches!(err, messages::DiscoveryError::DirectoryNotFound(_)), 
-                    "Expected DirectoryNotFound error, got: {:?}", err);
+                assert!(
+                    matches!(err, messages::DiscoveryError::DirectoryNotFound(_)),
+                    "Expected DirectoryNotFound error, got: {:?}",
+                    err
+                );
             }
         }
     }
@@ -451,10 +462,10 @@ mod tests {
         // Create a registry with an event bus
         let repository = MaterialRepository::new();
         let event_bus = Arc::new(EventBus::new());
-        
+
         // Create a subscriber to keep the event channel open
         let _subscriber = event_bus.subscribe();
-        
+
         let registry = MaterialRegistry::new(repository, event_bus);
 
         // Create a discovery actor
@@ -469,7 +480,10 @@ mod tests {
         };
 
         // Send start discovery message
-        let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
+        let result = actor
+            .send(messages::StartDiscovery { config })
+            .await
+            .unwrap();
         let success = result.unwrap();
         assert!(success.success);
 

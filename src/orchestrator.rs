@@ -67,7 +67,7 @@ impl QuiltOrchestrator {
         let repository = MaterialRepository::new();
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-        
+
         Self {
             discovery: None,
             registry,
@@ -127,7 +127,7 @@ impl QuiltOrchestrator {
     fn setup_event_monitoring(&self) {
         // Create a subscriber to the event bus
         let mut subscriber = self.event_bus.subscribe();
-        
+
         // Spawn a task to monitor events
         tokio::spawn(async move {
             while let Ok(event) = subscriber.recv().await {
@@ -139,8 +139,7 @@ impl QuiltOrchestrator {
     /// Initialize all actors in the system
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create the discovery actor with registry
-        self.discovery =
-            Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
+        self.discovery = Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
 
         // Future: Initialize other actors
         // self.cutting = Some(CuttingActor::new(self.registry.clone()).start());
