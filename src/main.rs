@@ -7,7 +7,7 @@ use env_logger::Env;
 use log::{error, info};
 use std::time::Duration;
 
-use orchestrator::{OrchestratorConfig, QuiltOrchestrator};
+use quilt::orchestrator::{OrchestratorConfig, QuiltOrchestrator};
 
 /// Local-first, modular memory and context engine
 #[derive(Parser, Debug)]
@@ -25,8 +25,6 @@ struct Args {
     #[arg(short, long)]
     exclude: Vec<String>,
 }
-
-mod orchestrator;
 
 #[actix::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

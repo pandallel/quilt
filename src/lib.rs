@@ -6,25 +6,13 @@
 
 pub mod actors;
 pub mod discovery;
+pub mod events;
 pub mod materials;
+pub mod orchestrator;
 
 // Re-export the scanner and repository types
 pub use discovery::{DirectoryScanner, ScanError, ScanResult, ScanResults};
+pub use events::{EventBus, QuiltEvent};
 pub use materials::{Material, MaterialFileType, MaterialStatus};
+pub use materials::{MaterialRegistry, RegistryError};
 pub use materials::{MaterialRepository, RepositoryError};
-
-// This function is only here for testing and can be removed later
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}

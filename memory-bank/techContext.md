@@ -1,145 +1,199 @@
 # Technical Context
 
-## Technology Stack
+## Core Technologies
 
-### Core Technologies
-
-- **Language**: Rust (stable channel)
-- **Actor Framework**: Actix
-- **Async Runtime**: Tokio
-- **Documentation**: mdBook with admonish extension
-- **Build System**: Cargo (Rust's package manager)
-- **CI/CD**: GitHub Actions for PR validation
-- **Code Quality**: rustfmt, Clippy
-- **Rust Language** (Edition 2021): Primary programming language for the project
-- **Actix** (v0.13.1): Actor framework for implementing message-based concurrency
-- **Tokio** (v1.44.2): Async runtime, providing tasks, synchronization primitives, and channels
-  - Features used: macros, rt, rt-multi-thread, sync, time
-- **thiserror** (v2.0.12): Error handling with derive macros for custom error types
-- **time** (v0.3): Date and time utilities with serde support
-- **walkdir** (v2.4.0): Filesystem traversal for material discovery
-- **cuid2** (v0.1.2): Collision-resistant IDs for materials and swatches
-- **log** (v0.4.20): Logging facade for Rust
-- **env_logger** (v0.11.8): Environment-based logging configuration
-
-### Key Dependencies
-
-- **Actix**: Actor framework for message-based concurrency
+- **Rust**: The primary programming language for the project
+- **Actix**: Actor framework for managing actor lifecycle
 - **Tokio**: Async runtime and concurrency primitives
-- **Serde**: Serialization and deserialization
-- **Notify**: File system watching
-- **Local embedding models**: Using libraries like `llama.cpp` or similar for local embeddings
-- **Vector storage**: Implementation TBD (considering HNSW, LSH, or similar algorithms)
+- **Tokio-broadcast**: Event distribution for the Event Bus
+- **RwLock**: Thread-safe state management
 
-### Development Dependencies
+## Architecture Components
 
-- **tempfile** (v3.10.1): Creating temporary directories for testing
-- **futures** (v0.3): Future utilities for testing async code
+### Actor System
+
+Quilt uses Actix for actor lifecycle management, leveraging its robust features:
+
+- **Actor Trait**: For defining actor behavior and message handling
+- **Message Types**: Strongly typed with `#[derive(Message)]` macro
+- **Handler Implementation**: Using `ResponseFuture` for async processing
+- **Actor Lifecycle**: Proper startup and shutdown management
+
+### Event Bus
+
+The Event Bus is implemented using Tokio's broadcast channels:
+
+```rust
+pub struct EventBus {
+    material_tx: broadcast::Sender<MaterialEvent>,
+    system_tx: broadcast::Sender<SystemEvent>,
+    error_tx: broadcast::Sender<ErrorEvent>,
+}
+
+impl EventBus {
+    pub fn new(capacity: usize) -> Self {
+        let (material_tx, _) = broadcast::channel(capacity);
+        let (system_tx, _) = broadcast::channel(capacity);
+        let (error_tx, _) = broadcast::channel(capacity);
+
+        Self {
+            material_tx,
+            system_tx,
+            error_tx,
+        }
+    }
+
+    pub fn subscribe_to_material_events(&self) -> broadcast::Receiver<MaterialEvent> {
+        self.material_tx.subscribe()
+    }
+
+    // Other methods for subscription and publishing
+}
+```
+
+### Material Registry
+
+The Material Registry coordinates state management and event publishing:
+
+```rust
+pub struct MaterialRegistry {
+    materials: Arc<RwLock<HashMap<String, Material>>>,
+    event_bus: Arc<EventBus>,
+    repository: Arc<dyn MaterialRepository>,
+}
+
+impl MaterialRegistry {
+    pub async fn register_material(&self, material: Material) -> Result<(), RegistryError> {
+        // Update state
+        let mut materials = self.materials.write().await;
+        materials.insert(material.id.clone(), material.clone());
+
+        // Persist change
+        self.repository.save(&material).await?;
+
+        // Publish event
+        self.event_bus.publish_material_event(MaterialEvent::Discovered {
+            material_id: material.id.clone(),
+            file_path: material.file_path.clone(),
+        })?;
+
+        Ok(())
+    }
+
+    // Other methods for state management
+}
+```
+
+### Material Repository
+
+The Repository handles persistence operations:
+
+```rust
+#[async_trait]
+pub trait MaterialRepository: Send + Sync + 'static {
+    async fn save(&self, material: &Material) -> Result<()>;
+    async fn load(&self, id: &str) -> Result<Option<Material>>;
+    async fn delete(&self, id: &str) -> Result<()>;
+}
+```
+
+### Event Types
+
+The system uses domain events for communication:
+
+```rust
+pub enum MaterialEvent {
+    Discovered {
+        material_id: String,
+        file_path: String,
+    },
+    Cut {
+        material_id: String,
+        cut_ids: Vec<String>,
+    },
+    Swatched {
+        material_id: String,
+        swatch_id: String,
+    },
+}
+
+pub enum SystemEvent {
+    HealthCheck { actor_id: String },
+    Shutdown,
+}
+
+pub enum ErrorEvent {
+    ProcessingFailed {
+        material_id: String,
+        stage: ProcessingStage,
+        error: String,
+    },
+    PersistenceFailed {
+        material_id: String,
+        operation: String,
+        error: String,
+    },
+}
+
+pub enum ProcessingStage {
+    Discovery,
+    Cutting,
+    Swatching,
+}
+```
 
 ## Development Environment
 
-### Setup Requirements
+### Required Tools
 
-- Rust toolchain (rustc, cargo)
-- mdBook (for documentation)
-- mdbook-admonish (for advanced documentation features)
+- **Rust Toolchain**: Latest stable version
+- **Cargo**: For dependency management and building
+- **Clippy**: For linting
+- **Rustfmt**: For code formatting
+- **Visual Studio Code**: Recommended IDE with rust-analyzer
 
-### Development Commands
+### Build and Test
 
-```bash
-# Build the project
-cargo build
+- **Build**: `cargo build`
+- **Test**: `cargo test`
+- **Run**: `cargo run -- --discovery-dir=/path/to/scan`
 
-# Run tests
-cargo test
+### Continuous Integration
 
-# Check code formatting
-cargo fmt --all -- --check
+- **GitHub Actions**: For automated testing
+- **Rust Coverage**: For test coverage reporting
 
-# Apply code formatting
-cargo fmt
+## Implementation Approach
 
-# Run Clippy linter
-cargo clippy --all-targets --all-features -- -D warnings
+The system is being implemented incrementally, with focused milestones:
 
-# Documentation server
-cd docs && mdbook serve
+1. **Foundation**: Actor system, Material Repository, Discovery system
+2. **Event Infrastructure**: Event Bus, Material Registry, event types
+3. **Actor Evolution**: Updating actors to use event-driven approach
+4. **Processing Pipeline**: Implementing the full material processing pipeline
+5. **Persistence**: Adding durable storage and recovery mechanisms
 
-# Stop documentation server
-pkill -f "mdbook serve"
-```
+Each milestone focuses on providing tangible, demonstrable progress that can be validated through concrete log messages and metrics.
 
 ## Project Structure
 
 ```
 quilt/
-├── .cursor/     # Cursor IDE configuration
-├── .git/        # Git repository
-├── .github/     # GitHub configuration
-│   └── workflows/ # GitHub Actions workflows
+├── .github/     # GitHub workflows
 ├── docs/        # Documentation
-│   ├── book/    # Generated documentation site
+│   ├── book/    # Generated site
 │   ├── src/     # Documentation source
-│   │   └── development/ # Development docs
 │   └── book.toml # mdBook configuration
-├── memory-bank/ # Memory Bank for Cursor
+├── memory-bank/ # Memory Bank
 ├── src/         # Source code
-│   ├── actors/  # Actor system components and common messages
+│   ├── actors/  # Actor system components
 │   ├── discovery/ # Discovery actor module
-│   ├── materials/ # Material processing components
-│   │   └── tests/ # Integration tests
-│   ├── lib.rs   # Library entry point
+│   ├── materials/ # Material processing
 │   └── main.rs  # Application entry point
-├── target/      # Build artifacts
-├── test_dir/    # Test directory for development
+├── test_dir/    # Test directory
 ├── Cargo.toml   # Project manifest
-├── Cargo.lock   # Dependency lock file
-├── rustfmt.toml # Formatting configuration
-├── .clippy.toml # Linting configuration
 └── README.md    # Project overview
 ```
-
-## Implementation Approach
-
-### Milestone Plan
-
-The project follows an incremental implementation plan with clear milestones:
-
-1. **Core Actor System** (1-2 weeks) ✅
-
-   - Set up Actix actor framework
-   - Implement basic message types
-   - Create discovery actor
-   - Add structured logging
-
-2. **Discovery Actor Enhancement** (2-3 weeks)
-
-   - Integrate DirectoryScanner with DiscoveryActor
-   - Implement material creation from scanned files
-   - Connect to message channel system
-
-3. **Cutting Actor Implementation** (2-3 weeks)
-
-   - Implement Cutting Actor
-   - Add document content extraction
-   - Create text fragmentation strategies
-
-4. **Labeling Actor Implementation** (2-3 weeks)
-
-   - Implement Labeling Actor
-   - Add metadata extraction
-   - Integrate with embedding models
-
-5. **Query Interface** (2-3 weeks)
-
-   - Implement basic search functionality
-   - Create query processing logic
-   - Add results formatting
-
-6. **Persistence** (2-3 weeks)
-   - Add persistence for repositories
-   - Implement startup/shutdown persistence
-   - Create consistency checks and error recovery
 
 ## Technical Constraints
 
@@ -152,7 +206,7 @@ The project follows an incremental implementation plan with clear milestones:
 
 ### Development Constraints
 
-- Focus on local-first, privacy-preserving approach
+- Local-first, privacy-preserving approach
 - No cloud dependencies for core functionality
 - Cross-platform compatibility (Linux, macOS, Windows)
 - Modular, pluggable architecture
@@ -161,14 +215,7 @@ The project follows an incremental implementation plan with clear milestones:
 
 ### Actor System
 
-The actor system is implemented using the Actix framework:
-
-- **Actor Trait**: Base trait for all actors in the system
-- **Message Types**: Type-safe messages with defined response types
-- **Actor Lifecycle**: Proper handling of actor startup and shutdown
-- **Actor Organization**: Modular structure with actors in dedicated modules
-
-Example of an actor implementation:
+The actor system uses Actix with proper lifecycle management:
 
 ```rust
 pub struct DiscoveryActor {
@@ -186,86 +233,39 @@ impl Actor for DiscoveryActor {
         info!("DiscoveryActor '{}' stopped", self.name);
     }
 }
-
-impl Handler<Ping> for DiscoveryActor {
-    type Result = bool;
-
-    fn handle(&mut self, _msg: Ping, _ctx: &mut Self::Context) -> Self::Result {
-        debug!("DiscoveryActor '{}' received ping", self.name);
-        true
-    }
-}
 ```
-
-### Material Repository
-
-The repository is implemented as a thread-safe in-memory store using `Arc<RwLock<HashMap<String, Material>>>`. It provides CRUD operations with idempotence checks and state transition validation.
 
 ### Message Channel System
 
-The message system uses Tokio's MPSC channels with a carefully chosen capacity (100 messages) that balances throughput with memory usage. It implements:
+The message system uses Tokio's MPSC channels with capacity of 100 messages for direct actor-to-actor communication.
 
-- **MaterialMessage Enum**: Five message types representing the processing pipeline:
+### Message Types
 
-  ```rust
-  pub enum MaterialMessage {
-      Discovered(Material),      // Full material for initial discovery
-      Cut(String),               // Just material ID to minimize size
-      Swatched(String),          // Just material ID to minimize size
-      Error(String, String),     // Material ID and error message
-      Shutdown,                  // Signal to stop processing
-  }
-  ```
+Each actor has its own specific message types for direct communication:
 
-- **Channel Management**: Factory functions and helper methods for creating and using channels:
+pub struct MaterialDiscovered {
+pub material: Material, // Full material for initial registration
+}
 
-  ```rust
-  // Creating channels
-  pub fn create_channel() -> ChannelPair { /* ... */ }
+pub struct CutMaterial {
+pub material_id: String, // Reference to original material
+pub cut_ids: Vec<String>, // IDs of the generated cuts
+}
 
-  // Extension trait for sender
-  pub trait MaterialChannelExt {
-      async fn send_message(&self, message: MaterialMessage) -> Result<(), ChannelError>;
-      async fn try_send_message_timeout(&self, message: MaterialMessage,
-                                      timeout_duration: Duration) -> Result<(), ChannelError>;
-      async fn send_shutdown(&self) -> Result<(), ChannelError>;
-  }
-  ```
+pub struct MaterialSwatched {
+pub material_id: String, // Reference to original material
+pub cut_id: String, // Reference to the cut that was processed
+pub swatch_id: String, // ID of the generated swatch
+}
 
-- **Error Handling**: Structured error types for different failure scenarios:
-  ```rust
-  pub enum ChannelError {
-      SendError(String),
-      ReceiveTimeout(Duration),
-      ChannelClosed,
-  }
-  ```
+pub struct ProcessingError {
+pub material_id: String,
+pub stage: ProcessingStage,
+pub error: String,
+}
 
-### Logging System
-
-The logging system is implemented using the log crate with env_logger:
-
-- **Log Levels**: Different log levels for different types of information (debug, info, warn, error)
-- **Environment Configuration**: Configurable via environment variables (RUST_LOG)
-- **Structured Logging**: Includes timestamp, log level, and module path
-
-### Type System
-
-- **Material Struct**: Represents documents with metadata and state tracking
-- **MaterialStatus Enum**: Tracks the processing state (Discovered, Cut, Swatched, Error)
-- **MaterialFileType Enum**: Categorizes materials by file type (Markdown, Text, Other)
-
-### Testing Approach
-
-- **Unit Testing**: Comprehensive tests for each component's behavior
-- **Integration Testing**: Tests for how components work together (e.g., message flow through channels)
-- **Async Testing**: Using Tokio's test utilities for async code
-- **CI/CD Pipeline**: GitHub Actions workflow for automatic PR validation
-- **Code Quality Tools**:
-  - rustfmt with custom configuration for code style
-  - Clippy with tailored rules for static analysis
-  - Documented standards in the development guide
-- **Test Organization**:
-  - Unit tests located alongside the code they test
-  - Integration tests in dedicated test modules
-  - Test utilities to simplify test creation
+pub enum ProcessingStage {
+Discovery,
+Cutting,
+Swatching,
+}

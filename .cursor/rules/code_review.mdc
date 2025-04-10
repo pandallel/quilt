@@ -8,6 +8,16 @@ alwaysApply: false
 
 When conducting a code review, follow these structured steps to ensure a thorough analysis:
 
+# Automatic Review Trigger
+
+When a user requests a code review without additional context:
+1. Automatically compare against main branch
+2. Execute `git diff --stat main` to identify changes
+3. Review ALL changed files without waiting for further input
+4. Present findings following the structure below
+
+If the user provides specific files or scope, override this default behavior and review only the specified scope.
+
 ## Step 1: Compare Changes
 
 - Compare the current branch against the target branch (usually `main`)
@@ -17,7 +27,7 @@ When conducting a code review, follow these structured steps to ensure a thoroug
 ## Step 2: Review Code Quality
 
 ### Architecture and Design
-- Evaluate whether the code follows the actor-based architecture
+- Evaluate whether the code follows the actor-based architecture [actor-model-architecture.md](mdc:docs/src/features/actor-model-architecture.md)
 - Check if new components integrate correctly with existing systems
 - Assess modularity and separation of concerns
 - Verify proper encapsulation of implementation details
@@ -62,6 +72,9 @@ When conducting a code review, follow these structured steps to ensure a thoroug
 - Verify that complex logic has explanatory comments
 - Ensure public APIs have proper documentation
 - Check for consistent naming conventions
+- Ensure appropriate documentation in docs/
+- Ensure memory bank is up to date
+- Ensure [implementation-plan.md](mdc:docs/src/features/implementation-plan.md) is updated
 
 ## Step 6: Provide Constructive Feedback
 
@@ -69,30 +82,3 @@ When conducting a code review, follow these structured steps to ensure a thoroug
 - Suggest specific solutions for identified issues
 - Prioritize feedback by importance (critical, major, minor)
 - Frame feedback in a constructive, collaborative manner
-
-## Example Review Output
-
-```
-## Code Review Summary
-
-### Architecture and Design
-- [Strength] Well-structured actor hierarchy with clear separation of concerns
-- [Issue] Actor X has too many responsibilities; consider splitting
-
-### Error Handling
-- [Strength] Good use of custom error types with thiserror
-- [Issue] Missing error handling in function Y
-
-### Testing
-- [Strength] Good test coverage of core functionality
-- [Issue] Edge case Z is not tested
-
-### Performance
-- [Note] Consider using tokio::sync::oneshot instead of sleep for coordination
-
-### Documentation
-- [Strength] Clear module-level documentation
-- [Issue] Missing documentation for public function W
-```
-
-Always provide specific examples from the code to illustrate points, and suggest concrete improvements where possible. 

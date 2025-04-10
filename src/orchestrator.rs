@@ -10,11 +10,11 @@ use thiserror::Error;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
 
-use quilt::actors::{ActorError, Ping, Shutdown};
-use quilt::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
-use quilt::discovery::actor::DiscoveryConfig;
-use quilt::discovery::DiscoveryActor;
-use quilt::materials::MaterialRepository;
+use crate::actors::{ActorError, Ping, Shutdown};
+use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
+use crate::discovery::actor::DiscoveryConfig;
+use crate::discovery::DiscoveryActor;
+use crate::materials::MaterialRepository;
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -59,7 +59,7 @@ pub struct QuiltOrchestrator {
 }
 
 impl QuiltOrchestrator {
-    /// Create a new orchestrator
+    /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
         Self {
             discovery: None,
@@ -236,5 +236,11 @@ impl QuiltOrchestrator {
         System::current().stop();
 
         info!("Actor system shutdown complete");
+    }
+}
+
+impl Default for QuiltOrchestrator {
+    fn default() -> Self {
+        Self::new()
     }
 }

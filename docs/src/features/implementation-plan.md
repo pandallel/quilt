@@ -25,9 +25,9 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 3. ✅ **Message Channel System**
 
-   - ✅ Defined MaterialMessage enum (Discovered, Cut, Swatched, Error, Shutdown)
+   - ✅ Defined actor-specific message types for direct communication
    - ✅ Set up Tokio mpsc channels with appropriate capacity (100)
-   - ✅ Implemented channel creation and utilities for connect stages
+   - ✅ Implemented channel creation and utilities for connecting stages
    - ✅ Added helper traits for sending/receiving with timeout capabilities
    - ✅ Created comprehensive tests for message passing and backpressure
 
@@ -80,191 +80,246 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows list of materials found in the configured directory with repository statistics
 
-### Milestone 3: "Discovery Actor Sends Material Messages"
+### ✅ Milestone 3: "Event Bus and Material Registry Foundation"
 
-**Goal:** Establish message passing between actors
+**Goal:** Establish the core communication infrastructure
+**Implementation Time:** 2-3 days
+**Status:** Completed
+
+1. ✅ Implement basic Event Bus (1 day)
+
+   - ✅ Create central event bus using `tokio::sync::broadcast` channels
+   - ✅ Implement simple event types (MaterialDiscovered event only)
+   - ✅ Add logging for event publishing and subscription
+   - ✅ Create basic tests that verify event transmission
+
+2. ✅ Create Material Registry prototype (1-2 days)
+   - ✅ Implement basic registry that works alongside existing Repository
+   - ✅ Add minimal event publishing for material discovery
+   - ✅ Create simple validation of events using logging
+   - ✅ Keep the existing Repository functionality intact
+
+**Demonstration:** Running `main` shows "Event Bus initialized" in logs and demonstrates events flowing with log messages
+
+### Milestone 4: "Discovery Actor Publishes Events"
+
+**Goal:** Make Discovery Actor use the Event Bus for one simple operation
 **Implementation Time:** 2-3 days
 
-1. Connect to message channel system (1-2 days)
+1. Update Discovery Actor to publish events (1-2 days)
 
-   - Utilize existing MaterialMessage enum types
-   - Configure Tokio mpsc channels
-   - Implement channel registration and connection
+   - Add event publishing for discovered materials
+   - Keep existing direct interactions for compatibility
+   - Add logging to show event publishing
+   - Create simple test harness for validation
 
-2. Configure Discovery actor to send messages (1 day)
-   - Serialize materials into messages ⚠️
-     - Challenge: Balance between passing full objects vs just IDs
-     - Consider ownership transfer between components
-     - Address thread safety in async context
-   - Implement proper channel selection
-   - Add sending logic with logging
+2. Add event monitoring (1 day)
+   - Implement simple event listener in the main application
+   - Log all published events with timestamps
+   - Display event counts in logs
+   - Add basic metrics for event flow
 
-**Demonstration:** Running `main` logs "Sent X material messages to channel"
+**Demonstration:** Running `main` shows "Published X MaterialDiscovered events" with event details in logs
 
-### Milestone 4: "Cutting Actor Creates Document Cuts"
+### Milestone 5: "Basic Cutting Actor Creation"
 
-**Goal:** Process materials into cuts
+**Goal:** Create a minimal Cutting Actor that listens for events
+**Implementation Time:** 2-3 days
+
+1. Create Cutting Actor skeleton (1-2 days)
+
+   - Implement simple actor that subscribes to MaterialDiscovered events
+   - Add logging for received events
+   - Create basic actor lifecycle (start/stop)
+   - Do not implement actual material processing yet
+
+2. Set up actor monitoring (1 day)
+   - Add heartbeat logging for the actor
+   - Implement basic health checks
+   - Add subscription metrics
+   - Create actor configuration structure
+
+**Demonstration:** Running `main` shows "Cutting Actor received X MaterialDiscovered events" in logs without processing them
+
+### Milestone 6: "Cutting Actor Processes Materials"
+
+**Goal:** Implement actual processing in the Cutting Actor
 **Implementation Time:** 3-4 days
 
-1. Create CuttingActor implementation (1-2 days)
+1. Add document cutting functionality (2 days)
 
-   - Add message reception from Discovery
-   - Implement basic cut creation logic
-   - Add file content extraction ⚠️
-     - Challenge: CPU-intensive operations can block the async runtime
-     - Use `spawn_blocking` for long-running operations
-     - Implement async I/O operations where possible
+   - Implement text extraction and processing logic
+   - Create document splitting strategies
+   - Add cut creation from materials
+   - Keep detailed metrics of processing
 
-2. Implement document splitting strategies (2 days)
-   - Create text extraction pipeline
-   - Implement basic cutting strategies (paragraphs, fixed size)
-   - Add metadata extraction for cuts
+2. Implement Cut event publishing (1-2 days)
+   - Add MaterialCut event publishing
+   - Create proper state transitions in Registry
+   - Add validation through logging
+   - Implement recovery for failed cuts
 
-**Demonstration:** Running `main` shows "Created X cuts from material Y" with cut details
+**Demonstration:** Running `main` shows "Created X cuts from Y materials" with detailed metrics in logs
 
-### Milestone 5: "CutsRepository Stores Document Cuts"
+### Milestone 7: "Cuts Repository Implementation"
 
-**Goal:** Store processed cuts for later retrieval
+**Goal:** Store processed cuts with event integration
 **Implementation Time:** 2-3 days
 
 1. Implement CutsRepository (1-2 days)
 
-   - Create in-memory storage with proper concurrency
-   - Implement CRUD operations for cuts
-   - Add indexing for efficient retrieval
+   - Create in-memory storage for cuts
+   - Implement CRUD operations
+   - Add integration with Registry
+   - Create comprehensive tests
 
-2. Connect CuttingActor to repository (1 day)
-   - Add repository interaction in actor ⚠️
-     - Challenge: Select appropriate repository methods (register_material vs add_material)
-     - Handle borrowed data that must not escape its scope
-     - Manage ownership transfer between components carefully
+2. Connect Cutting Actor to repository (1 day)
+   - Add repository interaction in actor
    - Implement proper error handling
-   - Add logging for storage operations
+   - Add storage metrics and logging
+   - Create validation of stored cuts
 
-**Demonstration:** Running `main` logs "Stored cut ID X from material Y" for each processed cut
+**Demonstration:** Running `main` logs "Stored X cuts in repository" with metrics on storage operations
 
-### Milestone 6: "Cutting Actor Sends Cuts to Labeling"
+### Milestone 8: "Basic Swatching Actor Creation"
 
-**Goal:** Complete the second stage of the pipeline
+**Goal:** Create a minimal Swatching Actor that listens for cut events
 **Implementation Time:** 2-3 days
 
-1. Set up channels between cutting and labeling (1 day)
+1. Create Swatching Actor skeleton (1-2 days)
 
-   - Create CutMessage types
-   - Implement channel connections
-   - Add proper error handling
+   - Implement simple actor that subscribes to MaterialCut events
+   - Add logging for received events
+   - Create basic actor lifecycle management
+   - Do not implement swatch creation yet
 
-2. Configure CuttingActor to forward cuts (1-2 days)
-   - Implement message transformation
-   - Add sending logic with backpressure handling
-   - Create comprehensive logging
+2. Set up event flow monitoring (1 day)
+   - Add event flow tracking between actors
+   - Implement metrics for the pipeline
+   - Create visualization of event flow in logs
+   - Add configuration options
 
-**Demonstration:** Running `main` logs "Sent X cuts to labeling channel"
+**Demonstration:** Running `main` shows "Swatching Actor received X MaterialCut events" in logs without processing them
 
-### Milestone 7: "Labeling Actor Creates Swatches from Cuts"
+### Milestone 9: "Swatching Actor Processes Cuts"
 
-**Goal:** Implement the final stage of processing
+**Goal:** Implement actual swatch creation in the Swatching Actor
 **Implementation Time:** 3-4 days
 
-1. Create LabelingActor implementation (1-2 days)
+1. Add swatch creation functionality (2 days)
 
-   - Add message reception from Cutting
-   - Implement swatch creation logic
-   - Add metadata enrichment
+   - Implement metadata extraction
+   - Create content analysis features
+   - Add embedding generation with async processing
+   - Keep detailed metrics of swatch creation
 
-2. Implement swatch creation strategies (2 days)
-   - Create metadata extraction and enhancement
-   - Implement content analysis features
-   - Add classification and tagging
+2. Implement MaterialSwatched events (1-2 days)
+   - Add event publishing for completed swatches
+   - Create state transition in Registry
+   - Add validation through logging
+   - Implement recovery for failed swatches
 
-**Demonstration:** Running `main` shows "Created swatch from cut X" with swatch details
+**Demonstration:** Running `main` shows "Created X swatches from Y cuts" with detailed processing metrics
 
-### Milestone 8: "SwatchRepository Stores Processed Swatches"
+### Milestone 10: "Swatch Repository and Complete Pipeline"
 
-**Goal:** Complete the storage of final processed items
+**Goal:** Complete the storage and finalize the processing pipeline
 **Implementation Time:** 2-3 days
 
 1. Implement SwatchRepository (1-2 days)
 
-   - Create in-memory storage with proper concurrency
-   - Implement CRUD operations for swatches
+   - Create in-memory storage for swatches
+   - Implement CRUD operations
    - Add indexing for efficient retrieval
+   - Create comprehensive tests
 
-2. Connect LabelingActor to repository (1 day)
-   - Add repository interaction in actor
-   - Implement proper error handling
-   - Add logging for storage operations
+2. Validate full event pipeline (1 day)
+   - Add end-to-end metrics for the pipeline
+   - Create visualization of complete material flow
+   - Add system health checks
+   - Implement recovery for pipeline failures
 
-**Demonstration:** Running `main` logs "Stored swatch ID X in repository"
+**Demonstration:** Running `main` displays "Full pipeline metrics: X discovered → Y cut → Z swatched" with complete flow statistics
 
-### Milestone 9: "Query Swatches by Content"
+### Milestone 11: "Basic Query Capability"
 
-**Goal:** Enable basic search functionality
+**Goal:** Enable simple searching of swatches
 **Implementation Time:** 2-3 days
 
-1. Implement basic text search (1-2 days)
+1. Implement basic search functionality (1-2 days)
 
-   - Add content indexing in repository
-   - Implement simple query interface
-   - Create results formatting
+   - Add simple text indexing in SwatchRepository
+   - Create basic query API
+   - Implement search results formatter
+   - Add search metrics
 
-2. Add search commands to main (1 day)
-   - Create simple query API
-   - Implement results display
-   - Add error handling
+2. Integrate with the main application (1 day)
+   - Add search command to the interface
+   - Create results display
+   - Add error handling for searches
+   - Implement logging for search operations
 
-**Demonstration:** Running `main` shows "Found X swatches matching query 'Z'"
+**Demonstration:** Running `main` with search parameter shows "Found X swatches matching query 'Z'" with results displayed
 
-### Milestone 10: "Repositories Persist Data to Disk"
+### Milestone 12: "Event and Data Persistence"
 
-**Goal:** Ensure data persists between application runs
+**Goal:** Ensure data and events persist between application runs
 **Implementation Time:** 3-4 days
 
-1. Implement basic persistence for repositories (2 days)
+1. Implement event logging (1-2 days)
 
-   - Add serialization for repository data
-   - Implement file-based storage ⚠️
-     - Challenge: I/O operations can block the async runtime
-     - Use async file I/O where possible
-     - Offload to dedicated threads for blocking operations
-   - Create consistent loading/saving
+   - Add event serialization
+   - Create file-based event log
+   - Implement event replay on startup
+   - Add validation for event consistency
 
-2. Add startup/shutdown persistence (1-2 days)
-   - Implement startup loading
-   - Add shutdown saving
-   - Create consistency checks and error recovery
+2. Add repository persistence (1-2 days)
+   - Implement serialization for repository data
+   - Create file-based storage
+   - Add startup/shutdown procedures
+   - Create recovery mechanisms
 
-**Demonstration:** Running `main` logs "Loaded X cuts and Y swatches from disk" on startup
+**Demonstration:** Stopping and restarting `main` shows "Recovered X events and restored system state" with intact data
 
 ## Future Milestones
 
 Future milestones will focus on more advanced features:
 
-1. **Enhanced Text Processing**
+1. **Scaling and Performance**
+
+   - Swatching Router implementation for dynamic actor scaling
+     - Router actor for managing multiple Swatching Actors
+     - Queue length monitoring and health checks
+     - Dynamic actor pool management
+   - Enhanced caching strategies
+   - Load balancing and monitoring
+   - Performance optimization based on usage patterns
+
+2. **Enhanced Text Processing**
 
    - Language detection
    - Text classification
    - Entity extraction
 
-2. **Embedding and Vector Search**
+3. **Embedding and Vector Search**
 
    - Integration with embedding models
    - Vector storage for semantic search
    - Similarity search implementation
 
-3. **Advanced Search and Queries**
+4. **Advanced Search and Queries**
 
    - Query language development
    - Search result ranking
    - Filter and facet implementation
 
-4. **User Interfaces**
+5. **User Interfaces**
 
    - Web-based dashboard
    - Search interface
    - Material management
 
-5. **Integration APIs**
+6. **Integration APIs**
    - REST API for external access
    - Webhooks for processing events
    - Subscription mechanism for updates

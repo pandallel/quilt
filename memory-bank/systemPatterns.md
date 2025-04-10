@@ -2,91 +2,95 @@
 
 ## Architecture Overview
 
-Quilt uses an **actor model architecture** implemented with Actix. The system processes materials through a pipeline of specialized actors, with a thread-safe repository serving as the single source of truth.
+Quilt uses an **event-driven actor model architecture** implemented with Actix for actor lifecycle management and Tokio for concurrency primitives. The system processes materials through a pipeline of independent actors that communicate via an Event Bus, with a Material Registry serving as the central coordinator for state and event publishing.
 
 ```mermaid
 graph TB
-    QO[QuiltOrchestrator]
-
-    subgraph "Processing Actors"
-        DA[Discovery Actor]
-        CA[Cutting Actor]
-        LA[Labeling Actor]
+    subgraph EventBus["Event Bus"]
+        E1[MaterialDiscovered]
+        E2[MaterialCut]
+        E3[MaterialSwatched]
     end
 
-    Repo[Material Repository]
+    subgraph ProcessingActors["Processing Actors"]
+        DW[Discovery Actor]
+        CW[Cutting Actor]
+        SW[Swatching Actor]
+    end
 
-    QO -->|Manages| DA
-    QO -->|Manages| CA
-    QO -->|Manages| LA
+    Reg[Material Registry]
+    DB[(Material Repository)]
 
-    DA -->|Detect Material| Repo
-    DA -->|Send Discovered Material| CA
-    CA -->|Process material and update state to Cut| Repo
-    CA -->|Send Cut Material| LA
-    LA -->|Process material and update state to Swatched| Repo
+    %% Discovery flow
+    DW -->|"Register"| Reg
+    Reg -->|"Publish"| E1
+    E1 -->|"Subscribe"| CW
+
+    %% Cutting flow
+    CW -->|"Update Status"| Reg
+    Reg -->|"Publish"| E2
+    E2 -->|"Subscribe"| SW
+
+    %% Swatching flow
+    SW -->|"Update Status"| Reg
+    Reg -->|"Publish"| E3
+
+    %% Persistence flow
+    Reg -.->|"Persist"| DB
 ```
 
 ## Key Design Patterns
 
-### Orchestrator Pattern
+### Event-Driven Architecture
 
-- **QuiltOrchestrator**: Central component responsible for actor lifecycle management
-- **Actor Initialization**: The orchestrator creates and initializes all actors in the system
-- **Message Flow Coordination**: Establishes connections between actors
-- **Graceful Shutdown**: Manages orderly shutdown of the actor system
-- **Error Handling**: Centralizes error handling logic for actor operations
-- **Configuration Management**: Handles actor-specific configuration settings
+- **Event Bus**: System-wide bus implemented with Tokio broadcast channels
+- **Event Publishing**: Registry publishes events on state changes
+- **Event Subscription**: Actors subscribe to events they need to process
+- **Decoupling**: No direct actor-to-actor coupling, enabling independent scaling
+
+### State Management and Registry Pattern
+
+- **Material Registry**: Central coordinator for material state
+- **State Changes**: Atomic operations with event publishing
+- **Separation of Concerns**: Registry manages state, Repository handles persistence
+- **Single Source of Truth**: Registry provides consistent view of system state
 
 ### Actor Model Implementation
 
-- **Actix Framework**: Using the Actix actor system for message-based concurrency
-- **Actor Lifecycle Management**: Proper handling of actor startup and shutdown
-- **Message Types**: Clearly defined message types with appropriate response types
-- **Direct Messaging**: Actors communicate directly via message passing
-- **Shared State**: Thread-safe repository provides consistent state management
+- **Actix for Lifecycle**: Using Actix for actor management
+- **Tokio for Concurrency**: Using Tokio primitives for synchronization
+- **Event Subscription**: Actors subscribe to relevant event channels
+- **Backpressure Handling**: Controlling event consumption rate
 
-### Actor Organization
-
-- **Modular Structure**: Actors are organized in dedicated modules (e.g., src/discovery)
-- **Common Messaging**: Shared message types in a central actors module
-- **Actor-Specific Messages**: Custom messages defined in the actor's namespace
-- **Orchestrator**: Top-level component (src/orchestrator.rs) that coordinates the entire system
-
-### Message Flow Patterns
+### Material Processing Flow
 
 ```mermaid
 sequenceDiagram
-    participant DiscoveryActor
-    participant CuttingActor
-    participant LabelingActor
-    participant Repository
+    participant DA as Discovery Actor
+    participant CA as Cutting Actor
+    participant SA as Swatching Actor
+    participant Reg as Material Registry
+    participant EB as Event Bus
+    participant Repo as Material Repository
 
-    DiscoveryActor->>Repository: Register material (status: Discovered)
-    DiscoveryActor->>CuttingActor: Send Discovered(Material)
-    CuttingActor->>Repository: Get material if needed
-    CuttingActor->>Repository: Update status to Cut
-    CuttingActor->>LabelingActor: Send Cut(material_id)
-    LabelingActor->>Repository: Get material
-    LabelingActor->>Repository: Update status to Swatched
+    DA->>Reg: Register material
+    Reg->>Repo: Persist material
+    Reg->>EB: Publish MaterialDiscovered
+    EB-->>CA: Subscribe to MaterialDiscovered
+    CA->>Reg: Update status to Cut
+    Reg->>Repo: Persist updated state
+    Reg->>EB: Publish MaterialCut
+    EB-->>SA: Subscribe to MaterialCut
+    SA->>Reg: Update status to Swatched
+    Reg->>Repo: Persist updated state
+    Reg->>EB: Publish MaterialSwatched
 
     alt Error occurs
-        CuttingActor->>Repository: Update status to Error
-        CuttingActor->>LabelingActor: Send Error(material_id, error_message)
-    end
-
-    alt Shutdown requested
-        DiscoveryActor->>DiscoveryActor: Handle Shutdown message
-        CuttingActor->>CuttingActor: Handle Shutdown message
-        LabelingActor->>LabelingActor: Handle Shutdown message
+        CA->>Reg: Update status to Error
+        Reg->>Repo: Persist error state
+        Reg->>EB: Publish ErrorEvent
     end
 ```
-
-### Material Processing Pipeline
-
-1. **Discovery Stage**: Scans for new/updated materials, registers them in repository, sends discovery messages
-2. **Cutting Stage**: Receives discovery messages, cuts materials into swatches, updates state, sends cut messages
-3. **Labeling Stage**: Receives cut messages, embeds swatches, updates state, makes swatches available for queries
 
 ### Domain Model
 
@@ -94,22 +98,28 @@ sequenceDiagram
 classDiagram
     class Material {
         +String id
-        +String path
-        +MaterialState state
+        +String file_path
+        +MaterialStatus status
         +DateTime last_modified
+        +Option~String~ error
+    }
+
+    class Cut {
+        +String id
+        +String material_id
         +String content
-        +List~Swatch~ swatches
+        +CutMetadata metadata
     }
 
     class Swatch {
         +String id
         +String material_id
-        +String content
+        +Vec~Cut~ cuts
         +Vec~f32~ embedding
         +SwatchMetadata metadata
     }
 
-    class MaterialState {
+    class MaterialStatus {
         <<enumeration>>
         +DISCOVERED
         +CUT
@@ -117,58 +127,68 @@ classDiagram
         +ERROR
     }
 
-    class SwatchBook {
-        +add_swatch(Swatch)
-        +query(String) List~Swatch~
-        +get_swatches(String) List~Swatch~
+    class MaterialEvent {
+        <<enumeration>>
+        +Discovered
+        +Cut
+        +Swatched
     }
 
-    class Spread {
-        +String query
-        +List~Swatch~ swatches
-        +List~Material~ materials
+    class SystemEvent {
+        <<enumeration>>
+        +HealthCheck
+        +Shutdown
     }
 
-    Material "1" --> "*" Swatch
-    Material --> MaterialState
-    SwatchBook --> "*" Swatch
-    Spread --> "*" Swatch
-    Spread --> "*" Material
+    class ErrorEvent {
+        <<enumeration>>
+        +ProcessingFailed
+        +PersistenceFailed
+    }
+
+    Material --> MaterialStatus
+    Cut --> Material
+    Swatch --> Material
 ```
 
 ## Technical Decisions
 
-### Actor System Organization: Orchestrator Pattern
+### Event Bus Implementation
 
-- **Rationale**: Centralizes actor management for cleaner code organization
-- **Benefits**: Improves maintainability, simplifies main.rs, and provides better separation of concerns
-- **Implementation**: QuiltOrchestrator manages actor creation, messaging, and shutdown
+- **Tokio Broadcast Channels**: Using `tokio::sync::broadcast` for event distribution with a default capacity of 128
+- **Multiple Consumers**: Supporting multiple subscribers with independent receivers
+- **Event Types**: Implemented MaterialDiscovered and System events (Shutdown, HealthCheck)
+- **Error Handling**: Comprehensive error handling with EventBusError and detailed logging
+- **Subscription Management**: Simple subscribe() method returning a Receiver
+- **Event Publishing**: Publish method with receiver count logging and error propagation
+- **EventSubscriber Trait**: Helper trait for processing events from a receiver
+- **Comprehensive Tests**: Test coverage for publishing, multiple subscribers, and event processing
 
-### Actor Framework: Actix
+### Actor Implementation
 
-- **Rationale**: Provides a robust, production-ready actor system for Rust
-- **Benefits**: Well-established in the Rust ecosystem, excellent documentation and support
-- **Implementation**: Actors are implemented with appropriate message handling and lifecycle management
+- **Actix Actors**: Implementing actors using the Actix framework
+- **Event Processing**: Subscribing to events during actor initialization
+- **Async Processing**: Using `ResponseFuture` for long-running operations
+- **Supervision**: Implementing proper error handling and recovery strategies
 
-### Runtime Integration: Actix and Tokio
+### State Management
 
-- **#[actix::main]** macro for initializing the Actix system on top of Tokio
-- **Tokio Channels**: Leveraging Tokio's async primitives for additional functionality
-- **Message Passing**: Using Actix's type-safe message passing system
+- **Thread-Safe Registry**: Using Tokio's RwLock for thread-safe state access
+- **Atomic Operations**: Ensuring state changes and event publishing are atomic
+- **Persistence Layer**: Separate repository for persistent storage
 
-### Logging: env_logger
+### Concurrency Safety
 
-- **Structured Logging**: Using the log crate with env_logger implementation
-- **Configuration**: Configurable log levels via environment variables
-- **Actor Lifecycle Logging**: Logging important events in actor lifecycle (start, stop, message handling)
+- **Synchronization Primitives**: Using appropriate primitives for shared state
+- **Message Passing**: Relying on message passing for inter-actor communication
+- **Ownership Model**: Leveraging Rust's ownership system for safety
 
-### State Management: In-memory with Persistence
+## Implementation Approach
 
-- **Initial Implementation**: In-memory repository with thread-safe access for concurrent operations
-- **Future Evolution**: Add persistent storage and recovery mechanisms
+The system is being implemented incrementally, with each milestone providing a tangible, demonstrable change:
 
-### Modular Design
-
-- **Independent Components**: Each actor is independently implementable and testable
-- **Actor Namespaces**: Organizing actors in dedicated modules for better code organization
-- **Plugin Architecture**: Long-term goal to allow custom implementations of each actor
+1. First establishing the Event Bus and Material Registry
+2. Updating Discovery Actor to publish events
+3. Creating processing actors that subscribe to events
+4. Implementing the full pipeline with proper event flow
+5. Adding query capabilities and persistence
