@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 3: "Event Bus and Material Registry Foundation" and is now working on Milestone 4: "Discovery Actor Publishes Events" to integrate the Discovery Actor with the event-driven communication infrastructure.
+The project has completed Milestone 4: "Discovery Actor Publishes Events" and is now preparing for Milestone 5: "Basic Cutting Actor Creation". The Discovery Actor is now fully integrated with the event-driven communication infrastructure via the Material Registry.
 
 ## Current Implementation Status
 
@@ -15,11 +15,13 @@ The codebase currently has these key components implemented:
    - QuiltOrchestrator implementing the Orchestrator pattern
    - Proper Actix/Tokio runtime integration with #[actix::main]
 
-2. **Material Repository**:
+2. **Material Repository and Registry**:
 
    - Thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
    - Material state tracking with proper validation (Discovered → Cut → Swatched → Error)
    - CRUD operations with idempotence and state transition validation
+   - Registry wrapping repository and providing event coordination
+   - Fully transition from direct Repository use to Registry pattern
 
 3. **Event System**:
 
@@ -28,6 +30,7 @@ The codebase currently has these key components implemented:
    - Event types defined for material and system events
    - Comprehensive test coverage for event publishing and subscription
    - Clear error handling for event operations
+   - Improved logging with appropriate debug level for routine events
 
 4. **Message System**:
 
@@ -41,28 +44,29 @@ The codebase currently has these key components implemented:
    - DiscoveryActor that wraps the scanner in the actor interface
    - DiscoveryConfig for scanner parameters
    - Support for excluding patterns and hidden files
+   - Event publishing for discovered materials
 
 ## Recent Changes
 
-1. **Event Bus Implementation**:
+1. **Registry Integration**:
 
-   - Implemented EventBus using tokio::sync::broadcast channels
-   - Created event types for MaterialDiscovered and System events
-   - Added error handling and logging for event operations
-   - Implemented comprehensive tests for event bus functionality
+   - Fully transitioned from MaterialRepository to MaterialRegistry in all actors
+   - Updated DiscoveryActor to work with the Registry
+   - Enhanced QuiltOrchestrator to initialize and manage the Registry
+   - Improved test coverage for Registry operations
 
-2. **Material Registry Creation**:
+2. **Event System Enhancements**:
 
-   - Created MaterialRegistry to coordinate state and events
-   - Integrated registry with the existing repository system
-   - Implemented event publishing for material operations
-   - Added tests verifying registry and event bus integration
+   - Implemented event monitoring in QuiltOrchestrator
+   - Changed event logging from info to debug level for better production usage
+   - Added proper subscriber setup in the test environment
+   - Improved error handling in event-related error cases
 
-3. **Architecture Updates**:
-   - Removed the old channels implementation in favor of the Event Bus
-   - Updated the lib.rs exports to include the new event types
-   - Enhanced error handling throughout the system
-   - Improved documentation reflecting the event-driven architecture
+3. **Code Quality Improvements**:
+   - Enhanced error message extraction in DiscoveryActor debug logging
+   - Simplified test code for better readability and maintainability
+   - Improved pattern matching for error handling
+   - Updated documentation to reflect architectural changes
 
 ## Active Decisions and Considerations
 
@@ -104,15 +108,15 @@ The codebase currently has these key components implemented:
 
 ### Short-term Tasks (Current Sprint)
 
-1. Update Discovery Actor to publish events:
+1. Create Cutting Actor skeleton:
 
-   - Add event publishing for discovered materials
-   - Keep existing direct interactions for compatibility
-   - Add logging to show event publishing
-   - Create simple test harness for validation
+   - Implement simple actor that subscribes to MaterialDiscovered events
+   - Add logging for received events
+   - Create basic actor lifecycle (start/stop)
+   - Ensure proper integration with the Registry
 
-2. Add event monitoring:
-   - Implement simple event listener in the main application
-   - Log all published events with timestamps
-   - Display event counts in logs
-   - Add basic metrics for event flow
+2. Set up actor monitoring:
+   - Add heartbeat logging for the actor
+   - Implement basic health checks
+   - Add subscription metrics
+   - Create actor configuration structure
