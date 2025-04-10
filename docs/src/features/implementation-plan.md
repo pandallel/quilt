@@ -144,9 +144,9 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Cutting Actor received X MaterialDiscovered events" in logs without processing them
 
-### Milestone 6: "Text Cutting Implementation"
+### Milestone 6: "Material Text Cutting Implementation"
 
-**Goal:** Implement basic TextCutter functionality in the Cutting Actor
+**Goal:** Implement the text-based document cutting functionality that transforms discovered materials into meaningful cuts
 **Implementation Time:** 3-4 days
 
 1. Integrate text-splitter crate (1 day)
@@ -163,6 +163,7 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - Implement error handling with fallback strategy
 
 3. Implement Cut event publishing (1 day)
+
    - Add MaterialCut event creation and publishing
    - Update material status in registry (Processing → Cut)
    - Implement error reporting for failed cuts
@@ -324,15 +325,15 @@ Future milestones will focus on more advanced features:
 
 5. **Enhanced Cutting Strategies**
 
-   - Markdown cutting support
-     - MarkdownCutter using MarkdownSplitter
+   - Markdown content cutting
+     - MarkdownCutter implementation using MarkdownSplitter
      - Format detection for Markdown content
      - Fallback to TextCutter on errors
-   - Code cutting support
-     - CodeCutter using CodeSplitter
+   - Source code cutting
+     - CodeCutter implementation using CodeSplitter
      - Language detection for code content
-     - Specialized handling for code semantics
-   - Format-specific optimizations and metrics
+     - Specialized semantic boundary handling for code structures
+   - Format-specific optimizations including language-specific tokenization and semantic boundary recognition
 
 6. **User Interfaces**
 

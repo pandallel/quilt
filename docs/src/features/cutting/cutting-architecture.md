@@ -53,7 +53,7 @@ graph TD
   A[Material Content] --> B[Format Detection]
   B -->|Markdown| C[MarkdownCutter]
   B -->|Plain Text| D[TextCutter]
-  B -->|Code| E[ CodeCutter]
+  B -->|Code| E[CodeCutter]
   C --> F[Convert to MaterialCut]
   D --> F
   E --> F
@@ -148,10 +148,13 @@ See [Cut Error Handling](./cut-errors.md) for details on error types and recover
 
 Quilt configures text-splitter with sensible defaults:
 
-```
-Target size: 300 tokens
-Minimum size: 150 tokens
-Maximum size: 800 tokens
+```rust
+// Default token size configuration
+let config = SplitterConfig {
+    target_size: 300,  // Target number of tokens per chunk
+    min_size: 150,     // Minimum tokens in a chunk
+    max_size: 800,     // Maximum tokens in a chunk
+};
 ```
 
 These values are used for all splitter types to maintain consistency.

@@ -69,9 +69,11 @@ Cuts are created by:
 
 Quilt uses a progressive fallback strategy to maximize successful cutting:
 
-- Specialized strategies (Markdown, Code) are tried first
-- If these fail, the system falls back to simpler text-based cutting
-- Only if all strategies fail is an error surfaced to the user
+- Specialized format-specific strategies are tried first:
+  - Markdown strategy: Uses MarkdownSplitter to preserve heading hierarchy and block structure
+  - Code strategy: Uses CodeSplitter to respect function boundaries and code structure
+- If a specialized strategy fails, the system falls back to the general-purpose TextSplitter
+- Error reporting occurs only when all cutting strategies have been tried and failed
 
 For detailed information on error handling during the cutting process, see [Cut Error Handling](./cutting-errors.md).
 
