@@ -1,6 +1,12 @@
+// Materials module for Quilt
+// Defines material types and storage
+
 pub mod types;
-// registry module removed as it needs significant refactoring
 pub mod repository;
+pub mod registry;
+
+// Re-export material types
+pub use registry::*;
 
 #[cfg(test)]
 mod tests;
