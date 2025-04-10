@@ -158,14 +158,9 @@ mod tests {
         // Spawn a task to process events
         tokio::spawn(async move {
             let mut receiver = receiver;
-            loop {
-                match receiver.recv().await {
-                    Ok(event) => {
-                        if let QuiltEvent::MaterialDiscovered(evt) = event {
-                            tx.send(evt.material_id.clone()).await.unwrap();
-                        }
-                    }
-                    Err(_) => break,
+            while let Ok(event) = receiver.recv().await {
+                if let QuiltEvent::MaterialDiscovered(evt) = event {
+                    tx.send(evt.material_id.clone()).await.unwrap();
                 }
             }
         });
