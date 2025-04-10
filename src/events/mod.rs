@@ -1,12 +1,12 @@
 // Events module for Quilt
 // Defines event types, event bus, and related utilities
 
-mod types;
 mod bus;
+mod types;
 
 // Re-export public items
-pub use self::types::*;
 pub use self::bus::*;
+pub use self::types::*;
 
 #[cfg(test)]
-mod tests; 
+mod tests;

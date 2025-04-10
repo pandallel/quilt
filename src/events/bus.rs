@@ -40,24 +40,30 @@ impl EventBus {
     /// Publish an event to all subscribers
     pub fn publish(&self, event: QuiltEvent) -> Result<(), EventBusError> {
         debug!("Publishing event: {}", event);
-        
+
         if self.sender.receiver_count() == 0 {
             debug!("No subscribers for event: {}", event);
         }
-        
+
         self.sender.send(event.clone()).map_err(|e| {
             error!("Failed to send event: {}: {}", event, e);
             EventBusError::SendError(e.to_string())
         })?;
-        
-        debug!("Successfully published event to {} receivers", self.sender.receiver_count());
+
+        debug!(
+            "Successfully published event to {} receivers",
+            self.sender.receiver_count()
+        );
         Ok(())
     }
 
     /// Subscribe to events
     pub fn subscribe(&self) -> Receiver<QuiltEvent> {
         let receiver = self.sender.subscribe();
-        debug!("New subscription created. Current receiver count: {}", self.sender.receiver_count());
+        debug!(
+            "New subscription created. Current receiver count: {}",
+            self.sender.receiver_count()
+        );
         receiver
     }
 
@@ -89,17 +95,17 @@ mod tests {
     async fn test_event_bus_publish_subscribe() {
         let bus = EventBus::new();
         let mut receiver = bus.subscribe();
-        
+
         // Create and publish a test event
         let material = Material::new("test/file.md".to_string());
         let event = QuiltEvent::material_discovered(&material);
-        
+
         // Publish the event
         bus.publish(event.clone()).unwrap();
-        
+
         // Receive the event
         let received = receiver.recv().await.unwrap();
-        
+
         // Verify the received event
         if let QuiltEvent::MaterialDiscovered(evt) = received {
             assert_eq!(evt.material_id, material.id);
@@ -113,26 +119,26 @@ mod tests {
         let bus = EventBus::new();
         let mut receiver1 = bus.subscribe();
         let mut receiver2 = bus.subscribe();
-        
+
         assert_eq!(bus.subscriber_count(), 2);
-        
+
         // Create and publish a test event
         let material = Material::new("test/file.md".to_string());
         let event = QuiltEvent::material_discovered(&material);
-        
+
         // Publish the event
         bus.publish(event.clone()).unwrap();
-        
+
         // Both receivers should get the event
         let received1 = receiver1.recv().await.unwrap();
         let received2 = receiver2.recv().await.unwrap();
-        
+
         if let QuiltEvent::MaterialDiscovered(evt) = received1 {
             assert_eq!(evt.material_id, material.id);
         } else {
             panic!("Receiver 1 got wrong event type");
         }
-        
+
         if let QuiltEvent::MaterialDiscovered(evt) = received2 {
             assert_eq!(evt.material_id, material.id);
         } else {
@@ -145,10 +151,10 @@ mod tests {
         // Create an event bus
         let bus = EventBus::new();
         let receiver = bus.subscribe();
-        
+
         // Channel to communicate test results
         let (tx, mut rx) = mpsc::channel(10);
-        
+
         // Spawn a task to process events
         tokio::spawn(async move {
             let mut receiver = receiver;
@@ -163,16 +169,16 @@ mod tests {
                 }
             }
         });
-        
+
         // Create and publish events
         let material = Material::new("test/file.md".to_string());
         let material_id = material.id.clone();
         let event = QuiltEvent::material_discovered(&material);
-        
+
         bus.publish(event).unwrap();
-        
+
         // Verify the event was processed
         let received_id = rx.recv().await.unwrap();
         assert_eq!(received_id, material_id);
     }
-} 
+}

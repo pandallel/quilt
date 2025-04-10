@@ -1,9 +1,9 @@
 // Materials module for Quilt
 // Defines material types and storage
 
-pub mod types;
-pub mod repository;
 pub mod registry;
+pub mod repository;
+pub mod types;
 
 // Re-export material types
 pub use registry::*;

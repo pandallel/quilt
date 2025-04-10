@@ -1,6 +1,6 @@
 use crate::materials::types::Material;
-use time::OffsetDateTime;
 use std::fmt;
+use time::OffsetDateTime;
 
 /// Material event containing material information
 #[derive(Debug, Clone)]
@@ -110,10 +110,10 @@ mod tests {
     fn test_event_display() {
         let material = Material::new("test/file.md".to_string());
         let event = QuiltEvent::material_discovered(&material);
-        
+
         let display = format!("{}", event);
         assert!(display.contains("MaterialDiscovered"));
         assert!(display.contains(&material.id));
         assert!(display.contains("test/file.md"));
     }
-} 
+}

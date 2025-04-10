@@ -43,14 +43,14 @@ impl MaterialRegistry {
     /// Register a new material and publish a MaterialDiscovered event
     pub async fn register_material(&self, material: Material) -> Result<(), RegistryError> {
         debug!("Registering material: {}", material.id);
-        
+
         // First register in the repository
         self.repository.register_material(material.clone()).await?;
-        
+
         // Then publish the event
         let event = QuiltEvent::material_discovered(&material);
         self.event_bus.publish(event)?;
-        
+
         info!("Material registered successfully: {}", material.id);
         Ok(())
     }
@@ -84,8 +84,8 @@ impl MaterialRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::broadcast::Receiver;
     use std::sync::Arc;
+    use tokio::sync::broadcast::Receiver;
 
     // Helper function to create a registry with a subscriber
     async fn setup_registry() -> (MaterialRegistry, Receiver<QuiltEvent>) {
@@ -99,17 +99,17 @@ mod tests {
     #[tokio::test]
     async fn test_register_material() {
         let (registry, mut receiver) = setup_registry().await;
-        
+
         // Create and register a material
         let material = Material::new("test/file.md".to_string());
         let material_id = material.id.clone();
-        
+
         registry.register_material(material).await.unwrap();
-        
+
         // Check that the material was registered in the repository
         let stored = registry.get_material(&material_id).await.unwrap();
         assert_eq!(stored.id, material_id);
-        
+
         // Check that an event was published
         let event = receiver.recv().await.unwrap();
         if let QuiltEvent::MaterialDiscovered(evt) = event {
@@ -118,4 +118,4 @@ mod tests {
             panic!("Expected MaterialDiscovered event");
         }
     }
-} 
+}
