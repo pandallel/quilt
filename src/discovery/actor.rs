@@ -191,7 +191,13 @@ impl DiscoveryActor {
                     registered_count += 1;
                 }
                 Err(RegistryError::Repository(ref err)) if matches!(err, RepositoryError::MaterialAlreadyExists(_)) => {
-                    debug!("Material already exists in registry, skipping");
+                    // Extract the material ID if possible
+                    let id = if let RepositoryError::MaterialAlreadyExists(id) = err {
+                        id
+                    } else {
+                        "unknown"
+                    };
+                    debug!("Material '{}' already exists in registry, skipping", id);
                 }
                 Err(err) => {
                     error!("Failed to register material: {}", err);
@@ -418,16 +424,14 @@ mod tests {
             exclude_patterns: vec![],
         };
 
-        // Send start discovery message
+        // Send start discovery message and check for the expected error
         let result = actor.send(messages::StartDiscovery { config }).await.unwrap();
-        assert!(result.is_err());
-
-        if let Err(err) = result {
-            match err {
-                messages::DiscoveryError::DirectoryNotFound(_) => {
-                    // This is the expected error
-                }
-                _ => panic!("Expected DirectoryNotFound error, got: {:?}", err),
+        
+        match result {
+            Ok(_) => panic!("Expected an error for invalid directory"),
+            Err(err) => {
+                assert!(matches!(err, messages::DiscoveryError::DirectoryNotFound(_)), 
+                    "Expected DirectoryNotFound error, got: {:?}", err);
             }
         }
     }

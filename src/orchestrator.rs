@@ -131,7 +131,7 @@ impl QuiltOrchestrator {
         // Spawn a task to monitor events
         tokio::spawn(async move {
             while let Ok(event) = subscriber.recv().await {
-                info!("Event received: {}", event);
+                debug!("Event received: {}", event);
             }
         });
     }
