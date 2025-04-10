@@ -3,6 +3,7 @@
 // The QuiltOrchestrator manages the lifecycle of all actors in the system,
 // coordinating their startup, inter-communication, and shutdown.
 
+use actix::dev::ToEnvelope;
 use actix::prelude::*;
 use log::{debug, error, info, warn};
 use std::sync::Arc;
@@ -12,6 +13,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
+use crate::cutting::CuttingActor;
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
@@ -54,22 +56,23 @@ impl From<Box<dyn std::error::Error>> for OrchestratorError {
 /// Manages actor lifecycle and coordinates the material processing pipeline
 pub struct QuiltOrchestrator {
     discovery: Option<Addr<DiscoveryActor>>,
+    cutting: Option<Addr<CuttingActor>>,
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
     // Future actors:
-    // cutting: Option<Addr<CuttingActor>>,
     // swatching: Option<Addr<SwatchingActor>>,
 }
 
 impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
-        let repository = MaterialRepository::new();
         let event_bus = Arc::new(EventBus::new());
+        let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
 
         Self {
             discovery: None,
+            cutting: None,
             registry,
             event_bus,
         }
@@ -139,10 +142,24 @@ impl QuiltOrchestrator {
     /// Initialize all actors in the system
     fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create the discovery actor with registry
-        self.discovery = Some(DiscoveryActor::new("main-discovery", self.registry.clone()).start());
+        let discovery_actor = DiscoveryActor::new("main-discovery", self.registry.clone());
+        self.discovery = Some(discovery_actor.start());
+
+        // Verify discovery actor is running
+        if let Some(_discovery) = &self.discovery {
+            debug!("Initialized discovery actor, verifying it's running...");
+            // Don't wait for verification here - we'll check before using it
+        } else {
+            return Err("Failed to start discovery actor".into());
+        }
+
+        // Initialize cutting actor
+        let cutting_actor = CuttingActor::new("main-cutting", self.registry.clone());
+        let cutting_addr = cutting_actor.start();
+        debug!("Initialized cutting actor");
+        self.cutting = Some(cutting_addr);
 
         // Future: Initialize other actors
-        // self.cutting = Some(CuttingActor::new(self.registry.clone()).start());
         // self.swatching = Some(SwatchingActor::new(self.registry.clone()).start());
 
         Ok(())
@@ -231,34 +248,42 @@ impl QuiltOrchestrator {
         });
     }
 
-    /// Shutdown all actors in the system with timeout
+    /// Shutdown all actors in the system with a timeout
     async fn shutdown_actors_with_timeout(&self, timeout_duration: Duration) {
-        if let Some(discovery) = &self.discovery {
-            // Shutdown the discovery actor with timeout
-            match timeout(timeout_duration, discovery.send(Shutdown)).await {
-                Ok(result) => match result {
-                    Ok(_) => {
-                        info!("Shutdown message sent to discovery actor");
-                    }
-                    Err(e) => {
-                        error!("Failed to send shutdown message: {}", e);
-                    }
-                },
-                Err(_) => {
-                    warn!("Timeout while shutting down discovery actor");
+        info!("Shutting down actors...");
+
+        // Helper function to shutdown an actor with consistent error handling
+        async fn shutdown_actor_with_timeout<A>(
+            actor_name: &str,
+            actor_addr: &Option<Addr<A>>,
+            timeout_duration: Duration,
+        ) where
+            A: Actor,
+            A: Handler<Shutdown>,
+            <A as Actor>::Context: ToEnvelope<A, Shutdown>,
+        {
+            if let Some(addr) = actor_addr {
+                match timeout(timeout_duration, addr.send(Shutdown)).await {
+                    Ok(Ok(_)) => info!("{} actor shut down successfully", actor_name),
+                    Ok(Err(e)) => error!("Failed to send shutdown to {} actor: {}", actor_name, e),
+                    Err(_) => error!("Timeout shutting down {} actor", actor_name),
                 }
             }
         }
 
-        // Future: Shutdown other actors
-        // if let Some(cutting) = &self.cutting {
-        //     timeout(timeout_duration, cutting.send(Shutdown)).await.ok();
-        // }
+        // Shutdown discovery actor
+        shutdown_actor_with_timeout("Discovery", &self.discovery, timeout_duration).await;
 
-        // Wait for actor system to shut down
-        System::current().stop();
+        // Shutdown cutting actor
+        shutdown_actor_with_timeout("Cutting", &self.cutting, timeout_duration).await;
 
-        info!("Actor system shutdown complete");
+        // Future: Add other actors here using the same pattern
+        // shutdown_actor_with_timeout("Swatching", &self.swatching, timeout_duration).await;
+
+        info!("All actors shut down");
+
+        // Optionally stop the entire actor system
+        // System::current().stop();
     }
 }
 

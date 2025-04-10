@@ -123,23 +123,24 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Published X MaterialDiscovered events" with event details in logs
 
-### Milestone 5: "Basic Cutting Actor Creation"
+### ✅ Milestone 5: "Basic Cutting Actor Creation"
 
 **Goal:** Create a minimal Cutting Actor that listens for events
 **Implementation Time:** 2-3 days
+**Status:** Completed
 
-1. Create Cutting Actor skeleton (1-2 days)
+1. ✅ Create Cutting Actor skeleton (1-2 days)
 
-   - Implement simple actor that subscribes to MaterialDiscovered events
-   - Add logging for received events
-   - Create basic actor lifecycle (start/stop)
-   - Do not implement actual material processing yet
+   - ✅ Implement simple actor that subscribes to MaterialDiscovered events
+   - ✅ Add logging for received events
+   - ✅ Create basic actor lifecycle (start/stop)
+   - ✅ Do not implement actual material processing yet
 
-2. Set up actor monitoring (1 day)
-   - Add heartbeat logging for the actor
-   - Implement basic health checks
-   - Add subscription metrics
-   - Create actor configuration structure
+2. ✅ Set up actor monitoring (1 day)
+   - ✅ Add heartbeat logging for the actor
+   - ✅ Implement basic health checks
+   - ✅ Add subscription metrics
+   - ✅ Create actor configuration structure
 
 **Demonstration:** Running `main` shows "Cutting Actor received X MaterialDiscovered events" in logs without processing them
 

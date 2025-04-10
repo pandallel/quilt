@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**, transitioning from Milestone 4 to Milestone 5. The event-driven architecture is now complete with the Discovery Actor fully integrated with the Material Registry and event system. The focus is now on implementing the Cutting Actor to process discovered materials.
+The project is in the **implementation stage**, transitioning from Milestone 5 to Milestone 6. The Cutting Actor has been successfully implemented and integrated with the event system, subscribed to MaterialDiscovered events. The focus is now on implementing the actual document processing functionality in the Cutting Actor.
 
 ## What Works
 
@@ -36,7 +36,15 @@ The project is in the **implementation stage**, transitioning from Milestone 4 t
    - Proper log levels for events (debug for routine events)
    - Comprehensive test coverage for event publishing and subscription
 
-5. **Supporting Infrastructure**:
+5. **Cutting System**:
+
+   - CuttingActor subscribes to MaterialDiscovered events
+   - Processing error events for materials not found
+   - Actor lifecycle management with proper logging
+   - Integration with MaterialRegistry for material lookup
+   - Comprehensive test coverage for success and error paths
+
+6. **Supporting Infrastructure**:
    - Structured logging with severity levels and actor details
    - Comprehensive error types for each component
    - Command-line interface with flexible configurations
@@ -45,12 +53,12 @@ The project is in the **implementation stage**, transitioning from Milestone 4 t
 
 ## In Progress
 
-1. **Cutting Actor Development**:
+1. **Material Processing Implementation**:
 
-   - Designing Cutting Actor that subscribes to MaterialDiscovered events
-   - Planning document processing strategies
-   - Implementing basic event handling before processing logic
-   - Creating actor monitoring infrastructure
+   - Designing document cutting strategies
+   - Planning content splitting algorithms
+   - Implementing text extraction
+   - Creating cut creation logic
 
 2. **Processing Pipeline Setup**:
    - Defining the material processing workflow
@@ -60,33 +68,34 @@ The project is in the **implementation stage**, transitioning from Milestone 4 t
 
 ## Next Major Milestone
 
-**Milestone 5: "Basic Cutting Actor Creation"** - The current focus is creating a minimal Cutting Actor that listens for MaterialDiscovered events.
+**Milestone 6: "Cutting Actor Processes Materials"** - The current focus is on implementing actual document processing in the Cutting Actor.
 
 ## Upcoming Work
 
-1. **Cutting Actor Skeleton** (Milestone 5):
+1. **Document Cutting Functionality** (Milestone 6):
 
-   - Create Cutting Actor with event subscription
-   - Implement actor lifecycle (start/stop)
-   - Set up event monitoring for the actor
-   - Add metrics and health checks
+   - Implement text extraction and processing logic
+   - Create document splitting strategies
+   - Add cut creation from materials
+   - Keep detailed metrics of processing
 
-2. **Processing Pipeline** (Milestones 6-7):
+2. **Cut Event Publishing** (Milestone 6):
 
-   - Implement document cutting functionality
-   - Create state transitions for cut materials
-   - Develop repository for cuts
-   - Implement MaterialCut event publishing
+   - Add MaterialCut event publishing
+   - Create proper state transitions in Registry
+   - Add validation through logging
+   - Implement recovery for failed cuts
 
-3. **Pipeline Completion** (Milestones 8-10):
+3. **Cuts Repository Implementation** (Milestone 7):
 
-   - Create Swatching Actor with event subscription
-   - Complete event flow through all actors
-   - Implement query capabilities
-   - Add persistence and recovery mechanisms
+   - Create in-memory storage for cuts
+   - Implement CRUD operations
+   - Add integration with Registry
+   - Create comprehensive tests
 
 4. **Recent Improvements**:
-   - Improved error message extraction in debug logging
-   - Changed event monitoring log level from info to debug for better production usage
-   - Simplified test code for better readability and maintainability
-   - Fully transitioned from direct Repository use to Registry pattern
+   - Implemented CuttingActor with event subscription
+   - Added processing error events for error cases
+   - Created comprehensive test coverage for Cutting Actor
+   - Added integration with QuiltOrchestrator
+   - Improved error handling with detailed error messages

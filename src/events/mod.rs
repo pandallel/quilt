@@ -2,7 +2,7 @@
 // Defines event types, event bus, and related utilities
 
 mod bus;
-mod types;
+pub mod types;
 
 // Re-export public items
 pub use self::bus::*;

@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 4: "Discovery Actor Publishes Events" and is now preparing for Milestone 5: "Basic Cutting Actor Creation". The Discovery Actor is now fully integrated with the event-driven communication infrastructure via the Material Registry.
+The project has completed Milestone 5: "Basic Cutting Actor Creation" and is now preparing for Milestone 6: "Cutting Actor Processes Materials". The Cutting Actor has been successfully implemented and integrated with the event-driven architecture, subscribing to MaterialDiscovered events from the MaterialRegistry.
 
 ## Current Implementation Status
 
@@ -12,6 +12,7 @@ The codebase currently has these key components implemented:
 
    - Common actor module with Ping and Shutdown messages
    - DiscoveryActor with lifecycle management
+   - CuttingActor with event subscription and basic processing
    - QuiltOrchestrator implementing the Orchestrator pattern
    - Proper Actix/Tokio runtime integration with #[actix::main]
 
@@ -28,6 +29,7 @@ The codebase currently has these key components implemented:
    - Event Bus implemented using `tokio::sync::broadcast` channels
    - Material Registry coordinating state management and event publishing
    - Event types defined for material and system events
+   - ProcessingError events for handling error cases
    - Comprehensive test coverage for event publishing and subscription
    - Clear error handling for event operations
    - Improved logging with appropriate debug level for routine events
@@ -40,33 +42,48 @@ The codebase currently has these key components implemented:
    - Direct actor-to-actor communication pattern
 
 5. **Discovery System**:
+
    - DirectoryScanner that finds files in configured directories
    - DiscoveryActor that wraps the scanner in the actor interface
    - DiscoveryConfig for scanner parameters
    - Support for excluding patterns and hidden files
    - Event publishing for discovered materials
 
+6. **Cutting System**:
+   - CuttingActor that subscribes to MaterialDiscovered events
+   - Error handling for materials not found in repository
+   - ProcessingDiscoveredMaterial message for handling event data
+   - Event-driven architecture for processing
+   - Proper actor lifecycle management
+
 ## Recent Changes
 
-1. **Registry Integration**:
+1. **Cutting Actor Implementation**:
 
-   - Fully transitioned from MaterialRepository to MaterialRegistry in all actors
-   - Updated DiscoveryActor to work with the Registry
-   - Enhanced QuiltOrchestrator to initialize and manage the Registry
-   - Improved test coverage for Registry operations
+   - Created CuttingActor that subscribes to MaterialDiscovered events
+   - Implemented proper error handling with ProcessingError events
+   - Added comprehensive test coverage for success and error paths
+   - Integrated with the QuiltOrchestrator for lifecycle management
 
-2. **Event System Enhancements**:
+2. **Error Handling Improvements**:
 
-   - Implemented event monitoring in QuiltOrchestrator
-   - Changed event logging from info to debug level for better production usage
-   - Added proper subscriber setup in the test environment
-   - Improved error handling in event-related error cases
+   - Added ProcessingError event type for reporting processing errors
+   - Implemented error publishing through the event bus
+   - Enhanced error logging with stage and material information
+   - Improved test coverage for error scenarios
 
-3. **Code Quality Improvements**:
-   - Enhanced error message extraction in DiscoveryActor debug logging
-   - Simplified test code for better readability and maintainability
-   - Improved pattern matching for error handling
-   - Updated documentation to reflect architectural changes
+3. **Orchestrator Enhancements**:
+
+   - Updated QuiltOrchestrator to initialize and manage the CuttingActor
+   - Enhanced actor shutdown with proper timeout handling
+   - Improved error propagation from actors to orchestrator
+   - Added actor health check monitoring
+
+4. **Code Quality Improvements**:
+   - Enhanced documentation across the codebase
+   - Improved error message clarity
+   - Better organized test structure with dedicated test modules
+   - Added TODOs for future implementation in Milestone 6
 
 ## Active Decisions and Considerations
 
@@ -81,23 +98,24 @@ The codebase currently has these key components implemented:
 
 ### Open Questions
 
-1. **Actor Recovery and Supervision**:
+1. **Document Processing Strategies**:
+
+   - What algorithms should be used for text splitting?
+   - How should we handle different document formats?
+   - What metadata should be preserved during cutting?
+   - How to implement error recovery during processing?
+
+2. **Actor Recovery and Supervision**:
 
    - How should actors handle failures and restart?
    - What's the proper supervisor hierarchy for our actors?
    - Should we implement circuit breakers for external dependencies?
 
-2. **Event Ordering and Consistency**:
+3. **Event Ordering and Consistency**:
 
    - How do we ensure event ordering when needed?
    - Should we implement event versioning or sequence numbers?
    - How do we handle event replay for recovery scenarios?
-
-3. **Backpressure Strategy**:
-
-   - What are the optimal channel capacities for different event types?
-   - How should actors handle backpressure when processing is slow?
-   - Should we implement different priorities for different event types?
 
 4. **State Recovery**:
    - How do we handle Registry state recovery after crashes?
@@ -108,15 +126,15 @@ The codebase currently has these key components implemented:
 
 ### Short-term Tasks (Current Sprint)
 
-1. Create Cutting Actor skeleton:
+1. Implement document cutting functionality:
 
-   - Implement simple actor that subscribes to MaterialDiscovered events
-   - Add logging for received events
-   - Create basic actor lifecycle (start/stop)
-   - Ensure proper integration with the Registry
+   - Develop text extraction and processing logic
+   - Create document splitting strategies
+   - Add cut creation from materials
+   - Implement metrics collection for processing
 
-2. Set up actor monitoring:
-   - Add heartbeat logging for the actor
-   - Implement basic health checks
-   - Add subscription metrics
-   - Create actor configuration structure
+2. Add Cut event publishing:
+   - Create MaterialCut event type
+   - Implement state transitions in Registry
+   - Add event validation through logging
+   - Create recovery mechanisms for failed cuts
