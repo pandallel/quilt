@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **early implementation stage**, transitioning from Milestone 2 to Milestone 3. The foundation architecture has been established with the actor framework, material repository, and discovery system.
+The project is in the **early implementation stage**, transitioning from Milestone 2 to Milestone 3. The foundation architecture has been established with the actor framework, material repository, and discovery system. The architecture has been refined to follow an event-driven approach with a Material Registry.
 
 ## What Works
 
@@ -11,7 +11,7 @@ The project is in the **early implementation stage**, transitioning from Milesto
    - QuiltOrchestrator coordinates actor lifecycle and communication
    - Actor model implemented with Actix and proper message types
    - Thread-safe Material Repository with state management
-   - Channel-based message system using Tokio mpsc channels
+   - Basic message types for actor communication
 
 2. **Discovery System**:
 
@@ -35,37 +35,48 @@ The project is in the **early implementation stage**, transitioning from Milesto
 
 ## In Progress
 
-1. **Actor Communication**:
+1. **Event-Driven Architecture Implementation**:
 
-   - Implementing direct actor-to-actor message passing
-   - Creating appropriate message types for DiscoveryActor and CuttingActor
-   - Setting up actor supervision in the orchestrator
+   - Developing Event Bus using Tokio broadcast channels
+   - Creating Material Registry to coordinate state and events
+   - Designing event types for system communication
+   - Planning actor subscription to events
 
-2. **CuttingActor Design**:
-   - Planning implementation of material processing
-   - Designing document content extraction strategy
-   - Defining appropriate cutting algorithms
+2. **Repository Refinement**:
+   - Separating state management (Registry) from persistence (Repository)
+   - Ensuring atomic operations for state changes and event publishing
+   - Implementing thread-safe event distribution
 
 ## Next Major Milestone
 
-**Milestone 3: "Discovery Actor Sends Material Messages"** - The current focus is establishing message passing between actors for pipeline processing.
+**Milestone 3: "Event Bus and Material Registry Foundation"** - The current focus is establishing the core communication infrastructure for the event-driven architecture.
 
 ## Upcoming Work
 
-1. **Core Pipeline** (Milestones 3-5):
+1. **Event-Driven Implementation** (Milestones 3-4):
 
-   - Complete message passing from Discovery to Cutting
-   - Implement CuttingActor for material processing
-   - Create CutsRepository for storing processed fragments
-   - Add Labeling stage for final processing
+   - Implement Event Bus with Tokio broadcast channels
+   - Create Material Registry as coordinator
+   - Update Discovery Actor to publish events
+   - Add event monitoring and metrics
 
-2. **Embedding and Search** (Milestones 6-9):
+2. **Processing Pipeline** (Milestones 5-7):
 
-   - Integrate local embedding models
-   - Implement vector storage
-   - Create query interface
+   - Create Cutting Actor with event subscription
+   - Implement document cutting functionality
+   - Create Swatching Actor with event subscription
+   - Develop repositories for cuts and swatches
 
-3. **Production Readiness** (Milestone 10):
-   - Add persistence for repositories
-   - Implement startup/shutdown persistence
-   - Create consistency checks and error recovery
+3. **Pipeline Completion** (Milestones 8-10):
+
+   - Complete event flow through all actors
+   - Implement query capabilities
+   - Add persistence and recovery mechanisms
+   - Validate the end-to-end pipeline
+
+4. **Open Questions to Address**:
+   - Actor recovery and supervision strategies
+   - Event ordering and consistency mechanisms
+   - Backpressure handling approaches
+   - State recovery after system crashes
+   - Performance optimization for large datasets

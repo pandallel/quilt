@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 2: "Discovery Actor Uses Scanner for Single Directory" and is now transitioning to Milestone 3: "Discovery Actor Sends Material Messages" to establish message passing between actors.
+The project has completed Milestone 2: "Discovery Actor Uses Scanner for Single Directory" and is now transitioning to Milestone 3: "Event Bus and Material Registry Foundation" to establish the core event-driven communication infrastructure.
 
 ## Current Implementation Status
 
@@ -36,52 +36,67 @@ The codebase currently has these key components implemented:
 
 ## Recent Changes
 
-1. **Actor System Implementation**:
+1. **Architecture Refinement**:
 
-   - Added QuiltOrchestrator for centralized actor management
-   - Configured proper lifecycle with validation and timeouts
-   - Refactored main.rs to use the orchestrator pattern
+   - Updated architecture to use an event-driven approach with a Material Registry
+   - Separated Material Registry (state management) from Material Repository (persistence)
+   - Defined an Event Bus using Tokio broadcast channels
+   - Created a clearer separation of concerns throughout the architecture
 
-2. **Pipeline Preparation**:
-   - Defined message channel structure for the pipeline
-   - Created channel connection interfaces
-   - Added type aliases for different pipeline stages
+2. **Implementation Plan Adjustments**:
+   - Restructured implementation plan to build the event-driven architecture incrementally
+   - Created focused milestones with clear demonstrations for validation
+   - Separated actor creation from processing logic for more tangible progress
 
 ## Active Decisions and Considerations
 
 ### Key Architectural Decisions
 
-- Using Actix for the actor system and Tokio for async runtime
-- Organizing actors in dedicated modules for better maintainability
-- Using the Orchestrator pattern to manage actor lifecycle
-- Using Tokio's async primitives for thread-safe access and communication
-- Fixed channel capacity (100) to balance memory usage with throughput
-- Minimizing message size by passing only material IDs for later pipeline stages
+- Using Actix for actor lifecycle management and Tokio for concurrency primitives
+- Implementing Event Bus using `tokio::sync::broadcast` channels
+- Organizing actors around event subscription rather than direct message passing
+- Using Registry as the central coordinator for state changes and event publishing
+- Following idiomatic Rust patterns for concurrency safety
+- Implementing atomic operations for state changes with event publishing
 
 ### Open Questions
 
-1. **Message Passing Implementation**:
+1. **Actor Recovery and Supervision**:
 
-   - How to efficiently design message types between actors
-   - Best approach for handling backpressure between actor stages
-   - How to properly handle long-running operations in actors
+   - How should actors handle failures and restart?
+   - What's the proper supervisor hierarchy for our actors?
+   - Should we implement circuit breakers for external dependencies?
 
-2. **Persistence & Embedding**:
-   - Persistence mechanism for the Material Repository
-   - Which local embedding model to integrate first
-   - Vector similarity algorithm balancing speed and recall
+2. **Event Ordering and Consistency**:
+
+   - How do we ensure event ordering when needed?
+   - Should we implement event versioning or sequence numbers?
+   - How do we handle event replay for recovery scenarios?
+
+3. **Backpressure Strategy**:
+
+   - What are the optimal channel capacities for different event types?
+   - How should actors handle backpressure when processing is slow?
+   - Should we implement different priorities for different event types?
+
+4. **State Recovery**:
+   - How do we handle Registry state recovery after crashes?
+   - Should we implement event sourcing for state reconstruction?
+   - What's the strategy for state snapshots?
 
 ## Next Steps
 
 ### Short-term Tasks (Current Sprint)
 
-1. Implement message passing from DiscoveryActor to CuttingActor:
+1. Implement basic Event Bus:
 
-   - Define proper message types for actor communication
-   - Add message handling in the CuttingActor
-   - Update the orchestrator to manage both actors
+   - Create central event bus using `tokio::sync::broadcast` channels
+   - Implement simple event types (MaterialDiscovered event only)
+   - Add logging for event publishing and subscription
+   - Create basic tests that verify event transmission
 
-2. Begin CuttingActor implementation:
-   - Create basic structure with message handling
-   - Implement content extraction
-   - Design and implement cutting strategies
+2. Create Material Registry prototype:
+   - Implement basic registry that works alongside existing Repository
+   - Add minimal event publishing for material discovery
+   - Create simple validation of events using logging
+   - Keep the existing Repository functionality intact

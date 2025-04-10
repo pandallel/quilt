@@ -1,56 +1,179 @@
 # Technical Context
 
-## Technology Stack
+## Core Technologies
 
-### Core Technologies
+- **Rust**: The primary programming language for the project
+- **Actix**: Actor framework for managing actor lifecycle
+- **Tokio**: Async runtime and concurrency primitives
+- **Tokio-broadcast**: Event distribution for the Event Bus
+- **RwLock**: Thread-safe state management
 
-- **Language**: Rust (stable channel, Edition 2021)
-- **Actor Framework**: Actix (v0.13.1)
-- **Async Runtime**: Tokio (v1.44.2)
-- **Documentation**: mdBook with admonish extension
-- **Build System**: Cargo
+## Architecture Components
 
-### Key Dependencies
+### Actor System
 
-- **thiserror** (v2.0.12): Error handling with derive macros
-- **time** (v0.3): Date and time utilities with serde support
-- **walkdir** (v2.4.0): Filesystem traversal for material discovery
-- **cuid2** (v0.1.2): Collision-resistant IDs for materials and swatches
-- **log** (v0.4.20): Logging facade
-- **env_logger** (v0.11.8): Environment-based logging configuration
+Quilt uses Actix for actor lifecycle management, leveraging its robust features:
 
-### Development Dependencies
+- **Actor Trait**: For defining actor behavior and message handling
+- **Message Types**: Strongly typed with `#[derive(Message)]` macro
+- **Handler Implementation**: Using `ResponseFuture` for async processing
+- **Actor Lifecycle**: Proper startup and shutdown management
 
-- **tempfile** (v3.10.1): Creating temporary directories for testing
-- **futures** (v0.3): Future utilities for testing async code
+### Event Bus
+
+The Event Bus is implemented using Tokio's broadcast channels:
+
+```rust
+pub struct EventBus {
+    material_tx: broadcast::Sender<MaterialEvent>,
+    system_tx: broadcast::Sender<SystemEvent>,
+    error_tx: broadcast::Sender<ErrorEvent>,
+}
+
+impl EventBus {
+    pub fn new(capacity: usize) -> Self {
+        let (material_tx, _) = broadcast::channel(capacity);
+        let (system_tx, _) = broadcast::channel(capacity);
+        let (error_tx, _) = broadcast::channel(capacity);
+
+        Self {
+            material_tx,
+            system_tx,
+            error_tx,
+        }
+    }
+
+    pub fn subscribe_to_material_events(&self) -> broadcast::Receiver<MaterialEvent> {
+        self.material_tx.subscribe()
+    }
+
+    // Other methods for subscription and publishing
+}
+```
+
+### Material Registry
+
+The Material Registry coordinates state management and event publishing:
+
+```rust
+pub struct MaterialRegistry {
+    materials: Arc<RwLock<HashMap<String, Material>>>,
+    event_bus: Arc<EventBus>,
+    repository: Arc<dyn MaterialRepository>,
+}
+
+impl MaterialRegistry {
+    pub async fn register_material(&self, material: Material) -> Result<(), RegistryError> {
+        // Update state
+        let mut materials = self.materials.write().await;
+        materials.insert(material.id.clone(), material.clone());
+
+        // Persist change
+        self.repository.save(&material).await?;
+
+        // Publish event
+        self.event_bus.publish_material_event(MaterialEvent::Discovered {
+            material_id: material.id.clone(),
+            file_path: material.file_path.clone(),
+        })?;
+
+        Ok(())
+    }
+
+    // Other methods for state management
+}
+```
+
+### Material Repository
+
+The Repository handles persistence operations:
+
+```rust
+#[async_trait]
+pub trait MaterialRepository: Send + Sync + 'static {
+    async fn save(&self, material: &Material) -> Result<()>;
+    async fn load(&self, id: &str) -> Result<Option<Material>>;
+    async fn delete(&self, id: &str) -> Result<()>;
+}
+```
+
+### Event Types
+
+The system uses domain events for communication:
+
+```rust
+pub enum MaterialEvent {
+    Discovered {
+        material_id: String,
+        file_path: String,
+    },
+    Cut {
+        material_id: String,
+        cut_ids: Vec<String>,
+    },
+    Swatched {
+        material_id: String,
+        swatch_id: String,
+    },
+}
+
+pub enum SystemEvent {
+    HealthCheck { actor_id: String },
+    Shutdown,
+}
+
+pub enum ErrorEvent {
+    ProcessingFailed {
+        material_id: String,
+        stage: ProcessingStage,
+        error: String,
+    },
+    PersistenceFailed {
+        material_id: String,
+        operation: String,
+        error: String,
+    },
+}
+
+pub enum ProcessingStage {
+    Discovery,
+    Cutting,
+    Swatching,
+}
+```
 
 ## Development Environment
 
-### Setup Requirements
+### Required Tools
 
-- Rust toolchain (rustc, cargo)
-- mdBook (for documentation)
-- mdbook-admonish (for advanced documentation features)
+- **Rust Toolchain**: Latest stable version
+- **Cargo**: For dependency management and building
+- **Clippy**: For linting
+- **Rustfmt**: For code formatting
+- **Visual Studio Code**: Recommended IDE with rust-analyzer
 
-### Development Commands
+### Build and Test
 
-```bash
-# Build the project
-cargo build
+- **Build**: `cargo build`
+- **Test**: `cargo test`
+- **Run**: `cargo run -- --discovery-dir=/path/to/scan`
 
-# Run tests
-cargo test
+### Continuous Integration
 
-# Check and apply code formatting
-cargo fmt --all -- --check
-cargo fmt
+- **GitHub Actions**: For automated testing
+- **Rust Coverage**: For test coverage reporting
 
-# Run Clippy linter
-cargo clippy --all-targets --all-features -- -D warnings
+## Implementation Approach
 
-# Documentation server
-cd docs && mdbook serve
-```
+The system is being implemented incrementally, with focused milestones:
+
+1. **Foundation**: Actor system, Material Repository, Discovery system
+2. **Event Infrastructure**: Event Bus, Material Registry, event types
+3. **Actor Evolution**: Updating actors to use event-driven approach
+4. **Processing Pipeline**: Implementing the full material processing pipeline
+5. **Persistence**: Adding durable storage and recovery mechanisms
+
+Each milestone focuses on providing tangible, demonstrable progress that can be validated through concrete log messages and metrics.
 
 ## Project Structure
 
@@ -71,21 +194,6 @@ quilt/
 ├── Cargo.toml   # Project manifest
 └── README.md    # Project overview
 ```
-
-## Implementation Approach
-
-The project follows an incremental implementation plan with 10 clear milestones:
-
-1. ✅ **Core Actor System**: Set up Actix actor framework, basic message types
-2. ✅ **Discovery Actor**: Integrate DirectoryScanner with DiscoveryActor
-3. **Message Channel System**: Connect discovery to message channel system
-4. **Cutting Actor**: Implement document content extraction and fragmentation
-5. **Cuts Repository**: Store processed cuts for retrieval
-6. **Cutting to Labeling**: Set up channels and message passing
-7. **Labeling Actor**: Implement swatch creation and metadata enrichment
-8. **Swatch Repository**: Store processed swatches
-9. **Query Interface**: Implement basic search functionality
-10. **Persistence**: Add persistence for repositories
 
 ## Technical Constraints
 
