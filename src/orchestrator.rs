@@ -59,7 +59,7 @@ pub struct QuiltOrchestrator {
 }
 
 impl QuiltOrchestrator {
-    /// Create a new orchestrator
+    /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
         Self {
             discovery: None,
@@ -236,5 +236,11 @@ impl QuiltOrchestrator {
         System::current().stop();
 
         info!("Actor system shutdown complete");
+    }
+}
+
+impl Default for QuiltOrchestrator {
+    fn default() -> Self {
+        Self::new()
     }
 }
