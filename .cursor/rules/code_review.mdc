@@ -27,7 +27,7 @@ If the user provides specific files or scope, override this default behavior and
 ## Step 2: Review Code Quality
 
 ### Architecture and Design
-- Evaluate whether the code follows the actor-based architecture
+- Evaluate whether the code follows the actor-based architecture [actor-model-architecture.md](mdc:docs/src/features/actor-model-architecture.md)
 - Check if new components integrate correctly with existing systems
 - Assess modularity and separation of concerns
 - Verify proper encapsulation of implementation details
@@ -72,6 +72,9 @@ If the user provides specific files or scope, override this default behavior and
 - Verify that complex logic has explanatory comments
 - Ensure public APIs have proper documentation
 - Check for consistent naming conventions
+- Ensure appropriate documentation in docs/
+- Ensure memory bank is up to date
+- Ensure [implementation-plan.md](mdc:docs/src/features/implementation-plan.md) is updated
 
 ## Step 6: Provide Constructive Feedback
 
