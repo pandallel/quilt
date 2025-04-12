@@ -77,7 +77,7 @@ pub struct CuttingActor {
     /// Text cutter with default configuration
     cutter: TextCutter,
     /// Sender for the internal work queue
-    work_sender: Option<mpsc::Sender<ProcessDiscoveredMaterial>>,
+    work_sender: Option<mpsc::Sender<CuttingWorkItem>>,
     /// Handle for the listener task
     listener_handle: Option<SpawnHandle>,
     /// Handle for the processor task
@@ -111,7 +111,7 @@ impl Actor for CuttingActor {
 
         const INTERNAL_QUEUE_CAPACITY: usize = 32;
         let (work_sender, work_receiver) =
-            mpsc::channel::<ProcessDiscoveredMaterial>(INTERNAL_QUEUE_CAPACITY);
+            mpsc::channel::<CuttingWorkItem>(INTERNAL_QUEUE_CAPACITY);
         self.work_sender = Some(work_sender.clone());
 
         let bus_receiver = self.registry.event_bus().subscribe();
@@ -135,7 +135,7 @@ impl Actor for CuttingActor {
                                     listener_actor_name,
                                     evt.material_id.as_str()
                                 );
-                                let work_item = ProcessDiscoveredMaterial {
+                                let work_item = CuttingWorkItem {
                                     material_id: evt.material_id,
                                     file_path: evt.file_path.clone(),
                                 };
@@ -187,13 +187,33 @@ impl Actor for CuttingActor {
                     if let Err(e) = process_discovered_material(
                         &actor_name,
                         &registry,
-                        work_item.material_id,
+                        work_item.material_id.clone(),
                         work_item.file_path,
                         &cutter,
                     )
                     .await
                     {
                         error!("{}: Error processing material: {}", actor_name, e);
+                        
+                        // Handle material not found error by updating status to Error
+                        // This will trigger the ProcessingError event from the registry
+                        if let messages::CuttingError::MaterialNotFound(material_id) = &e {
+                            if let Err(update_err) = registry
+                                .update_material_status(
+                                    material_id.as_str(),
+                                    MaterialStatus::Error,
+                                    Some(format!("Material not found during cutting: {}", material_id.as_str())),
+                                )
+                                .await
+                            {
+                                error!(
+                                    "{}: Failed to update material status to Error for '{}' after not found error: {}",
+                                    actor_name,
+                                    material_id.as_str(),
+                                    update_err
+                                );
+                            }
+                        }
                     }
                 }
                 info!(
@@ -240,9 +260,9 @@ impl Handler<Shutdown> for CuttingActor {
 
 /// Internal message to process a discovered material
 ///
-/// This is no longer an Actix message
-/// It's just a struct passed via the mpsc channel.
-struct ProcessDiscoveredMaterial {
+/// This is a struct passed via the mpsc channel within the CuttingActor
+/// to move work from the listener task to the processor task.
+struct CuttingWorkItem {
     /// ID of the discovered material
     material_id: MaterialId,
     /// File path of the discovered material

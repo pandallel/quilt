@@ -45,7 +45,11 @@ impl TextCutter {
         material_id: Option<MaterialId>,
     ) -> Result<Vec<ChunkInfo>, CutterError> {
         // Create text splitter with our configuration
-        let splitter = TextSplitter::new(self.config.min_size..=self.config.max_size);
+        // The TextSplitter uses a range for chunk sizes, attempting to keep chunks
+        // as close to the target size as possible, while respecting the min/max bounds.
+        // The target size is used to guide splitting, though chunks can vary in size.
+        let splitter = TextSplitter::new(self.config.min_size..=self.config.max_size)
+            .with_trimming(true); // Enable trimming to better honor the target size
 
         // Split the text and collect chunks
         let chunks = splitter.chunks(text);
