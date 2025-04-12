@@ -189,13 +189,13 @@ The system is being implemented incrementally, with each milestone providing a t
 
 1. First establishing the Event Bus and Material Registry
 2. Updating Discovery Actor to publish events
-3. Creating processing actors that subscribe to events
+3. Creating processing actors that subscribe to events and implement internal backpressure queues
 4. Implementing the full pipeline with proper event flow
 5. Adding query capabilities and persistence
 
 ## Additional Details
 
-- **Cutting:** The `CuttingActor` subscribes to `MaterialDiscovered` events from the bus, processes materials into cuts (using `text-splitter`), and publishes `MaterialCut` events back onto the bus after updating the `MaterialRegistry`. It uses an internal SPSC `mpsc` channel to manage backpressure between its event listener task and its processing task.
+- **Cutting:** The `CuttingActor` subscribes to `MaterialDiscovered` events from the bus, processes materials into cuts (using `text-splitter`), and publishes `MaterialCut` events back onto the bus after updating the `MaterialRegistry`. It now uses an internal SPSC `mpsc` channel to manage backpressure between its event listener task and its processing task.
 - **Swatching (Future):** A `SwatchingActor` will subscribe to `MaterialCut` events, perform embedding (potentially concurrently), update the registry, and publish `MaterialSwatched` events. It will also use an internal `mpsc` queue for backpressure.
 - **Reconciliation:** A dedicated `ReconciliationActor` periodically scans the `MaterialRegistry` for materials stuck in intermediate states. It attempts retries by re-publishing the preceding event onto the `EventBus` and eventually marks items as `Error` if retries fail.
 

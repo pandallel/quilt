@@ -8,6 +8,8 @@ use log::{debug, error, info, warn};
 use tokio::sync::broadcast;
 use tokio::fs;
 use std::path::Path;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
 use super::cutter::TextCutter;
 
@@ -67,10 +69,14 @@ pub struct CuttingActor {
     name: String,
     /// Registry to retrieve materials and publish events
     registry: MaterialRegistry,
-    /// Event receiver for MaterialDiscovered events
-    event_receiver: Option<broadcast::Receiver<QuiltEvent>>,
     /// Text cutter with default configuration
     cutter: TextCutter,
+    /// Sender for the internal work queue
+    work_sender: Option<mpsc::Sender<ProcessDiscoveredMaterial>>,
+    /// Handle for the listener task
+    listener_handle: Option<JoinHandle<()>>,
+    /// Handle for the processor task
+    processor_handle: Option<JoinHandle<()>>,
 }
 
 impl CuttingActor {
@@ -84,8 +90,10 @@ impl CuttingActor {
         Self {
             name: name.to_string(),
             registry,
-            event_receiver: None,
             cutter: TextCutter::default(),
+            work_sender: None,
+            listener_handle: None,
+            processor_handle: None,
         }
     }
 }
@@ -96,44 +104,105 @@ impl Actor for CuttingActor {
     fn started(&mut self, ctx: &mut Self::Context) {
         info!("{}: Started", self.name);
 
-        // Subscribe to events via the registry
-        let event_receiver = self.registry.event_bus().subscribe();
-        // Store the receiver in the actor state
-        self.event_receiver = Some(event_receiver.resubscribe());
-        let addr = ctx.address();
+        const INTERNAL_QUEUE_CAPACITY: usize = 32;
+        let (work_sender, work_receiver) =
+            mpsc::channel::<ProcessDiscoveredMaterial>(INTERNAL_QUEUE_CAPACITY);
+        self.work_sender = Some(work_sender.clone());
 
-        // Process events in a separate task
-        ctx.spawn(
+        let bus_receiver = self.registry.event_bus().subscribe();
+        let actor_name = self.name.clone();
+        let registry = self.registry.clone();
+        let cutter = self.cutter.clone();
+
+        let listener_actor_name = actor_name.clone();
+        let listener_handle = ctx.spawn(
             async move {
-                info!("Started listening for material events");
-                let mut receiver = event_receiver;
+                info!("{}: Listener task started", listener_actor_name);
+                let mut bus_receiver = bus_receiver;
+                let work_sender = work_sender;
 
-                // Process events until error or shutdown
-                while let Ok(event) = receiver.recv().await {
-                    if let QuiltEvent::MaterialDiscovered(evt) = event {
-                        debug!(
-                            "Received MaterialDiscovered event: {}",
-                            evt.material_id.as_str()
-                        );
-
-                        // Send a message to self to process the event
-                        addr.do_send(ProcessDiscoveredMaterial {
-                            material_id: evt.material_id,
-                            file_path: evt.file_path.clone(),
-                        });
+                loop {
+                    match bus_receiver.recv().await {
+                        Ok(event) => {
+                            if let QuiltEvent::MaterialDiscovered(evt) = event {
+                                debug!(
+                                    "{}: Listener received MaterialDiscovered: {}",
+                                    listener_actor_name,
+                                    evt.material_id.as_str()
+                                );
+                                let work_item = ProcessDiscoveredMaterial {
+                                    material_id: evt.material_id,
+                                    file_path: evt.file_path.clone(),
+                                };
+                                if let Err(e) = work_sender.send(work_item).await {
+                                    error!(
+                                        "{}: Listener failed to send work item to processor: {}",
+                                        listener_actor_name, e
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("{}: Listener lagged behind {} events.", listener_actor_name, n);
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            info!("{}: Listener stopping as event bus channel closed.", listener_actor_name);
+                            break;
+                        }
                     }
                 }
-
-                info!("Stopped listening for material events");
+                info!("{}: Listener task finished", listener_actor_name);
             }
             .into_actor(self),
         );
+        self.listener_handle = Some(listener_handle);
+
+        let processor_actor_name = actor_name.clone();
+        let processor_handle = ctx.spawn(
+            async move {
+                info!("{}: Processor task started", processor_actor_name);
+                let mut work_receiver = work_receiver;
+                let registry = registry;
+                let cutter = cutter;
+                let actor_name = processor_actor_name;
+
+                while let Some(work_item) = work_receiver.recv().await {
+                    debug!(
+                        "{}: Processor received work item for: {}",
+                        actor_name,
+                        work_item.material_id.as_str()
+                    );
+                    if let Err(e) = process_discovered_material(
+                        &actor_name,
+                        &registry,
+                        work_item.material_id,
+                        work_item.file_path,
+                        &cutter
+                    ).await {
+                        error!("{}: Error processing material: {}", actor_name, e);
+                    }
+                }
+                info!("{}: Processor task finished as work queue closed", actor_name);
+            }
+            .into_actor(self),
+        );
+        self.processor_handle = Some(processor_handle);
     }
 
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        info!("{}: Stopped", self.name);
-        // Clear the event receiver on shutdown
-        self.event_receiver = None;
+    fn stopping(&mut self, _ctx: &mut Self::Context) -> Running {
+        info!("{}: Stopping", self.name);
+        self.work_sender.take();
+
+        if let Some(handle) = self.listener_handle.take() {
+            debug!("{}: Aborting listener task", self.name);
+            handle.abort();
+        }
+        if let Some(handle) = self.processor_handle.take() {
+            debug!("{}: Aborting processor task", self.name);
+            handle.abort();
+        }
+        Running::Stop
     }
 }
 
@@ -156,8 +225,9 @@ impl Handler<Shutdown> for CuttingActor {
 }
 
 /// Internal message to process a discovered material
-#[derive(Message)]
-#[rtype(result = "()")]
+///
+/// This is no longer an Actix message
+/// It's just a struct passed via the mpsc channel.
 struct ProcessDiscoveredMaterial {
     /// ID of the discovered material
     material_id: MaterialId,
@@ -165,34 +235,7 @@ struct ProcessDiscoveredMaterial {
     file_path: String,
 }
 
-impl Handler<ProcessDiscoveredMaterial> for CuttingActor {
-    type Result = ResponseFuture<()>;
-
-    fn handle(&mut self, msg: ProcessDiscoveredMaterial, _ctx: &mut Self::Context) -> Self::Result {
-        let name = self.name.clone();
-        debug!(
-            "{}: Processing discovered material '{}'",
-            name,
-            msg.material_id.as_str()
-        );
-
-        // Use message data directly and access self methods without cloning the actor
-        let material_id = msg.material_id;
-        let file_path = msg.file_path;
-        let registry = self.registry.clone();
-        let actor_name = self.name.clone();
-        let cutter = self.cutter.clone();
-
-        Box::pin(async move {
-            // Process the discovered material using the cloned registry instead of the actor instance
-            if let Err(e) = process_discovered_material(&actor_name, &registry, material_id, file_path, &cutter).await {
-                error!("{}: Error processing material: {}", actor_name, e);
-            }
-        })
-    }
-}
-
-/// Process a MaterialDiscovered event
+/// Process a MaterialDiscovered event (called by the processor task)
 ///
 /// Reads the file content, cuts it into chunks, and logs sample information.
 ///
@@ -217,25 +260,14 @@ async fn process_discovered_material(
         file_path
     );
 
-    // Check if the material exists in the repository
-    let _material = match registry.get_material(material_id.as_str()).await {
-        Some(material) => {
-            debug!(
-                "{}: Found material '{}' in repository with state '{:?}'",
-                actor_name,
-                material_id.as_str(),
-                material.status
-            );
-            material
-        }
+    let material = match registry.get_material(material_id.as_str()).await {
+        Some(m) => m,
         None => {
             error!(
                 "{}: Failed to retrieve material '{}': Not found",
                 actor_name,
                 material_id.as_str()
             );
-
-            // Publish error event
             let error_event = QuiltEvent::create_processing_error_event(
                 material_id.as_str(),
                 ProcessingStage::Cutting,
@@ -244,154 +276,151 @@ async fn process_discovered_material(
                     material_id.as_str()
                 ),
             );
-
             if let Err(e) = registry.event_bus().publish(error_event) {
                 warn!(
                     "{}: Failed to publish error event for material '{}': {}",
-                    actor_name,
-                    material_id.as_str(),
-                    e
+                    actor_name, material_id.as_str(), e
                 );
             }
-
             return Err(messages::CuttingError::MaterialNotFound(material_id));
         }
     };
 
-    // Read the file content
-    let file_path = Path::new(&file_path);
-    let content = fs::read_to_string(file_path).await.map_err(|e| {
-        // Publish error event for file read failure
-        let error_msg = format!("Failed to read file: {}", e);
+    if material.status != MaterialStatus::Discovered {
+        warn!(
+            "{}: Skipping processing for material '{}', status is {:?} (expected Discovered)",
+            actor_name,
+            material_id.as_str(),
+            material.status
+        );
+        return Ok(());
+    }
+
+    debug!(
+        "{}: Updating status to Cutting for material '{}'",
+        actor_name, material_id.as_str()
+    );
+    if let Err(e) = registry
+        .update_material_status(material_id.as_str(), MaterialStatus::Cutting, None)
+        .await
+    {
+        error!(
+            "{}: Failed to update material status to Cutting for '{}': {}",
+            actor_name,
+            material_id.as_str(),
+            e
+        );
         let error_event = QuiltEvent::create_processing_error_event(
             material_id.as_str(),
             ProcessingStage::Cutting,
-            &error_msg,
+            &format!("Failed to update status to Cutting: {}", e),
         );
-        let _ = registry.event_bus().publish(error_event);
-        
-        messages::CuttingError::FileError(e)
-    })?;
+        if let Err(publish_err) = registry.event_bus().publish(error_event) {
+            warn!(
+                "{}: Failed to publish error event for material '{}' after status update failure: {}",
+                actor_name, material_id.as_str(), publish_err
+            );
+        }
+        return Err(messages::CuttingError::OperationFailed(format!(
+            "Failed to update status to Cutting: {}",
+            e
+        )));
+    }
 
-    // Cut the material into chunks
-    let cuts = cutter.cut(&content, Some(material_id.clone())).map_err(|e| {
-        // Publish error event for cutting failure
-        let error_msg = format!("Failed to cut material: {}", e);
-        let error_event = QuiltEvent::create_processing_error_event(
-            material_id.as_str(),
-            ProcessingStage::Cutting,
-            &error_msg,
-        );
-        let _ = registry.event_bus().publish(error_event);
-        
-        messages::CuttingError::OperationFailed(e.to_string())
-    })?;
+    let content = match fs::read_to_string(Path::new(&file_path)).await {
+        Ok(content) => {
+            debug!(
+                "{}: Read {} bytes from file '{}'",
+                actor_name,
+                content.len(),
+                file_path
+            );
+            content
+        }
+        Err(e) => {
+            error!(
+                "{}: Failed to read file '{}': {}",
+                actor_name, file_path, e
+            );
 
-    // Log information about cuts
-    let cut_count = cuts.len();
-    info!(
-        "{}: Successfully cut material '{}' into {} chunks",
+            if let Err(update_err) = registry
+                .update_material_status(
+                    material_id.as_str(),
+                    MaterialStatus::Error,
+                    Some(format!("Failed to read file: {}", e)),
+                )
+                .await
+            {
+                error!(
+                    "{}: Failed to update material status to Error for '{}' after read failure: {}",
+                    actor_name,
+                    material_id.as_str(),
+                    update_err
+                );
+            }
+            let error_event = QuiltEvent::create_processing_error_event(
+                material_id.as_str(),
+                ProcessingStage::Cutting,
+                &format!("Failed to read file {}: {}", file_path, e),
+            );
+            if let Err(publish_err) = registry.event_bus().publish(error_event) {
+                warn!(
+                    "{}: Failed to publish error event for material '{}' after read failure: {}",
+                    actor_name, material_id.as_str(), publish_err
+                );
+            }
+
+            return Err(messages::CuttingError::FileError(e));
+        }
+    };
+
+    let chunks = cutter.cut(&content);
+    debug!(
+        "{}: Cut material '{}' into {} chunks",
         actor_name,
         material_id.as_str(),
-        cut_count
+        chunks.len()
     );
 
-    // Log a sample of the cuts (first 2 and last 2 if there are more than 4 cuts)
-    if cut_count > 0 {
-        if cut_count <= 4 {
-            // Log all cuts for small numbers
-            for (i, cut) in cuts.iter().enumerate() {
-                let preview = if cut.content.len() > 50 {
-                    format!("{}...", &cut.content[..50])
-                } else {
-                    cut.content.clone()
-                };
-                
-                info!(
-                    "{}: Cut {}/{} - ID: {}, Sequence: {}, Content: '{}'",
-                    actor_name,
-                    i + 1,
-                    cut_count,
-                    cut.id,
-                    cut.sequence,
-                    preview
-                );
-            }
-        } else {
-            // Log first 2
-            for i in 0..2 {
-                let cut = &cuts[i];
-                let preview = if cut.content.len() > 50 {
-                    format!("{}...", &cut.content[..50])
-                } else {
-                    cut.content.clone()
-                };
-                
-                info!(
-                    "{}: Cut {}/{} - ID: {}, Sequence: {}, Content: '{}'",
-                    actor_name,
-                    i + 1,
-                    cut_count,
-                    cut.id,
-                    cut.sequence,
-                    preview
-                );
-            }
-            
-            info!("{}: ... {} more cuts ...", actor_name, cut_count - 4);
-            
-            // Log last 2
-            for i in (cut_count - 2)..cut_count {
-                let cut = &cuts[i];
-                let preview = if cut.content.len() > 50 {
-                    format!("{}...", &cut.content[..50])
-                } else {
-                    cut.content.clone()
-                };
-                
-                info!(
-                    "{}: Cut {}/{} - ID: {}, Sequence: {}, Content: '{}'",
-                    actor_name,
-                    i + 1,
-                    cut_count,
-                    cut.id,
-                    cut.sequence,
-                    preview
-                );
-            }
-        }
+    if let Some(first_chunk) = chunks.first() {
+        debug!(
+            "{}: First chunk sample ({} chars): '{}...'",
+            actor_name,
+            first_chunk.content.chars().count(),
+            first_chunk.content.chars().take(50).collect::<String>()
+        );
     }
 
-    // Update material status to Cut
-    if let Err(e) = registry.update_material_status(material_id.as_str(), MaterialStatus::Cut, None).await {
+    debug!(
+        "{}: Updating status to Cut for material '{}'",
+        actor_name, material_id.as_str()
+    );
+    if let Err(e) = registry
+        .update_material_status(material_id.as_str(), MaterialStatus::Cut, None)
+        .await
+    {
         error!(
-            "{}: Failed to update material status: {}",
+            "{}: Failed to update material status to Cut for '{}': {}",
             actor_name,
+            material_id.as_str(),
             e
         );
-        
-        // Publish error event
-        let error_msg = format!("Failed to update material status: {}", e);
         let error_event = QuiltEvent::create_processing_error_event(
             material_id.as_str(),
             ProcessingStage::Cutting,
-            &error_msg,
+            &format!("Failed to update status to Cut after processing: {}", e),
         );
-        let _ = registry.event_bus().publish(error_event);
-        
-        return Err(messages::CuttingError::OperationFailed(e.to_string()));
-    }
-
-    // TODO: In the next milestone, store the cuts in the CutsRepository
-    
-    // Publish MaterialCut event
-    let cut_event = QuiltEvent::material_cut(material_id.as_str(), cut_count);
-    if let Err(e) = registry.event_bus().publish(cut_event) {
-        warn!(
-            "{}: Failed to publish MaterialCut event for material '{}': {}",
+        if let Err(publish_err) = registry.event_bus().publish(error_event) {
+            warn!(
+                "{}: Failed to publish error event for material '{}' after status update failure: {}",
+                actor_name, material_id.as_str(), publish_err
+            );
+        }
+    } else {
+        info!(
+            "{}: Successfully processed and marked material '{}' as Cut",
             actor_name,
-            material_id.as_str(),
-            e
+            material_id.as_str()
         );
     }
 

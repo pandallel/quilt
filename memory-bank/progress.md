@@ -20,13 +20,14 @@ The project is in the **implementation stage**, working on Milestone 6: "Materia
 - Event Bus setup (`broadcast`) and event publishing/subscription for `MaterialDiscovered`.
 - Material Registry prototype managing basic state and publishing discovery events.
 - Basic `CuttingActor` skeleton (subscribes to events, basic lifecycle).
+- **`CuttingActor` now implements internal listener/mpsc/processor pattern for backpressure.**
 - `text-splitter` integrated.
 
 ## In Progress
 
-1. **Material Cut Processing**:
+1. **Material Cut Processing (Milestone 6)**:
 
-   - Finalizing document cutting implementation
+   - Finalizing document cutting implementation **within `CuttingActor` processor task**
    - Completing MaterialCut event creation and publishing
    - Implementing material state transition (Discovered → Cut)
    - Adding error recovery for failed cuts
@@ -89,15 +90,14 @@ The project is in the **implementation stage**, working on Milestone 6: "Materia
 
 ## What's Left to Build (Immediate Milestones)
 
-1.  **Implement Cutting Actor Internals (M5):** Set up the internal `mpsc` channel, spawn and implement the basic Listener Task (filtering, logging, sending to queue), and Processor Task (receiving from queue, logging) within the existing `CuttingActor`.
-2.  **Complete Cutting Logic (M6):** Finish text extraction, chunking, `MaterialCut` creation, backpressure handling (in Listener Task), and event publishing within the `CuttingActor`'s Processor Task.
-3.  **Cuts Repository (M7):** Implement storage for cuts and integrate with `CuttingActor`.
-4.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern (listener/mpsc/processor).
-5.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
-6.  **Swatch Repository (M10):** Implement storage for swatches.
-7.  **Basic Query (M11):** Simple search capability.
-8.  **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
-9.  **Persistence (M13):** Implement file-based persistence for events and repositories.
+1.  **Complete Cutting Logic (M6):** Finish text extraction, chunking, `MaterialCut` creation, backpressure handling, and event publishing within the `CuttingActor`'s Processor Task.
+2.  **Cuts Repository (M7):** Implement storage for cuts and integrate with `CuttingActor`.
+3.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern (listener/mpsc/processor).
+4.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+5.  **Swatch Repository (M10):** Implement storage for swatches.
+6.  **Basic Query (M11):** Simple search capability.
+7.  **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+8.  **Persistence (M13):** Implement file-based persistence for events and repositories.
 
 ## Known Issues & Blockers
 

@@ -51,6 +51,7 @@ The codebase currently has these key components implemented:
 
 6. **Cutting System**:
    - CuttingActor that subscribes to MaterialDiscovered events
+   - **Implemented internal listener/mpsc/processor pattern for backpressure**
    - TextCutter implementation using text-splitter crate for document chunking
    - CutterConfig with configurable token size settings (target: 300, min: 150, max: 800)
    - File content extraction using tokio::fs for async file operations
@@ -62,22 +63,21 @@ The codebase currently has these key components implemented:
 
 - Refined the `@actor-model-architecture.md` to incorporate details about internal actor backpressure queues (`mpsc`) between listener and processor tasks, and the role of the `ReconciliationActor`. Merged implementation/scaling details.
 - Updated the `implementation-plan.md` accordingly, adding Milestone 12 for Reconciliation.
-- Identified that while Milestone 5 (Basic Cutting Actor) was marked complete, the newly required internal queue/task structure is **pending implementation** within that actor.
+- Identified that while Milestone 5 (Basic Cutting Actor) was marked complete, the newly required internal queue/task structure is **pending implementation** within that actor. **<-- This is now COMPLETE.**
+- **Refactored `CuttingActor` to implement the internal listener/mpsc/processor pattern.**
 - Currently focusing on:
-  1.  **Implementing M5 Internals:** Adding the listener/mpsc/processor structure to the existing `CuttingActor`.
-  2.  **Starting M6:** Integrating the `text-splitter` logic _within_ the new Processor Task structure and handling backpressure/event flow.
+  1.  **Starting M6:** Integrating the `text-splitter` logic _within_ the new Processor Task structure and handling `MaterialCut` event creation/publishing and backpressure.
 
 ## Next Steps
 
-1.  **Complete M5 Internals:** Add the required listener/mpsc/processor structure to `CuttingActor`.
-2.  **Complete Milestone 6:** Finish implementing the cutting logic within the `CuttingActor`'s Processor Task, including `MaterialCut` creation, registry updates, event publishing, and backpressure handling.
-3.  **Implement Milestone 7:** Build the `CutsRepository`.
-4.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
-5.  **Implement Milestone 12 (Reconciliation):** Begin work on the `ReconciliationActor`.
+1.  **Complete Milestone 6:** Finish implementing the cutting logic within the `CuttingActor`'s Processor Task, including `MaterialCut` creation, registry updates, event publishing, and backpressure handling.
+2.  **Implement Milestone 7:** Build the `CutsRepository`.
+3.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
+4.  **Implement Milestone 12 (Reconciliation):** Begin work on the `ReconciliationActor`.
 
 ## Active Decisions & Considerations
 
-- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (e.g., 16-64) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable. Initial implementation will use reasonable defaults.
+- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 32 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
 - **Error Handling:** Continue refining error types and handling, particularly around `RecvError::Lagged` in listeners and potential failures during reconciliation.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
