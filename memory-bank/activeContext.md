@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has **completed Milestone 6: "Material Text Cutting Implementation"** and **Part 1 of Milestone 7: "Cuts Repository Implementation"**. The focus is now shifting to **Milestone 7 (Part 2): "Cuts Repository Integration"**.
+The project has **completed Milestone 6: "Material Text Cutting Implementation"** and **Milestone 7: "Cuts Repository Implementation"**. The focus is now shifting to **Milestone 8: "Basic Swatching Actor Creation"**.
 
 ## Current Implementation Status
 
@@ -12,7 +12,7 @@ The codebase currently has these key components implemented:
 
    - Common actor module with Ping and Shutdown messages
    - DiscoveryActor with lifecycle management
-   - CuttingActor with event subscription and basic processing
+   - CuttingActor with event subscription and processing
    - QuiltOrchestrator implementing the Orchestrator pattern
    - Proper Actix/Tokio runtime integration with #[actix::main]
 
@@ -22,7 +22,7 @@ The codebase currently has these key components implemented:
    - Material state tracking with proper validation (Discovered → Cut → Swatched → Error)
    - CRUD operations with idempotence and state transition validation
    - Registry wrapping repository and providing event coordination
-   - **Registry now handles publishing of `MaterialCut` and `ProcessingError` events based on state transitions.**
+   - Registry handles publishing of `MaterialCut` and `ProcessingError` events based on state transitions
 
 3. **Event System**:
 
@@ -54,16 +54,18 @@ The codebase currently has these key components implemented:
    - TextCutter implementation using text-splitter crate for document chunking
    - CutterConfig with configurable token size settings (target: 300, min: 150, max: 800)
    - File content extraction using tokio::fs for async file operations
-   - Material processing logic: reads file, calls cutter, updates registry (which publishes events).
-   - Specialized CutterError types
+   - Material processing logic: reads file, calls cutter, updates registry, stores cuts in repository
+   - Specialized CutterError types with proper error propagation
 
 7. **Cuts Repository**:
-   - `Cut` data structure with metadata (id, material_id, content, chunk_index, created_at, token_count, byte offsets)
+   - `Cut` data structure with comprehensive metadata (id, material_id, content, chunk_index, created_at, token_count, byte offsets)
    - `CutsRepository` trait defining async operations for cuts management
-   - Thread-safe in-memory implementation using `Arc<RwLock<HashMap<...>>>`
-   - Efficient lookup by material ID using a secondary index
+   - Thread-safe in-memory implementation `InMemoryCutsRepository` using `Arc<RwLock<HashMap<...>>>`
+   - Efficient lookup by material ID using a secondary index for material_id → [cut_ids]
+   - Comprehensive CRUD operations (save_cut, save_cuts, get_cut_by_id, get_cuts_by_material_id, delete_cut, delete_cuts_by_material_id, count_cuts_by_material_id)
+   - Proper error handling with custom `CutsRepositoryError` type
    - Comprehensive test coverage for all repository operations
-   - Uses native Rust async traits with explicit future returns and Send bounds
+   - Full integration with CuttingActor for storing processed cuts
 
 ## Recent Changes & Current Focus
 
@@ -72,28 +74,35 @@ The codebase currently has these key components implemented:
   - Refactored `MaterialRegistry` to publish `MaterialCut` and `ProcessingError` events upon successful state transitions.
   - Simplified `CuttingActor` to focus on processing and calling `registry.update_material_status`.
   - Updated event definitions and tests.
-- **Completed M7 (Part 1):**
+- **Completed M7:**
 
-  - Designed and implemented `Cut` data structure with complete metadata.
-  - Created `CutsRepository` trait with comprehensive async operations.
-  - Implemented thread-safe in-memory repository pattern with `InMemoryCutsRepository`.
+  - Designed and implemented `Cut` data structure with comprehensive metadata.
+  - Created `CutsRepository` trait with fully-featured async operations.
+  - Implemented thread-safe in-memory repository with `InMemoryCutsRepository`.
   - Used native Rust async traits with explicit future returns for better type safety.
   - Added comprehensive test coverage for all repository operations.
+  - Fully integrated `CutsRepository` with `CuttingActor` to store processed cuts.
+  - Enhanced error handling in the cutting pipeline with proper error propagation.
+  - Connected the full processing chain from discovery through cutting to storage.
 
 - **Current Focus:**
-  1.  **Starting M7 (Part 2):** Integrate the `CuttingActor` with the new `CutsRepository`.
+  1. **Starting Milestone 8:** Create a basic `SwatchingActor` skeleton that subscribes to `MaterialCut` events.
 
 ## Next Steps
 
-1.  **Implement Milestone 7 (Part 2):** Modify the `CuttingActor` to save cuts using the `CutsRepository` and update the `MaterialCut` event to include cut IDs.
-2.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
-3.  **Implement Milestone 12 (Reconciliation):** Begin work on the `ReconciliationActor`.
+1. **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
+2. **Implement Milestone 9:** Implement actual swatch creation in the `SwatchingActor`.
+3. **Implement Milestone 10:** Create the `SwatchRepository` and complete the processing pipeline.
 
 ## Active Decisions & Considerations
 
-- **Integrating Cuts Repository with CuttingActor:** Determine where and how to inject the `CutsRepository` into the `CuttingActor`. Consider using dependency injection patterns similar to the existing code.
+- **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
+  - Explicit backpressure handling when the internal queue fills up.
+  - Retry mechanisms for recoverable errors with exponential backoff.
+  - Making cutting parameters configurable at runtime.
+- **SwatchingActor Design:** Determine the optimal structure for the `SwatchingActor` based on lessons learned from `CuttingActor`.
 - **MaterialCut Event Structure Update:** Decide whether to include all cut IDs in the event or just a reference to the material that now has cuts.
-- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 32 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable (likely after M8/M9).
+- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
 - **Error Handling:** Continue refining error types and handling, particularly around persistence (M13) and potential reconciliation loops.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
