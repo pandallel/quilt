@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         discovery_dir: args.dir,
         ignore_hidden: !args.include_hidden,
         exclude_patterns: args.exclude,
-        actor_timeout: Duration::from_secs(30),
+        actor_timeout: Duration::from_secs(120),
     };
 
     // Log the configuration

@@ -119,7 +119,7 @@ impl Actor for CuttingActor {
     fn started(&mut self, ctx: &mut Self::Context) {
         info!("{}: Started", self.name);
 
-        const INTERNAL_QUEUE_CAPACITY: usize = 32;
+        const INTERNAL_QUEUE_CAPACITY: usize = 128;
         let (work_sender, work_receiver) =
             mpsc::channel::<CuttingWorkItem>(INTERNAL_QUEUE_CAPACITY);
         self.work_sender = Some(work_sender.clone());
