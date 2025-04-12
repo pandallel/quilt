@@ -67,37 +67,40 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## Next Major Milestone
 
-**Milestone 7.5 (Continued): "SQLite Repository Implementation"** - Complete the SQLite implementation with `SqliteCutsRepository` and address identified issues.
+**Task: Refactor Material Timestamps** - Rename `ingested_at` to `created_at`, add `status_updated_at`, `updated_at`, and leverage `sqlx` time feature.
 
 ## Upcoming Work (Revised Plan)
 
 1. ✅ **Complete Repository Trait Refactoring:**
    - ✅ All steps completed (1-6).
-2. **Complete SQLite Implementation:**
+2. **Refactor Material Timestamps (Next Task):**
+   - See goal above.
+3. **Complete SQLite Implementation:**
    - ✅ Partial completion: Added SQLx dependency, created database module, implemented `SqliteMaterialRepository`
    - Implement `SqliteCutsRepository` using the same pattern
    - Add transaction support for operations requiring atomicity
    - Enhance error handling for database operations
    - Resolve path issues in file processing
    - Enhance the CLI options for repository selection
-3. **Basic Swatching Actor (M8):**
+4. **Basic Swatching Actor (M8):**
 
    - Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern
    - Follow the same dual-task pattern (listener/processor) as the CuttingActor
    - Ensure proper lifecycle management and event handling
 
-4. **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+5. **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
 
-5. **Swatch Repository (M10):** Implement storage for swatches.
+6. **Swatch Repository (M10):** Implement storage for swatches.
 
-6. **Basic Query (M11):** Simple search capability.
+7. **Basic Query (M11):** Simple search capability.
 
-7. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+8. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
 
-8. **Persistence (M13):** Implement file-based persistence for events and repositories.
+9. **Persistence (M13):** Implement file-based persistence for events and repositories.
 
 ## What's Left to Build (Immediate Milestones)
 
+- Timestamp Refactoring (see plan above).
 - `SqliteCutsRepository` implementation.
 - Swatching Actor implementation (Milestone 8+).
 - Reconciliation Actor (Milestone 12).

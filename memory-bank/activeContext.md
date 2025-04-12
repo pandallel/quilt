@@ -113,8 +113,9 @@ The codebase currently has these key components implemented:
   - Added `--in-memory` flag for repository selection.
   - Fixed the file path resolution issue: `DiscoveryActor` now converts relative paths to absolute paths before registration, ensuring `CuttingActor` receives correct paths.
 - **Next Steps:**
-  - Implement `SqliteCutsRepository`.
+  - **Refactor Material Timestamps (Immediate Next Task):** Rename `ingested_at` to `created_at`, add `status_updated_at` and `updated_at`. Leverage `sqlx` time feature for simplification.
   - Enhance transaction support and error handling in SQLite repositories.
+  - Implement `SqliteCutsRepository`.
   - Begin work on Milestone 8 (Basic Swatching Actor).
 - **Decisions/Considerations:**
   - Sticking with `sqlx` for SQLite interaction.
@@ -142,9 +143,11 @@ The codebase currently has these key components implemented:
    - Address path resolution issues
 
 2. **Implement Basic Swatching Actor (M8):**
+   - **Preceded by:** Material Timestamp Refactoring Task
    - Create skeleton actor that subscribes to `MaterialCut` events
    - Implement internal listener/mpsc/processor pattern for backpressure
    - Add lifecycle management (start/stop)
+   - Subscription mechanism for updates
 
 ## Active Decisions & Considerations
 
