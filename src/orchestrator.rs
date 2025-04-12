@@ -158,9 +158,9 @@ impl QuiltOrchestrator {
 
         // Initialize cutting actor with cuts repository
         let cutting_actor = CuttingActor::new(
-            "main-cutting", 
-            self.registry.clone(), 
-            self.cuts_repository.clone()
+            "main-cutting",
+            self.registry.clone(),
+            self.cuts_repository.clone(),
         );
         let cutting_addr = cutting_actor.start();
         debug!("Initialized cutting actor");

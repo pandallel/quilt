@@ -213,7 +213,10 @@ impl Actor for CuttingActor {
                                 .update_material_status(
                                     material_id.as_str(),
                                     MaterialStatus::Error,
-                                    Some(format!("Material not found for cutting: {}", material_id)),
+                                    Some(format!(
+                                        "Material not found for cutting: {}",
+                                        material_id
+                                    )),
                                 )
                                 .await
                             {
@@ -225,7 +228,7 @@ impl Actor for CuttingActor {
                                 );
                             }
                         } else {
-                            // For all other errors, update the status of the material 
+                            // For all other errors, update the status of the material
                             let material_id = work_item.material_id.clone();
                             if let Err(update_err) = registry
                                 .update_material_status(
@@ -427,7 +430,7 @@ async fn process_discovered_material(
                     material_id.as_str(),
                     e
                 );
-                
+
                 // Update material status to Error
                 if let Err(update_err) = registry
                     .update_material_status(
@@ -444,7 +447,7 @@ async fn process_discovered_material(
                         update_err
                     );
                 }
-                
+
                 return Err(messages::CuttingError::OperationFailed(format!(
                     "Failed to save cuts: {}",
                     e
@@ -506,7 +509,7 @@ mod tests {
         let event_bus = Arc::new(EventBus::new());
         let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus);
-        
+
         // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
@@ -527,7 +530,7 @@ mod tests {
         let event_bus = Arc::new(EventBus::new());
         let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus);
-        
+
         // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
@@ -567,12 +570,13 @@ mod tests {
         let event_bus = Arc::new(EventBus::new());
         let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-        
+
         // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
         // Create and start actor
-        let cutting_actor = CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
+        let cutting_actor =
+            CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
 
         // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -673,7 +677,7 @@ mod tests {
 
         // There should be multiple cuts
         assert!(!cuts.is_empty(), "Expected at least one cut to be saved");
-        
+
         // Verify cut properties
         for (i, cut) in cuts.iter().enumerate() {
             assert_eq!(cut.material_id, material_id);

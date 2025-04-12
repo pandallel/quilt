@@ -17,7 +17,8 @@ async fn test_cutting_actor_integration() {
     let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
     // Start the cutting actor
-    let cutting_actor = CuttingActor::new("IntegrationCuttingActor", registry.clone(), cuts_repository).start();
+    let cutting_actor =
+        CuttingActor::new("IntegrationCuttingActor", registry.clone(), cuts_repository).start();
 
     // Test ping works
     let ping_result = cutting_actor.send(Ping).await;
@@ -56,7 +57,8 @@ async fn test_cutting_actor_handles_missing_material() {
     let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
     // Start the cutting actor
-    let cutting_actor = CuttingActor::new("ErrorTestCuttingActor", registry.clone(), cuts_repository).start();
+    let cutting_actor =
+        CuttingActor::new("ErrorTestCuttingActor", registry.clone(), cuts_repository).start();
 
     // Give the actor time to set up
     tokio::time::sleep(Duration::from_millis(50)).await;
