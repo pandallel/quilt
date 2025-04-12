@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**. Milestone 6: "Material Text Cutting Implementation" has been completed.
+The project is in the **implementation stage**. Milestone 6: "Material Text Cutting Implementation" has been completed. Part 1 of Milestone 7: "Cuts Repository Implementation" has been completed.
 
 ## Current Status
 
@@ -11,6 +11,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - **Discovery:** `DiscoveryActor` implemented and successfully publishing `MaterialDiscovered` events to the shared `EventBus` (Milestone 4).
 - **Cutting Actor (M5):** Basic `CuttingActor` skeleton created, subscribing to events, and implementing the internal listener/mpsc/processor pattern (Milestone 5).
 - **Cutting Logic (M6):** Completed. Integrated `text-splitter`, implemented processing logic within the `CuttingActor`'s processor task, and updated `MaterialRegistry` to handle state updates (`Discovered` -> `Cut`/`Error`) and publish corresponding events (`MaterialCut`/`ProcessingError`).
+- **Cuts Repository (M7 - Part 1):** Completed. Implemented `Cut` data structure and `CutsRepository` interface with an in-memory implementation. The repository supports CRUD operations for cuts, managing cuts by material ID, and has comprehensive test coverage.
 - **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
 
 ## What Works
@@ -24,16 +25,17 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - Text cutting using `text-splitter` within `CuttingActor`.
 - Material status transition `Discovered` -> `Cut` or `Discovered` -> `Error` handled by `CuttingActor` via `MaterialRegistry`.
 - Event publication (`MaterialCut`, `ProcessingError`) handled by `MaterialRegistry`.
+- `Cut` data structure with complete metadata (id, material_id, chunk_index, content, token_count, byte offsets).
+- `CutsRepository` with in-memory implementation for storing, retrieving, and managing cuts.
 
 ## In Progress
 
-1. **Cuts Repository Implementation (Milestone 7)**:
+1. **Cuts Repository Integration (Milestone 7 - Part 2)**:
 
-   - Define `Cut` data structure.
-   - Create in-memory storage for cuts (`CutsRepository`).
-   - Implement CRUD operations.
-   - Integrate with Registry/pipeline.
-   - Create comprehensive tests.
+   - Integrate `CutsRepository` with `CuttingActor`.
+   - Update `CuttingActor` to save generated cuts.
+   - Enhance the `MaterialCut` event to include cut IDs.
+   - Create comprehensive tests for the integration.
 
 2. **Processing Pipeline Enhancement & Performance Optimization**:
 
@@ -46,16 +48,15 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## Next Major Milestone
 
-**Milestone 7: "Cuts Repository Implementation"** - Focus is on implementing storage for processed cuts.
+**Milestone 7 (Part 2): "Cuts Repository Integration"** - Focus is on connecting the `CuttingActor` to the new `CutsRepository` implementation.
 
 ## Upcoming Work
 
-1. **Cuts Repository Implementation** (Milestone 7):
+1. **Cuts Repository Integration** (Milestone 7 - Part 2):
 
-   - Create in-memory storage for cuts.
-   - Implement CRUD operations.
-   - Add integration with Registry (potentially `CuttingActor` needs to store Cut IDs).
-   - Create comprehensive tests.
+   - Modify `CuttingActor` to save cuts using `CutsRepository`.
+   - Update `MaterialCut` event structure to include cut IDs.
+   - Add integration tests.
 
 2. **Swatching Actor Implementation** (Milestone 8):
 
@@ -73,7 +74,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## What's Left to Build (Immediate Milestones)
 
-1.  **Cuts Repository (M7):** Implement storage for cuts and integrate with the pipeline.
+1.  **Cuts Repository Integration (M7 Part 2):** Connect the `CuttingActor` to the new `CutsRepository`.
 2.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
 3.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
 4.  **Swatch Repository (M10):** Implement storage for swatches.
@@ -86,4 +87,3 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - **Backpressure Tuning:** Internal queue sizes (`mpsc`) and Event Bus capacity need empirical tuning once the pipeline is more complete (M7+).
 - **Reconciliation Logic Details:** Specific timeouts and retry counts need finalization.
 - **Error Handling:** Needs further refinement, especially around persistence and potential reconciliation loops.
-- **`Cut` Data Model:** Precise definition needed for `Cut` data structure for M7.
