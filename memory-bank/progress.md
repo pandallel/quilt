@@ -4,54 +4,23 @@
 
 The project is in the **implementation stage**, working on Milestone 6: "Material Text Cutting Implementation". The TextCutter component has been successfully implemented using the text-splitter crate, and work is in progress on integrating it fully with the CuttingActor for document processing.
 
+## Current Status
+
+- **Architecture:** Defined and documented in `@actor-model-architecture.md`, incorporating event-driven actors, a shared event bus, a central registry, internal backpressure queues for processing actors, and a reconciliation actor for resilience.
+- **Foundation:** Core repository, data structures, message channels (for direct comms, distinct from event bus), and basic actor framework are complete (Milestones 1-4).
+- **Discovery:** `DiscoveryActor` implemented and successfully publishing `MaterialDiscovered` events to the shared `EventBus` (Milestone 4).
+- **Cutting Actor (M5):** Basic `CuttingActor` skeleton created and subscribing to events (Milestone 5 marked complete), BUT the implementation of the internal listener/mpsc/processor task structure (required by the updated architecture) is **pending**.
+- **Cutting Logic (M6):** **In Progress** - Integrating `text-splitter`, planning implementation within the (pending) Processor Task structure, handling backpressure in the (pending) Listener Task.
+- **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
+
 ## What Works
 
-1. **Core Architecture**:
-
-   - QuiltOrchestrator coordinates actor lifecycle and communication
-   - Actor model implemented with Actix and proper message types
-   - Thread-safe Material Registry with state management and event publishing
-   - Event-driven communication between components
-
-2. **Discovery System**:
-
-   - DirectoryScanner scans directories for materials
-   - DiscoveryActor manages discovery lifecycle
-   - Command-line parameter handling for directory, exclusions
-   - Material registration with event publishing
-
-3. **Message System**:
-
-   - Actor-specific message types for direct communication
-   - Clear separation of concerns with dedicated message types per actor
-   - Strongly typed message responses with proper error handling
-   - Actix mailbox system for message queuing and backpressure
-
-4. **Event-Driven Architecture**:
-
-   - Event Bus implemented using Tokio broadcast channels
-   - Material Registry coordinating state and events
-   - Event types defined for system communication
-   - Event monitoring in QuiltOrchestrator
-   - Proper log levels for events (debug for routine events)
-   - Comprehensive test coverage for event publishing and subscription
-
-5. **Cutting System**:
-
-   - CuttingActor subscribes to MaterialDiscovered events
-   - TextCutter implemented with text-splitter for semantic chunking
-   - CutterConfig with configurable token size parameters (target: 300, min: 150, max: 800)
-   - ChunkInfo data structure for tracking cut chunks
-   - Asynchronous file content extraction with tokio::fs
-   - Processing error events for handling failures
-   - Comprehensive test coverage for cutting functionality
-
-6. **Supporting Infrastructure**:
-   - Structured logging with severity levels and actor details
-   - Comprehensive error types for each component
-   - Command-line interface with flexible configurations
-   - Robust test coverage across components
-   - Improved error handling for event-related operations
+- Actor system initialization and basic message handling.
+- Directory scanning and material discovery.
+- Event Bus setup (`broadcast`) and event publishing/subscription for `MaterialDiscovered`.
+- Material Registry prototype managing basic state and publishing discovery events.
+- Basic `CuttingActor` skeleton (subscribes to events, basic lifecycle).
+- `text-splitter` integrated.
 
 ## In Progress
 
@@ -117,3 +86,21 @@ The project is in the **implementation stage**, working on Milestone 6: "Materia
    - Enhanced CuttingActor with file content extraction
    - Added specialized error types for cutting operations
    - Enabled tokio::fs for asynchronous file operations
+
+## What's Left to Build (Immediate Milestones)
+
+1.  **Implement Cutting Actor Internals (M5):** Set up the internal `mpsc` channel, spawn and implement the basic Listener Task (filtering, logging, sending to queue), and Processor Task (receiving from queue, logging) within the existing `CuttingActor`.
+2.  **Complete Cutting Logic (M6):** Finish text extraction, chunking, `MaterialCut` creation, backpressure handling (in Listener Task), and event publishing within the `CuttingActor`'s Processor Task.
+3.  **Cuts Repository (M7):** Implement storage for cuts and integrate with `CuttingActor`.
+4.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern (listener/mpsc/processor).
+5.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+6.  **Swatch Repository (M10):** Implement storage for swatches.
+7.  **Basic Query (M11):** Simple search capability.
+8.  **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+9.  **Persistence (M13):** Implement file-based persistence for events and repositories.
+
+## Known Issues & Blockers
+
+- **Backpressure Tuning:** Internal queue sizes and Event Bus capacity need empirical tuning once the pipeline is more complete.
+- **Reconciliation Logic Details:** Specific timeouts and retry counts need finalization.
+- **Error Handling:** Needs further refinement, especially around persistence and potential reconciliation loops.

@@ -192,3 +192,34 @@ The system is being implemented incrementally, with each milestone providing a t
 3. Creating processing actors that subscribe to events
 4. Implementing the full pipeline with proper event flow
 5. Adding query capabilities and persistence
+
+## Additional Details
+
+- **Cutting:** The `CuttingActor` subscribes to `MaterialDiscovered` events from the bus, processes materials into cuts (using `text-splitter`), and publishes `MaterialCut` events back onto the bus after updating the `MaterialRegistry`. It uses an internal SPSC `mpsc` channel to manage backpressure between its event listener task and its processing task.
+- **Swatching (Future):** A `SwatchingActor` will subscribe to `MaterialCut` events, perform embedding (potentially concurrently), update the registry, and publish `MaterialSwatched` events. It will also use an internal `mpsc` queue for backpressure.
+- **Reconciliation:** A dedicated `ReconciliationActor` periodically scans the `MaterialRegistry` for materials stuck in intermediate states. It attempts retries by re-publishing the preceding event onto the `EventBus` and eventually marks items as `Error` if retries fail.
+
+### Key Components
+
+- **Actors:** Actix actors (`DiscoveryActor`, `CuttingActor`, `SwatchingActor`, `ReconciliationActor`) encapsulate stage-specific logic.
+- **Shared Event Bus:** A single `tokio::sync::broadcast` channel for all inter-actor event communication.
+- **Internal Queues:** Bounded `tokio::sync::mpsc` channels within `CuttingActor` and `SwatchingActor` to buffer work and provide backpressure between internal listener/processor tasks.
+- **Material Registry:** Central coordinator for state (`status`, `last_status_update`, `retry_count`), persistence orchestration, and primary event publishing.
+- **Material Repository:** Trait defining persistence operations (implemented initially with an in-memory store).
+
+### Backpressure & Resilience
+
+- **Intra-Actor Backpressure:** The primary mechanism. The listener task blocks if the internal `mpsc` queue is full.
+- **Inter-Actor Decoupling:** The broadcast bus decouples stages, but listeners can lag (`RecvError::Lagged`) if their internal queues remain full.
+- **Resilience:** The `ReconciliationActor` mitigates issues caused by lag, crashes, or processing errors by retrying stuck items.
+
+### State Management
+
+- The `MaterialRegistry` is the source of truth for material status, timestamps, and retry counts.
+- The `MaterialRepository` handles the actual persistence of this state.
+- Events are published by the Registry _after_ state is successfully persisted.
+
+### Implementation
+
+- Built using Actix for actor management and Tokio for async runtime, channels (`broadcast`, `mpsc`), and synchronization.
+- Detailed implementation patterns and considerations are documented in `docs/src/features/actor-model-architecture.md`.
