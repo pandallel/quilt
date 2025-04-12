@@ -1,5 +1,5 @@
 use crate::actors::{Ping, Shutdown};
-use crate::events::types::{MaterialId, ProcessingStage};
+use crate::events::types::MaterialId;
 use crate::events::QuiltEvent;
 use crate::materials::types::MaterialStatus;
 use crate::materials::MaterialRegistry;
@@ -282,22 +282,6 @@ async fn process_discovered_material(
                 actor_name,
                 material_id.as_str()
             );
-            let error_event = QuiltEvent::create_processing_error_event(
-                material_id.as_str(),
-                ProcessingStage::Cutting,
-                &format!(
-                    "Material not found during cutting stage: {}",
-                    material_id.as_str()
-                ),
-            );
-            if let Err(e) = registry.event_bus().publish(error_event) {
-                warn!(
-                    "{}: Failed to publish error event for material '{}': {}",
-                    actor_name,
-                    material_id.as_str(),
-                    e
-                );
-            }
             return Err(messages::CuttingError::MaterialNotFound(material_id));
         }
     };
@@ -341,17 +325,6 @@ async fn process_discovered_material(
                     update_err
                 );
                 }
-                let error_event = QuiltEvent::create_processing_error_event(
-                    material_id.as_str(),
-                    ProcessingStage::Cutting,
-                    &format!("Failed to read file {}: {}", file_path, e),
-                );
-                if let Err(publish_err) = registry.event_bus().publish(error_event) {
-                    warn!(
-                    "{}: Failed to publish error event for material '{}' after read failure: {}",
-                    actor_name, material_id.as_str(), publish_err
-                );
-                }
 
                 return Err(messages::CuttingError::FileError(e));
             }
@@ -389,17 +362,6 @@ async fn process_discovered_material(
             material_id.as_str(),
             e
         );
-        let error_event = QuiltEvent::create_processing_error_event(
-            material_id.as_str(),
-            ProcessingStage::Cutting,
-            &format!("Failed to update status to Cut after processing: {}", e),
-        );
-        if let Err(publish_err) = registry.event_bus().publish(error_event) {
-            warn!(
-                "{}: Failed to publish error event for material '{}' after status update failure: {}",
-                actor_name, material_id.as_str(), publish_err
-            );
-        }
     } else {
         info!(
             "{}: Successfully processed and marked material '{}' as Cut",

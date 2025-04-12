@@ -72,8 +72,6 @@ pub struct MaterialCutEvent {
     pub material_id: MaterialId,
     /// Timestamp when the event occurred
     pub timestamp: OffsetDateTime,
-    /// Number of cuts created
-    pub cut_count: usize,
 }
 
 /// Error event during material processing
@@ -123,11 +121,10 @@ impl QuiltEvent {
     }
 
     /// Create a MaterialCut event
-    pub fn material_cut(material_id: &str, cut_count: usize) -> Self {
+    pub fn material_cut(material_id: &str) -> Self {
         Self::MaterialCut(MaterialCutEvent {
             material_id: MaterialId::new(material_id.to_string()),
             timestamp: OffsetDateTime::now_utc(),
-            cut_count,
         })
     }
 
@@ -190,9 +187,8 @@ impl fmt::Display for QuiltEvent {
             ),
             Self::MaterialCut(evt) => write!(
                 f,
-                "MaterialCut {{ material_id: {}, cut_count: {} }}",
-                evt.material_id.as_str(),
-                evt.cut_count
+                "MaterialCut {{ material_id: {} }}",
+                evt.material_id.as_str()
             ),
             Self::System(SystemEvent::Shutdown) => write!(f, "System.Shutdown"),
             Self::System(SystemEvent::HealthCheck) => write!(f, "System.HealthCheck"),
@@ -282,11 +278,10 @@ mod tests {
 
     #[test]
     fn test_material_cut_event() {
-        let cut_event = QuiltEvent::material_cut("test-material", 10);
+        let cut_event = QuiltEvent::material_cut("test-material");
 
         if let QuiltEvent::MaterialCut(ref evt) = cut_event {
             assert_eq!(evt.material_id.as_str(), "test-material");
-            assert_eq!(evt.cut_count, 10);
         } else {
             panic!("Expected MaterialCut event");
         }
@@ -294,6 +289,5 @@ mod tests {
         let display = format!("{}", cut_event);
         assert!(display.contains("MaterialCut"));
         assert!(display.contains("test-material"));
-        assert!(display.contains("10"));
     }
 }
