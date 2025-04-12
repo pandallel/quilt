@@ -13,7 +13,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
-use crate::cutting::CuttingActor;
+use crate::cutting::{CuttingActor, InMemoryCutsRepository};
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
@@ -59,6 +59,7 @@ pub struct QuiltOrchestrator {
     cutting: Option<Addr<CuttingActor>>,
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
+    cuts_repository: Arc<InMemoryCutsRepository>,
     // Future actors:
     // swatching: Option<Addr<SwatchingActor>>,
 }
@@ -69,12 +70,14 @@ impl QuiltOrchestrator {
         let event_bus = Arc::new(EventBus::new());
         let repository = MaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
+        let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
         Self {
             discovery: None,
             cutting: None,
             registry,
             event_bus,
+            cuts_repository,
         }
     }
 
@@ -153,8 +156,12 @@ impl QuiltOrchestrator {
             return Err("Failed to start discovery actor".into());
         }
 
-        // Initialize cutting actor
-        let cutting_actor = CuttingActor::new("main-cutting", self.registry.clone());
+        // Initialize cutting actor with cuts repository
+        let cutting_actor = CuttingActor::new(
+            "main-cutting",
+            self.registry.clone(),
+            self.cuts_repository.clone(),
+        );
         let cutting_addr = cutting_actor.start();
         debug!("Initialized cutting actor");
         self.cutting = Some(cutting_addr);

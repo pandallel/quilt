@@ -174,25 +174,60 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Created X cuts from Y materials using TextSplitter" with detailed metrics in logs
 
-### Milestone 7: "Cuts Repository Implementation"
+### ✅ Milestone 7: "Cuts Repository Implementation"
 
 **Goal:** Store processed cuts with event integration
 **Implementation Time:** 2-3 days
+**Status:** ✅ Completed
 
-1. Implement CutsRepository (1-2 days)
+1. ✅ Implement CutsRepository (1-2 days)
 
-   - Create in-memory storage for cuts
-   - Implement CRUD operations
-   - Add integration with Registry
-   - Create comprehensive tests
+   - ✅ Create in-memory storage for cuts
+   - ✅ Implement CRUD operations
+   - ✅ Add integration with Registry
+   - ✅ Create comprehensive tests
 
-2. Connect Cutting Actor to repository (1 day)
-   - Add repository interaction in actor
-   - Implement proper error handling
-   - Add storage metrics and logging
-   - Create validation of stored cuts
+2. ✅ Connect Cutting Actor to repository (1 day)
+   - ✅ Add repository interaction in actor
+   - ✅ Implement proper error handling
+   - ✅ Add storage metrics and logging
+   - ✅ Create validation of stored cuts
 
 **Demonstration:** Running `main` logs "Stored X cuts in repository" with metrics on storage operations
+
+### Milestone 7.5: "SQLite Repository Implementation"
+
+**Goal:** Replace in-memory repositories with SQLite-backed implementations to enable persistence and vector search capability
+**Implementation Time:** 3-4 days
+
+1. Add SQLite infrastructure (1 day)
+
+   - Create connection management module
+   - Implement schema definition
+   - Add basic migration framework
+   - Set up SQLite-vec extension for vector operations
+
+2. Implement SQLite Material Repository (1 day)
+
+   - Create SQLite-backed implementation of MaterialRepository
+   - Preserve existing trait interface for backward compatibility
+   - Implement proper transaction handling
+   - Add comprehensive tests comparing with in-memory implementation
+
+3. Implement SQLite Cuts Repository (1 day)
+
+   - Create SQLite-backed implementation of CutsRepository
+   - Ensure performance for batch operations
+   - Optimize for material-based queries
+   - Set up indexes for common query patterns
+
+4. Add Repository Factory (0.5-1 day)
+   - Create factory pattern for repository instantiation
+   - Allow runtime selection between in-memory and SQLite
+   - Add configuration options for connection settings
+   - Update orchestrator to use repository factory
+
+**Demonstration:** Running `main` with SQLite repositories shows same functionality with persistence between runs
 
 ### Milestone 8: "Basic Swatching Actor Creation"
 
@@ -333,25 +368,55 @@ Future milestones will focus on more advanced features:
    - Load balancing and monitoring
    - Performance optimization based on usage patterns (tuning queue sizes, buffer capacities)
 
-2. **Enhanced Text Processing**
+2. **Cutting Enhancements**
+
+   - Improve backpressure handling
+     - Add explicit backpressure strategy when internal queue fills up
+     - Implement circuit-breaking for continuous error situations
+     - Add metrics for queue depth and backpressure events
+   - Implement retry mechanisms
+     - Add retry capability for recoverable errors
+     - Implement exponential backoff strategy
+     - Create configurable retry policies per error type
+   - Enhance configuration
+     - Make cutting parameters configurable (chunk size, overlap)
+     - Allow runtime configuration updates
+
+3. **Storage and Persistence Improvements**
+
+   - Implement disk-based repository options for cuts and materials
+   - Add streaming processing for very large files
+   - Create efficient indexing strategies for large repositories
+   - Implement data compression for storage efficiency
+   - Add data integrity validation and repair mechanisms
+
+4. **Enhanced Logging and Observability**
+
+   - Implement structured logging with span contexts
+   - Create comprehensive tracing for request flows
+   - Add detailed performance metrics collection
+   - Implement health monitoring dashboards
+   - Create alerting for system issues
+
+5. **Enhanced Text Processing**
 
    - Language detection
    - Text classification
    - Entity extraction
 
-3. **Embedding and Vector Search**
+6. **Embedding and Vector Search**
 
    - Integration with embedding models
    - Vector storage for semantic search
    - Similarity search implementation
 
-4. **Advanced Search and Queries**
+7. **Advanced Search and Queries**
 
    - Query language development
    - Search result ranking
    - Filter and facet implementation
 
-5. **Enhanced Cutting Strategies**
+8. **Enhanced Cutting Strategies**
 
    - Markdown content cutting
      - MarkdownCutter implementation using MarkdownSplitter
@@ -363,13 +428,13 @@ Future milestones will focus on more advanced features:
      - Specialized semantic boundary handling for code structures
    - Format-specific optimizations including language-specific tokenization and semantic boundary recognition
 
-6. **User Interfaces**
+9. **User Interfaces**
 
    - Web-based dashboard
    - Search interface
    - Material management
 
-7. **Integration APIs**
-   - REST API for external access
-   - Webhooks for processing events
-   - Subscription mechanism for updates
+10. **Integration APIs**
+    - REST API for external access
+    - Webhooks for processing events
+    - Subscription mechanism for updates
