@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 5: "Basic Cutting Actor Creation" and is now implementing Milestone 6: "Material Text Cutting Implementation". The Cutting Actor has been successfully integrated with the event-driven architecture and the initial text-splitting functionality has been implemented using the text-splitter crate.
+The project has **completed Milestone 6: "Material Text Cutting Implementation"**. The focus is now shifting to **Milestone 7: "Cuts Repository Implementation"**.
 
 ## Current Implementation Status
 
@@ -22,14 +22,12 @@ The codebase currently has these key components implemented:
    - Material state tracking with proper validation (Discovered → Cut → Swatched → Error)
    - CRUD operations with idempotence and state transition validation
    - Registry wrapping repository and providing event coordination
-   - Fully transition from direct Repository use to Registry pattern
+   - **Registry now handles publishing of `MaterialCut` and `ProcessingError` events based on state transitions.**
 
 3. **Event System**:
 
    - Event Bus implemented using `tokio::sync::broadcast` channels
-   - Material Registry coordinating state management and event publishing
-   - Event types defined for material and system events
-   - ProcessingError events for handling error cases
+   - Event types defined for material and system events (`MaterialDiscovered`, `MaterialCut`, `ProcessingError`)
    - Comprehensive test coverage for event publishing and subscription
    - Clear error handling for event operations
    - Improved logging with appropriate debug level for routine events
@@ -47,37 +45,37 @@ The codebase currently has these key components implemented:
    - DiscoveryActor that wraps the scanner in the actor interface
    - DiscoveryConfig for scanner parameters
    - Support for excluding patterns and hidden files
-   - Event publishing for discovered materials
+   - Event publishing for discovered materials (via Registry)
 
 6. **Cutting System**:
    - CuttingActor that subscribes to MaterialDiscovered events
-   - **Implemented internal listener/mpsc/processor pattern for backpressure**
+   - Implemented internal listener/mpsc/processor pattern for backpressure
    - TextCutter implementation using text-splitter crate for document chunking
    - CutterConfig with configurable token size settings (target: 300, min: 150, max: 800)
    - File content extraction using tokio::fs for async file operations
-   - Material processing logic with proper error handling
-   - Chunk information model with material tracking (ChunkInfo struct)
-   - Error handling with specialized CutterError types
+   - Material processing logic: reads file, calls cutter, updates registry (which publishes events).
+   - Specialized CutterError types
 
 ## Recent Changes & Current Focus
 
-- Refined the `@actor-model-architecture.md` to incorporate details about internal actor backpressure queues (`mpsc`) between listener and processor tasks, and the role of the `ReconciliationActor`. Merged implementation/scaling details.
-- Updated the `implementation-plan.md` accordingly, adding Milestone 12 for Reconciliation.
-- Identified that while Milestone 5 (Basic Cutting Actor) was marked complete, the newly required internal queue/task structure is **pending implementation** within that actor. **<-- This is now COMPLETE.**
-- **Refactored `CuttingActor` to implement the internal listener/mpsc/processor pattern.**
-- Currently focusing on:
-  1.  **Starting M6:** Integrating the `text-splitter` logic _within_ the new Processor Task structure and handling `MaterialCut` event creation/publishing and backpressure.
+- **Completed M6:**
+  - Integrated `text-splitter` into `CuttingActor`.
+  - Refactored `MaterialRegistry` to publish `MaterialCut` and `ProcessingError` events upon successful state transitions.
+  - Simplified `CuttingActor` to focus on processing and calling `registry.update_material_status`.
+  - Updated event definitions and tests.
+- **Current Focus:**
+  1.  **Starting M7:** Define the `Cut` data structure and implement the `CutsRepository` for in-memory storage.
 
 ## Next Steps
 
-1.  **Complete Milestone 6:** Finish implementing the cutting logic within the `CuttingActor`'s Processor Task, including `MaterialCut` creation, registry updates, event publishing, and backpressure handling.
-2.  **Implement Milestone 7:** Build the `CutsRepository`.
-3.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
-4.  **Implement Milestone 12 (Reconciliation):** Begin work on the `ReconciliationActor`.
+1.  **Implement Milestone 7:** Build the `CutsRepository` (define struct, implement CRUD, create tests).
+2.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
+3.  **Implement Milestone 12 (Reconciliation):** Begin work on the `ReconciliationActor`.
 
 ## Active Decisions & Considerations
 
-- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 32 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
+- **`Cut` Data Structure:** Define the fields for the `Cut` struct (ID, material ID, chunk content, chunk index, potentially metadata).
+- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 32 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable (likely after M8/M9).
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
-- **Error Handling:** Continue refining error types and handling, particularly around `RecvError::Lagged` in listeners and potential failures during reconciliation.
+- **Error Handling:** Continue refining error types and handling, particularly around persistence (M13) and potential reconciliation loops.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
