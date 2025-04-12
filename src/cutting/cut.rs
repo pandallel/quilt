@@ -74,7 +74,7 @@ mod tests {
         assert_eq!(cut.material_id, material_id);
         assert_eq!(cut.chunk_index, chunk_index);
         assert_eq!(cut.content, content);
-        assert!(cut.id.len() > 0);
+        assert!(!cut.id.is_empty());
         assert!(cut.token_count.is_none());
         assert!(cut.byte_offset_start.is_none());
         assert!(cut.byte_offset_end.is_none());
