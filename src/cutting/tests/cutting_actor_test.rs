@@ -49,7 +49,7 @@ async fn test_cutting_actor_integration() {
 async fn test_cutting_actor_handles_missing_material() {
     // Initialize event bus
     let event_bus = Arc::new(EventBus::new());
-    
+
     // Create repository and registry
     let repository = MaterialRepository::new();
     let registry = MaterialRegistry::new(repository, event_bus.clone());
@@ -81,7 +81,7 @@ async fn test_cutting_actor_handles_missing_material() {
     // The actor will try to process the material, but it won't find it
     // Since it returns an error immediately and doesn't try to update status,
     // we simply check if the actor is still alive
-    
+
     // Verify the actor is still alive
     let ping_result = cutting_actor.send(Ping).await;
     assert!(ping_result.is_ok());

@@ -194,9 +194,7 @@ impl Actor for CuttingActor {
                     .await
                     {
                         error!("{}: Error processing material: {}", actor_name, e);
-                        
                         // Handle material not found error by updating status to Error
-                        // This will trigger the ProcessingError event from the registry
                         if let messages::CuttingError::MaterialNotFound(material_id) = &e {
                             if let Err(update_err) = registry
                                 .update_material_status(
@@ -316,39 +314,38 @@ async fn process_discovered_material(
         return Ok(());
     }
 
-    let content =
-        match fs::read_to_string(Path::new(&file_path)).await {
-            Ok(content) => {
-                debug!(
-                    "{}: Read {} bytes from file '{}'",
-                    actor_name,
-                    content.len(),
-                    file_path
-                );
-                content
-            }
-            Err(e) => {
-                error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
+    let content = match fs::read_to_string(Path::new(&file_path)).await {
+        Ok(content) => {
+            debug!(
+                "{}: Read {} bytes from file '{}'",
+                actor_name,
+                content.len(),
+                file_path
+            );
+            content
+        }
+        Err(e) => {
+            error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
 
-                if let Err(update_err) = registry
-                    .update_material_status(
-                        material_id.as_str(),
-                        MaterialStatus::Error,
-                        Some(format!("Failed to read file: {}", e)),
-                    )
-                    .await
-                {
-                    error!(
+            if let Err(update_err) = registry
+                .update_material_status(
+                    material_id.as_str(),
+                    MaterialStatus::Error,
+                    Some(format!("Failed to read file: {}", e)),
+                )
+                .await
+            {
+                error!(
                     "{}: Failed to update material status to Error for '{}' after read failure: {}",
                     actor_name,
                     material_id.as_str(),
                     update_err
                 );
-                }
-
-                return Err(messages::CuttingError::FileError(e));
             }
-        };
+
+            return Err(messages::CuttingError::FileError(e));
+        }
+    };
 
     let chunks = cutter.cut(&content, Some(material_id.clone()))?;
     debug!(
