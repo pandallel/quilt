@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**, transitioning from Milestone 5 to Milestone 6. The Cutting Actor has been successfully implemented and integrated with the event system, subscribed to MaterialDiscovered events. The focus is now on implementing the actual document processing functionality in the Cutting Actor.
+The project is in the **implementation stage**, working on Milestone 6: "Material Text Cutting Implementation". The TextCutter component has been successfully implemented using the text-splitter crate, and work is in progress on integrating it fully with the CuttingActor for document processing.
 
 ## What Works
 
@@ -39,10 +39,12 @@ The project is in the **implementation stage**, transitioning from Milestone 5 t
 5. **Cutting System**:
 
    - CuttingActor subscribes to MaterialDiscovered events
-   - Processing error events for materials not found
-   - Actor lifecycle management with proper logging
-   - Integration with MaterialRegistry for material lookup
-   - Comprehensive test coverage for success and error paths
+   - TextCutter implemented with text-splitter for semantic chunking
+   - CutterConfig with configurable token size parameters (target: 300, min: 150, max: 800)
+   - ChunkInfo data structure for tracking cut chunks
+   - Asynchronous file content extraction with tokio::fs
+   - Processing error events for handling failures
+   - Comprehensive test coverage for cutting functionality
 
 6. **Supporting Infrastructure**:
    - Structured logging with severity levels and actor details
@@ -53,65 +55,65 @@ The project is in the **implementation stage**, transitioning from Milestone 5 t
 
 ## In Progress
 
-1. **Material Processing Implementation**:
+1. **Material Cut Processing**:
 
-   - Designing document cutting strategies
-   - Planning content splitting algorithms
-   - Implementing text extraction
-   - Creating cut creation logic
+   - Finalizing document cutting implementation
+   - Completing MaterialCut event creation and publishing
+   - Implementing material state transition (Discovered → Cut)
+   - Adding error recovery for failed cuts
+   - Creating metrics for cut creation and processing
 
-2. **Processing Pipeline Setup**:
+2. **Processing Pipeline Enhancement**:
 
-   - Defining the material processing workflow
-   - Planning the state transition workflow
-   - Designing the Cut data structure
-   - Preparing for CutsRepository implementation
+   - Implementing backpressure mechanism for large file batches
+   - Creating controlled processing rate with work queuing
+   - Planning the Cuts Repository implementation
+   - Preparing for integration with the next pipeline stage
 
 3. **Performance Optimization**:
-   - Addressing backpressure issue in CuttingActor for large file batches
-   - Planning throttling mechanism for event processing
-   - Designing work queue for controlled processing
-   - Identifying system bottlenecks during initial scanning
+   - Addressing timeout issues in CuttingActor for large file batches
+   - Implementing throttling mechanism for event processing
+   - Optimizing memory usage during batch processing
+   - Adding monitoring for processing rates and queue depths
 
 ## Next Major Milestone
 
-**Milestone 6: "Cutting Actor Processes Materials"** - The current focus is on implementing actual document processing in the Cutting Actor.
+**Milestone 7: "Cuts Repository Implementation"** - After completing Milestone 6, the focus will be on implementing storage for processed cuts.
 
 ## Upcoming Work
 
-1. **Document Cutting Functionality** (Milestone 6):
+1. **Complete Cutting Implementation** (Milestone 6):
 
-   - Implement text extraction and processing logic
-   - Create document splitting strategies
-   - Add cut creation from materials
-   - Keep detailed metrics of processing
-
-2. **Cut Event Publishing** (Milestone 6):
-
-   - Add MaterialCut event publishing
-   - Create proper state transitions in Registry
+   - Finish MaterialCut event publishing
+   - Complete state transitions in Registry
    - Add validation through logging
    - Implement recovery for failed cuts
 
-3. **Cuts Repository Implementation** (Milestone 7):
+2. **Cuts Repository Implementation** (Milestone 7):
 
    - Create in-memory storage for cuts
    - Implement CRUD operations
    - Add integration with Registry
    - Create comprehensive tests
 
-4. **Performance Improvements** (Milestone 6):
+3. **Performance Improvements** (Milestone 6-7):
 
    - Implement backpressure mechanism in CuttingActor
    - Add rate limiting for processing events
    - Create circuit breaker for system overload protection
    - Optimize memory usage during batch processing
-   - Add configurable timeouts for actor operations
+
+4. **Swatching Actor Implementation** (Milestone 8):
+
+   - Create basic Swatching Actor skeleton
+   - Implement event subscription for MaterialCut events
+   - Add actor lifecycle management
+   - Set up event flow monitoring
 
 5. **Recent Improvements**:
-   - Implemented CuttingActor with event subscription
-   - Added processing error events for error cases
-   - Created comprehensive test coverage for Cutting Actor
-   - Added integration with QuiltOrchestrator
-   - Improved error handling with detailed error messages
-   - Identified and worked around backpressure issue in the CuttingActor by excluding large document directories
+   - Implemented TextCutter with text-splitter crate integration
+   - Added CutterConfig for configurable token sizes
+   - Created ChunkInfo model for tracking cut chunks
+   - Enhanced CuttingActor with file content extraction
+   - Added specialized error types for cutting operations
+   - Enabled tokio::fs for asynchronous file operations

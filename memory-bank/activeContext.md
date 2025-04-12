@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has completed Milestone 5: "Basic Cutting Actor Creation" and is now preparing for Milestone 6: "Cutting Actor Processes Materials". The Cutting Actor has been successfully implemented and integrated with the event-driven architecture, subscribing to MaterialDiscovered events from the MaterialRegistry.
+The project has completed Milestone 5: "Basic Cutting Actor Creation" and is now implementing Milestone 6: "Material Text Cutting Implementation". The Cutting Actor has been successfully integrated with the event-driven architecture and the initial text-splitting functionality has been implemented using the text-splitter crate.
 
 ## Current Implementation Status
 
@@ -51,40 +51,43 @@ The codebase currently has these key components implemented:
 
 6. **Cutting System**:
    - CuttingActor that subscribes to MaterialDiscovered events
-   - Error handling for materials not found in repository
-   - ProcessingDiscoveredMaterial message for handling event data
-   - Event-driven architecture for processing
-   - Proper actor lifecycle management
+   - TextCutter implementation using text-splitter crate for document chunking
+   - CutterConfig with configurable token size settings (target: 300, min: 150, max: 800)
+   - File content extraction using tokio::fs for async file operations
+   - Material processing logic with proper error handling
+   - Chunk information model with material tracking (ChunkInfo struct)
+   - Error handling with specialized CutterError types
 
 ## Recent Changes
 
-1. **Cutting Actor Implementation**:
+1. **TextCutter Implementation**:
 
-   - Created CuttingActor that subscribes to MaterialDiscovered events
-   - Implemented proper error handling with ProcessingError events
-   - Added comprehensive test coverage for success and error paths
-   - Integrated with the QuiltOrchestrator for lifecycle management
+   - Implemented TextCutter using text-splitter crate for semantic document chunking
+   - Created CutterConfig for configurable token size parameters
+   - Added ChunkInfo data structure to store chunk metadata and content
+   - Implemented comprehensive test coverage for text cutting functionality
+   - Added tokio::fs for asynchronous file operations
 
-2. **Error Handling Improvements**:
+2. **Cutting Actor Enhancements**:
+
+   - Added file content reading capability using async file operations
+   - Implemented basic material processing with text extraction
+   - Enhanced error handling for file operations and cutting processes
+   - Integrated TextCutter with CuttingActor for document processing
+
+3. **Error Handling Improvements**:
 
    - Added ProcessingError event type for reporting processing errors
    - Implemented error publishing through the event bus
    - Enhanced error logging with stage and material information
+   - Added specialized CutterError for text splitting operations
    - Improved test coverage for error scenarios
 
-3. **Orchestrator Enhancements**:
+4. **Cargo Dependencies**:
 
-   - Updated QuiltOrchestrator to initialize and manage the CuttingActor
-   - Enhanced actor shutdown with proper timeout handling
-   - Improved error propagation from actors to orchestrator
-   - Added actor health check monitoring
-
-4. **Code Quality Improvements**:
-
-   - Enhanced documentation across the codebase
-   - Improved error message clarity
-   - Better organized test structure with dedicated test modules
-   - Added TODOs for future implementation in Milestone 6
+   - Added text-splitter crate for semantic document chunking
+   - Enabled tokio::fs feature for asynchronous file operations
+   - Enhanced error handling using thiserror for better error types
 
 5. **Performance Issues Identified**:
    - Discovered backpressure issue in CuttingActor when processing large batches of files

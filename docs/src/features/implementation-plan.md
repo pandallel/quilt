@@ -148,19 +148,20 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Goal:** Implement the text-based document cutting functionality that transforms discovered materials into meaningful cuts
 **Implementation Time:** 3-4 days
+**Status:** In Progress
 
-1. Integrate text-splitter crate (1 day)
+1. ✅ Integrate text-splitter crate (1 day)
 
-   - Add text-splitter dependency to Cargo.toml
-   - Create TextCutter implementation using TextSplitter
-   - Configure with default token sizes (target: 300, min: 150, max: 800)
+   - ✅ Add text-splitter dependency to Cargo.toml
+   - ✅ Create TextCutter implementation using TextSplitter
+   - ✅ Configure with default token sizes (target: 300, min: 150, max: 800)
 
-2. Implement basic cutting process (1-2 days)
+2. ⚠️ Implement basic cutting process (1-2 days)
 
-   - Add text extraction from materials
-   - Integrate with TextSplitter for content chunking
-   - Create MaterialCut model from text-splitter chunks
-   - Implement error handling with fallback strategy
+   - ✅ Add text extraction from materials
+   - ⚠️ Integrate with TextSplitter for content chunking
+   - ⚠️ Create MaterialCut model from text-splitter chunks
+   - ⚠️ Implement error handling with fallback strategy
 
 3. Implement Cut event publishing (1 day)
 
