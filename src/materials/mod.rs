@@ -8,6 +8,7 @@ use thiserror::Error;
 
 pub mod registry;
 pub mod repository;
+pub mod sqlite_repository;
 pub mod types;
 
 // Re-export material types
@@ -17,6 +18,7 @@ pub use registry::*;
 mod tests;
 
 pub use repository::InMemoryMaterialRepository;
+pub use sqlite_repository::SqliteMaterialRepository;
 pub use types::{Material, MaterialFileType, MaterialStatus};
 
 /// Errors that can occur during material repository operations
