@@ -195,6 +195,40 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` logs "Stored X cuts in repository" with metrics on storage operations
 
+### Milestone 7.5: "SQLite Repository Implementation"
+
+**Goal:** Replace in-memory repositories with SQLite-backed implementations to enable persistence and vector search capability
+**Implementation Time:** 3-4 days
+
+1. Add SQLite infrastructure (1 day)
+
+   - Create connection management module
+   - Implement schema definition
+   - Add basic migration framework
+   - Set up SQLite-vec extension for vector operations
+
+2. Implement SQLite Material Repository (1 day)
+
+   - Create SQLite-backed implementation of MaterialRepository
+   - Preserve existing trait interface for backward compatibility
+   - Implement proper transaction handling
+   - Add comprehensive tests comparing with in-memory implementation
+
+3. Implement SQLite Cuts Repository (1 day)
+
+   - Create SQLite-backed implementation of CutsRepository
+   - Ensure performance for batch operations
+   - Optimize for material-based queries
+   - Set up indexes for common query patterns
+
+4. Add Repository Factory (0.5-1 day)
+   - Create factory pattern for repository instantiation
+   - Allow runtime selection between in-memory and SQLite
+   - Add configuration options for connection settings
+   - Update orchestrator to use repository factory
+
+**Demonstration:** Running `main` with SQLite repositories shows same functionality with persistence between runs
+
 ### Milestone 8: "Basic Swatching Actor Creation"
 
 **Goal:** Create a minimal Swatching Actor that listens for cut events and sets up internal backpressure queue

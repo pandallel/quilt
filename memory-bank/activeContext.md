@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-The project has **completed Milestone 6: "Material Text Cutting Implementation"** and **Milestone 7: "Cuts Repository Implementation"**. The focus is now shifting to **Milestone 8: "Basic Swatching Actor Creation"**.
+The project has **completed Milestone 6: "Material Text Cutting Implementation"** and **Milestone 7: "Cuts Repository Implementation"**. The focus is now shifting to **Milestone 7.5: "SQLite Repository Implementation"** before proceeding to Milestone 8.
 
 ## Current Implementation Status
 
@@ -86,16 +86,24 @@ The codebase currently has these key components implemented:
   - Connected the full processing chain from discovery through cutting to storage.
 
 - **Current Focus:**
-  1. **Starting Milestone 8:** Create a basic `SwatchingActor` skeleton that subscribes to `MaterialCut` events.
+  1. **Starting Milestone 7.5:** Implement SQLite-backed repositories to enable persistence and future vector search capability, replacing the current in-memory implementations.
 
 ## Next Steps
 
-1. **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
-2. **Implement Milestone 9:** Implement actual swatch creation in the `SwatchingActor`.
-3. **Implement Milestone 10:** Create the `SwatchRepository` and complete the processing pipeline.
+1. **Implement Milestone 7.5:** Create SQLite-backed implementations of both repositories.
+   - Set up SQLite infrastructure with vector search capabilities
+   - Implement the SQLite MaterialRepository
+   - Implement the SQLite CutsRepository
+   - Create a repository factory pattern
+2. **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
+3. **Implement Milestone 9:** Implement actual swatch creation in the `SwatchingActor`.
 
 ## Active Decisions & Considerations
 
+- **SQLite Implementation Strategy:** Decide whether to use in-memory SQLite initially for simplified testing or directly implement file-based persistence.
+- **Migration Strategy:** Determine the best approach for schema migrations as the data model evolves.
+- **Connection Management:** Design connection pooling and lifecycle management for SQLite connections.
+- **Vector Search Integration:** Prepare for vector embedding storage by incorporating SQLite-vec extension.
 - **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
   - Explicit backpressure handling when the internal queue fills up.
   - Retry mechanisms for recoverable errors with exponential backoff.
