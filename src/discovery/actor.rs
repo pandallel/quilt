@@ -333,7 +333,7 @@ mod tests {
         init_test_logger();
 
         // Create a registry with an event bus
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -350,7 +350,7 @@ mod tests {
         init_test_logger();
 
         // Create a registry with an event bus
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -372,7 +372,7 @@ mod tests {
         File::create(&test_file_path).expect("Failed to create test file");
 
         // Create a registry with an event bus
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
 
         // Create a subscriber to keep the event channel open
@@ -415,7 +415,7 @@ mod tests {
         let invalid_path = "/path/to/nonexistent/directory";
 
         // Create a registry with an event bus
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -460,7 +460,7 @@ mod tests {
         File::create(subdir.join("excluded.md")).expect("Failed to create test file");
 
         // Create a registry with an event bus
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
 
         // Create a subscriber to keep the event channel open

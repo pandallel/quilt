@@ -3,7 +3,7 @@ use crate::cutting::{CuttingActor, InMemoryCutsRepository};
 use crate::events::EventBus;
 use crate::events::QuiltEvent;
 use crate::materials::types::Material;
-use crate::materials::{MaterialRegistry, InMemoryMaterialRepository};
+use crate::materials::{InMemoryMaterialRepository, MaterialRegistry};
 use actix::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,7 +12,7 @@ use std::time::Duration;
 async fn test_cutting_actor_integration() {
     // Initialize event bus and registry
     let event_bus = Arc::new(EventBus::new());
-    let repository = InMemoryMaterialRepository::new();
+    let repository = Arc::new(InMemoryMaterialRepository::new());
     let registry = MaterialRegistry::new(repository, event_bus.clone());
     let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
@@ -52,7 +52,7 @@ async fn test_cutting_actor_handles_missing_material() {
     let event_bus = Arc::new(EventBus::new());
 
     // Create repository and registry
-    let repository = InMemoryMaterialRepository::new();
+    let repository = Arc::new(InMemoryMaterialRepository::new());
     let registry = MaterialRegistry::new(repository, event_bus.clone());
     let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 

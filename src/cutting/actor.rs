@@ -506,7 +506,7 @@ mod tests {
         init_test_logger();
 
         let event_bus = Arc::new(EventBus::new());
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus);
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
@@ -521,7 +521,7 @@ mod tests {
         init_test_logger();
 
         let event_bus = Arc::new(EventBus::new());
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus);
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
@@ -551,11 +551,12 @@ mod tests {
         .expect("Failed to write test file");
 
         let event_bus = Arc::new(EventBus::new());
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus.clone());
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        let cutting_actor = CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
+        let cutting_actor =
+            CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -595,7 +596,7 @@ mod tests {
         .expect("Failed to write test file");
 
         let event_bus = Arc::new(EventBus::new());
-        let repository = InMemoryMaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus.clone());
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
