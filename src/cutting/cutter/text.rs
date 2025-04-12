@@ -96,7 +96,7 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].content, text);
         assert_eq!(result[0].sequence, 0);
-        assert!(result[0].id.len() > 0);
+        assert!(!result[0].id.is_empty());
     }
 
     #[test]
