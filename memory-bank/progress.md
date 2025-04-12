@@ -32,59 +32,57 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## In Progress
 
-1. **SQLite Repository Implementation (Milestone 7.5)**:
+1.  **Milestone 7.5 Planning & Refactoring**:
 
-   - Designing SQLite-backed repository implementations to replace in-memory versions
-   - Planning schema and migration strategy
-   - Researching SQLite-vec integration for future vector search capability
-   - Preparing connection management and lifecycle handling
+    - **Decision:** Proceeding with in-memory SQLite (`:memory:`) to defer migration complexity.
+    - **Required Refactoring (In Progress):**
+      - Refactoring `MaterialRepository` (`src/materials/repository.rs`) into an `async trait` and `InMemoryMaterialRepository` implementation.
+      - Updating `MaterialRegistry` (`src/materials/registry.rs`) to use `Arc<dyn MaterialRepository>`.
+      - Updating `CuttingActor` (`src/cutting/actor.rs`) to depend on `Arc<dyn CutsRepository>`.
+    - Planning SQLite schema and `sqlx` integration.
 
-2. **Processing Pipeline Enhancement & Performance Optimization**:
-   - Implementing backpressure mechanism for large file batches (ongoing tuning).
-   - Creating controlled processing rate with work queuing (ongoing tuning).
-   - Addressing potential timeout issues in `CuttingActor` for large file batches.
-   - Implementing throttling mechanism for event processing.
-   - Optimizing memory usage during batch processing (ongoing).
-   - Adding monitoring for processing rates and queue depths (ongoing).
+2.  **Processing Pipeline Enhancement & Performance Optimization**:
+    - Implementing backpressure mechanism for large file batches (ongoing tuning).
+    - Creating controlled processing rate with work queuing (ongoing tuning).
+    - Addressing potential timeout issues in `CuttingActor` for large file batches.
+    - Implementing throttling mechanism for event processing.
+    - Optimizing memory usage during batch processing (ongoing).
+    - Adding monitoring for processing rates and queue depths (ongoing).
 
 ## Next Major Milestone
 
-**Milestone 7.5: "SQLite Repository Implementation"** - Focus is on creating SQLite-backed implementations of both repositories to enable persistence and vector search capabilities.
+**Milestone 7.5: "SQLite Repository Implementation"** - Focus is on creating SQLite-backed implementations (initially in-memory) of both repositories after completing the prerequisite refactoring.
 
 ## Upcoming Work
 
-1. **SQLite Repository Implementation** (Milestone 7.5):
-
-   - Set up SQLite infrastructure with connection management
-   - Implement schema definition and migration framework
-   - Create SQLite-backed MaterialRepository implementation
-   - Create SQLite-backed CutsRepository implementation
-   - Develop repository factory pattern for runtime selection
-   - Add configuration for connection parameters and operational modes
-   - Set up SQLite-vec extension for future vector operations
-
-2. **Swatching Actor Implementation** (Milestone 8):
-
-   - Create basic Swatching Actor skeleton.
-   - Implement event subscription for MaterialCut events.
-   - Add actor lifecycle management and internal queue pattern.
-   - Set up event flow monitoring.
-
-3. **Performance Improvements** (Ongoing):
-   - Continue tuning backpressure mechanism in actors.
-   - Add rate limiting for processing events.
-   - Create circuit breaker for system overload protection.
-   - Optimize memory usage during batch processing.
+1.  **Complete Prerequisite Refactoring**:
+    - Finalize `MaterialRepository` trait definition and `InMemoryMaterialRepository` implementation.
+    - Update `MaterialRegistry` to use the trait.
+    - Finalize `CuttingActor` update to use `CutsRepository` trait.
+2.  **SQLite Repository Implementation** (Milestone 7.5 - In-Memory):
+    - Add `sqlx` dependency.
+    - Set up SQLite infrastructure (pool connected to `:memory:`, schema creation).
+    - Implement `SqliteMaterialRepository`.
+    - Implement `SqliteCutsRepository`.
+    - Integrate new repositories into application startup.
+    - Write integration tests for SQLite repositories.
+    - Defer `sqlite-vec` integration.
+3.  **Swatching Actor Implementation** (Milestone 8):
+    - Create basic Swatching Actor skeleton.
+    - Implement event subscription for MaterialCut events.
+    - Add actor lifecycle management and internal queue pattern.
+    - Set up event flow monitoring.
 
 ## What's Left to Build (Immediate Milestones)
 
-1. **SQLite Repository Infrastructure (M7.5):** Implement SQLite-backed versions of both repositories with vector search capability.
-2. **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
-3. **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
-4. **Swatch Repository (M10):** Implement storage for swatches.
-5. **Basic Query (M11):** Simple search capability.
-6. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
-7. **Persistence (M13):** Implement file-based persistence for events and repositories.
+1.  **Repository Refactoring:** Finalize trait-based repositories.
+2.  **SQLite Repository Infrastructure (M7.5 - In-Memory):** Implement in-memory SQLite versions of both repositories.
+3.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
+4.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+5.  **Swatch Repository (M10):** Implement storage for swatches.
+6.  **Basic Query (M11):** Simple search capability.
+7.  **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+8.  **Persistence (M13):** Implement file-based persistence for events and repositories.
 
 ## Future Enhancements (Post-Core Implementation)
 
@@ -112,3 +110,5 @@ Based on the recent code review, these enhancements have been identified for fut
 - **Backpressure Tuning:** Internal queue sizes (`mpsc`, currently 128 for `CuttingActor`) and Event Bus capacity need empirical tuning once the pipeline is more complete.
 - **Reconciliation Logic Details:** Specific timeouts and retry counts need finalization.
 - **Error Handling:** Continues to be refined, especially around persistence and potential reconciliation loops.
+- **Repository Refactoring:** The need to refactor `MaterialRepository` into a trait before implementing SQLite was identified.
+- **Cutting Actor Dependency:** The `CuttingActor` needs to be updated to use the `CutsRepository` trait for dependency injection.

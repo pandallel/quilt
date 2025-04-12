@@ -86,24 +86,33 @@ The codebase currently has these key components implemented:
   - Connected the full processing chain from discovery through cutting to storage.
 
 - **Current Focus:**
-  1. **Starting Milestone 7.5:** Implement SQLite-backed repositories to enable persistence and future vector search capability, replacing the current in-memory implementations.
+  1. **Starting Milestone 7.5:** Implement SQLite-backed repositories to enable persistence and future vector search capability, replacing the current in-memory implementations. **Decision:** We will start with an **in-memory SQLite database** (`:memory:`) to avoid dealing with migrations initially.
 
 ## Next Steps
 
-1. **Implement Milestone 7.5:** Create SQLite-backed implementations of both repositories.
-   - Set up SQLite infrastructure with vector search capabilities
-   - Implement the SQLite MaterialRepository
-   - Implement the SQLite CutsRepository
-   - Create a repository factory pattern
-2. **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
-3. **Implement Milestone 9:** Implement actual swatch creation in the `SwatchingActor`.
+1.  **Implement Prerequisite Refactoring for M7.5:**
+    - **Refactor `MaterialRepository` (`src/materials/repository.rs`):**
+      - Define `async trait MaterialRepository`.
+      - Rename concrete struct to `InMemoryMaterialRepository` and implement the trait.
+      - Update `MaterialRegistry` (`src/materials/registry.rs`) to use `Arc<dyn MaterialRepository>`.
+    - **Update `CuttingActor` Dependency (`src/cutting/actor.rs`):**
+      - Modify `CuttingActor::new` and the struct field to use `Arc<dyn CutsRepository>`.
+2.  **Implement Milestone 7.5 (In-Memory SQLite):** Create SQLite-backed implementations of both repositories using an in-memory database.
+    - Add `sqlx` dependency.
+    - Set up SQLite infrastructure (pool connected to `:memory:`, schema creation).
+    - Implement the `SqliteMaterialRepository`.
+    - Implement the `SqliteCutsRepository`.
+    - Integrate new repositories into the application startup.
+    - Defer `sqlite-vec` integration.
+3.  **Implement Milestone 8:** Create the basic `SwatchingActor` with its internal queue pattern.
+4.  **Implement Milestone 9:** Implement actual swatch creation in the `SwatchingActor`.
 
 ## Active Decisions & Considerations
 
-- **SQLite Implementation Strategy:** Decide whether to use in-memory SQLite initially for simplified testing or directly implement file-based persistence.
-- **Migration Strategy:** Determine the best approach for schema migrations as the data model evolves.
-- **Connection Management:** Design connection pooling and lifecycle management for SQLite connections.
-- **Vector Search Integration:** Prepare for vector embedding storage by incorporating SQLite-vec extension.
+- **SQLite Implementation Strategy:** **Decision:** Using in-memory SQLite (`:memory:`) initially for simplified testing and development, deferring file-based persistence and migrations.
+- **Migration Strategy:** Deferred until file-based persistence is implemented.
+- **Connection Management:** Design connection pooling (`sqlx::SqlitePool`) for the in-memory database.
+- **Vector Search Integration:** **Deferred:** `sqlite-vec` integration will be addressed later when file-based persistence is added or vector search is explicitly needed.
 - **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
   - Explicit backpressure handling when the internal queue fills up.
   - Retry mechanisms for recoverable errors with exponential backoff.

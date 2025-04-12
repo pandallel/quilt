@@ -200,12 +200,21 @@ This document outlines the incremental implementation plan for Quilt's core arch
 **Goal:** Replace in-memory repositories with SQLite-backed implementations to enable persistence and vector search capability
 **Implementation Time:** 3-4 days
 
-1. Add SQLite infrastructure (1 day)
+0.  **Prerequisites: Repository Trait Refactoring** (Required before starting SQLite work)
 
-   - Create connection management module
-   - Implement schema definition
-   - Add basic migration framework
-   - Set up SQLite-vec extension for vector operations
+    - Refactor `MaterialRepository` (`src/materials/repository.rs`):
+      - Define `async trait MaterialRepository`.
+      - Rename concrete struct to `InMemoryMaterialRepository` and implement the trait.
+      - Update `MaterialRegistry` (`src/materials/registry.rs`) to use `Arc<dyn MaterialRepository>`.
+    - Update `CuttingActor` Dependency (`src/cutting/actor.rs`):
+      - Modify `CuttingActor::new` and the struct field to use `Arc<dyn CutsRepository>`.
+
+1.  Add SQLite infrastructure (1 day)
+
+- Create connection management module
+- Implement schema definition
+- Add basic migration framework
+- Set up SQLite-vec extension for vector operations
 
 2. Implement SQLite Material Repository (1 day)
 
