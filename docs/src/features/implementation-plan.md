@@ -127,16 +127,16 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Goal:** Create a minimal Cutting Actor that listens for events and sets up internal backpressure queue
 **Implementation Time:** 2-3 days
-**Status:** Completed _(Note: Base actor done, internal queue pattern needs implementation)_
+**Status:** Completed
 
 1. ✅ Create Cutting Actor skeleton (1-2 days)
 
    - ✅ Implement simple actor that subscribes to MaterialDiscovered events from the shared `EventBus`
-   - ⚠️ Set up internal bounded `mpsc` channel (sender/receiver pair)
-   - ⚠️ Spawn internal 'Listener Task': receives events from `EventBus`, filters for `MaterialDiscovered`, logs receipt, tries sending to internal `mpsc` queue (no blocking/backpressure handling yet)
-   - ⚠️ Spawn internal 'Processor Task': receives from internal `mpsc` queue, logs receipt (no processing yet)
-   - ✅ Add logging for received events on both tasks _(Existing basic logging)_
-   - ✅ Create basic actor lifecycle (start/stop) including task cleanup _(Existing basic lifecycle)_
+   - ✅ Set up internal bounded `mpsc` channel (sender/receiver pair)
+   - ✅ Spawn internal 'Listener Task': receives events from `EventBus`, filters for `MaterialDiscovered`, logs receipt, tries sending to internal `mpsc` queue (no blocking/backpressure handling yet)
+   - ✅ Spawn internal 'Processor Task': receives from internal `mpsc` queue, logs receipt (no processing yet)
+   - ✅ Add logging for received events on both tasks
+   - ✅ Create basic actor lifecycle (start/stop) including task cleanup
 
 2. ✅ Set up actor monitoring (1 day)
    - ✅ Add heartbeat logging for the actor
