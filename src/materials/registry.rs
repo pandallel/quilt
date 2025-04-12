@@ -70,6 +70,28 @@ impl MaterialRegistry {
         self.repository.list_materials_by_status(status).await
     }
 
+    /// Update the status of a material in the repository
+    pub async fn update_material_status(
+        &self,
+        id: &str,
+        status: MaterialStatus,
+        error: Option<String>,
+    ) -> Result<(), RegistryError> {
+        debug!("Updating material status: {} -> {:?}", id, &status);
+        
+        // Use status.clone() to avoid moving the value
+        let status_clone = status.clone();
+        
+        // Update the status in the repository
+        self.repository
+            .update_material_status(id, status, error)
+            .await
+            .map_err(RegistryError::Repository)?;
+        
+        debug!("Material status updated successfully: {} -> {:?}", id, status_clone);
+        Ok(())
+    }
+
     /// Get the underlying repository
     pub fn repository(&self) -> &MaterialRepository {
         &self.repository
