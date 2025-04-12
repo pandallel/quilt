@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-Continuing the refactoring process for **Milestone 7.5: "SQLite Repository Implementation"**. The first step of renaming `MaterialRepository` to `InMemoryMaterialRepository` is now complete. The current focus is on introducing the `MaterialRepository` trait.
+Continuing the refactoring process for **Milestone 7.5: "SQLite Repository Implementation"**. The introduction of the `MaterialRepository` trait (Step 2) is now complete. The current focus is on **Step 3: Refactoring `MaterialRegistry` to use the trait**.
 
 ## Current Implementation Status
 
@@ -85,11 +85,13 @@ The codebase currently has these key components implemented:
   - Connected the full processing chain from discovery through cutting to storage.
 - **Milestone 7.5 Progress:**
   - ✅ **Completed Step 1 - Renaming `MaterialRepository`:** Successfully renamed the struct `MaterialRepository` to `InMemoryMaterialRepository` throughout the codebase and verified all tests pass.
-  - **Current Focus (Step 2):** Introducing the `MaterialRepository` trait:
-    - Adding `async-trait` dependency
-    - Defining `trait MaterialRepository` in `repository.rs` using `#[async_trait]`
-    - Implementing the trait for `InMemoryMaterialRepository`
-    - Running validation tests
+  - ✅ **Completed Step 2 - Introduce `MaterialRepository` Trait:** Added `async-trait`, defined `trait MaterialRepository` in `materials/mod.rs`, implemented it for `InMemoryMaterialRepository`, and validated with tests.
+  - **Current Focus (Step 3):** Refactoring `MaterialRegistry` to use `Arc<dyn MaterialRepository>`:
+    - Update `MaterialRegistry` struct definition.
+    - Update `MaterialRegistry::new` constructor.
+    - Update methods within `MaterialRegistry` that call repository methods.
+    - Update tests for `MaterialRegistry`.
+    - Run validation tests (`cargo check`, `cargo test`).
 
 ## Next Steps (Revised Plan)
 
@@ -97,11 +99,11 @@ The codebase currently has these key components implemented:
     - ✅ Finish renaming `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
     - ✅ Update all external usages.
     - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
-2.  **Introduce `MaterialRepository` Trait & Validate:**
-    - Add `async-trait` dependency.
-    - Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
-    - Implement the trait for `InMemoryMaterialRepository`.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+2.  ✅ **Introduce `MaterialRepository` Trait & Validate:**
+    - ✅ Add `async-trait` dependency.
+    - ✅ Define `trait MaterialRepository` in `materials/mod.rs` using `#[async_trait]`.
+    - ✅ Implement the trait for `InMemoryMaterialRepository`.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
 3.  **Refactor `MaterialRegistry` & Validate:**
     - Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
     - Update dependent code and tests.
@@ -110,7 +112,7 @@ The codebase currently has these key components implemented:
     - Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
     - **Validate:** Ensure `cargo check` and `cargo test` pass.
 5.  **(Optional Cleanup) Move Trait & Validate:**
-    - Move trait/error definitions to `mod.rs`.
+    - Move trait/error definitions to `mod.rs`. // Note: Trait is already in mod.rs
     - **Validate:** Ensure `cargo check` and `cargo test` pass.
 6.  **Implement SQLite Repositories (M7.5 - In-Memory):**
     - Implement `SqliteMaterialRepository` and `SqliteCutsRepository` (using `:memory:`).
