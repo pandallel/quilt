@@ -32,46 +32,45 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## In Progress
 
-1.  **Milestone 7.5 Planning & Refactoring**:
-
-    - **Decision:** Proceeding with in-memory SQLite (`:memory:`) to defer migration complexity.
-    - **Required Refactoring (In Progress):**
-      - Refactoring `MaterialRepository` (`src/materials/repository.rs`) into an `async trait` and `InMemoryMaterialRepository` implementation.
-      - Updating `MaterialRegistry` (`src/materials/registry.rs`) to use `Arc<dyn MaterialRepository>`.
-      - Updating `CuttingActor` (`src/cutting/actor.rs`) to depend on `Arc<dyn CutsRepository>`.
-    - Planning SQLite schema and `sqlx` integration.
-
-2.  **Processing Pipeline Enhancement & Performance Optimization**:
-    - Implementing backpressure mechanism for large file batches (ongoing tuning).
-    - Creating controlled processing rate with work queuing (ongoing tuning).
-    - Addressing potential timeout issues in `CuttingActor` for large file batches.
-    - Implementing throttling mechanism for event processing.
-    - Optimizing memory usage during batch processing (ongoing).
-    - Adding monitoring for processing rates and queue depths (ongoing).
+1.  **Milestone 7.5 Pre-Refactoring (In Progress):**
+    - Starting the prerequisite refactoring for SQLite implementation.
+    - **Current Step:** Renaming the `MaterialRepository` struct to `InMemoryMaterialRepository` across the project.
+    - **Next:** Validate the rename thoroughly via `cargo check` and `cargo test` before introducing the trait.
 
 ## Next Major Milestone
 
-**Milestone 7.5: "SQLite Repository Implementation"** - Focus is on creating SQLite-backed implementations (initially in-memory) of both repositories after completing the prerequisite refactoring.
+**Milestone 7.5: "SQLite Repository Implementation"** - Requires completion of prerequisite refactoring before implementation begins.
 
-## Upcoming Work
+## Upcoming Work (Revised Plan)
 
-1.  **Complete Prerequisite Refactoring**:
-    - Finalize `MaterialRepository` trait definition and `InMemoryMaterialRepository` implementation.
-    - Update `MaterialRegistry` to use the trait.
-    - Finalize `CuttingActor` update to use `CutsRepository` trait.
-2.  **SQLite Repository Implementation** (Milestone 7.5 - In-Memory):
-    - Add `sqlx` dependency.
-    - Set up SQLite infrastructure (pool connected to `:memory:`, schema creation).
-    - Implement `SqliteMaterialRepository`.
-    - Implement `SqliteCutsRepository`.
-    - Integrate new repositories into application startup.
-    - Write integration tests for SQLite repositories.
-    - Defer `sqlite-vec` integration.
-3.  **Swatching Actor Implementation** (Milestone 8):
-    - Create basic Swatching Actor skeleton.
-    - Implement event subscription for MaterialCut events.
-    - Add actor lifecycle management and internal queue pattern.
-    - Set up event flow monitoring.
+1.  **Complete `MaterialRepository` Rename & Validation:**
+    - Finish renaming `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
+    - Update all external usages.
+    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+2.  **Introduce `MaterialRepository` Trait & Validate:**
+    - Add `async-trait` dependency.
+    - Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
+    - Implement the trait for `InMemoryMaterialRepository`.
+    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+3.  **Refactor `MaterialRegistry` & Validate:**
+    - Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
+    - Update dependent code and tests.
+    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+4.  **Refactor Dependent Actors/Tests & Validate:**
+    - Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
+    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+5.  **(Optional Cleanup) Move Trait & Validate:**
+    - Move trait/error definitions to `mod.rs`.
+    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+6.  **Implement SQLite Repositories (M7.5 - In-Memory):**
+    - Implement `SqliteMaterialRepository` and `SqliteCutsRepository` (using `:memory:`).
+    - Integrate and test.
+7.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
+8.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+9.  **Swatch Repository (M10):** Implement storage for swatches.
+10. **Basic Query (M11):** Simple search capability.
+11. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+12. **Persistence (M13):** Implement file-based persistence for events and repositories.
 
 ## What's Left to Build (Immediate Milestones)
 

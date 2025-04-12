@@ -202,12 +202,27 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 0.  **Prerequisites: Repository Trait Refactoring** (Required before starting SQLite work)
 
-    - Refactor `MaterialRepository` (`src/materials/repository.rs`):
-      - Define `async trait MaterialRepository`.
-      - Rename concrete struct to `InMemoryMaterialRepository` and implement the trait.
-      - Update `MaterialRegistry` (`src/materials/registry.rs`) to use `Arc<dyn MaterialRepository>`.
-    - Update `CuttingActor` Dependency (`src/cutting/actor.rs`):
-      - Modify `CuttingActor::new` and the struct field to use `Arc<dyn CutsRepository>`.
+    - Refactor `MaterialRepository` using an incremental approach:
+      1. **Rename & Validate:**
+         - Rename concrete struct from `MaterialRepository` to `InMemoryMaterialRepository`
+         - Update all implementation blocks and usages within `repository.rs`
+         - Update external usages in the codebase
+         - Validate with `cargo check` and `cargo test`
+      2. **Add Trait & Validate:**
+         - Add `async-trait` dependency
+         - Define `async trait MaterialRepository` with same methods as the struct
+         - Implement the trait for `InMemoryMaterialRepository`
+         - Validate with `cargo check` and `cargo test`
+      3. **Update Registry & Validate:**
+         - Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`
+         - Validate with `cargo check` and `cargo test`
+      4. **Update Actor Dependencies & Validate:**
+         - Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization
+         - Modify `CuttingActor::new` to use `Arc<dyn CutsRepository>`
+         - Validate with `cargo check` and `cargo test`
+      5. **(Optional) Refine Organization & Validate:**
+         - Move trait definitions to `mod.rs` if desired
+         - Validate with `cargo check` and `cargo test`
 
 1.  Add SQLite infrastructure (1 day)
 
