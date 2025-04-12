@@ -65,6 +65,15 @@ pub struct MaterialDiscoveredEvent {
     pub file_path: String,
 }
 
+/// Material event when cuts have been created
+#[derive(Debug, Clone)]
+pub struct MaterialCutEvent {
+    /// ID of the material
+    pub material_id: MaterialId,
+    /// Timestamp when the event occurred
+    pub timestamp: OffsetDateTime,
+}
+
 /// Error event during material processing
 #[derive(Debug, Clone)]
 pub struct MaterialProcessingErrorEvent {
@@ -83,6 +92,8 @@ pub struct MaterialProcessingErrorEvent {
 pub enum QuiltEvent {
     /// Material has been discovered and registered
     MaterialDiscovered(MaterialDiscoveredEvent),
+    /// Material has been cut into chunks
+    MaterialCut(MaterialCutEvent),
     /// System event for shutdown or health check
     System(SystemEvent),
     /// Processing error occurred
@@ -106,6 +117,14 @@ impl QuiltEvent {
             material_id: MaterialId::new(material.id.clone()),
             timestamp: OffsetDateTime::now_utc(),
             file_path: material.file_path.clone(),
+        })
+    }
+
+    /// Create a MaterialCut event
+    pub fn material_cut(material_id: &str) -> Self {
+        Self::MaterialCut(MaterialCutEvent {
+            material_id: MaterialId::new(material_id.to_string()),
+            timestamp: OffsetDateTime::now_utc(),
         })
     }
 
@@ -165,6 +184,11 @@ impl fmt::Display for QuiltEvent {
                 "MaterialDiscovered {{ material_id: {}, file_path: {} }}",
                 evt.material_id.as_str(),
                 evt.file_path
+            ),
+            Self::MaterialCut(evt) => write!(
+                f,
+                "MaterialCut {{ material_id: {} }}",
+                evt.material_id.as_str()
             ),
             Self::System(SystemEvent::Shutdown) => write!(f, "System.Shutdown"),
             Self::System(SystemEvent::HealthCheck) => write!(f, "System.HealthCheck"),
@@ -250,5 +274,20 @@ mod tests {
     fn test_material_id_from_str() {
         let id = MaterialId::from("test-id");
         assert_eq!(id.as_str(), "test-id");
+    }
+
+    #[test]
+    fn test_material_cut_event() {
+        let cut_event = QuiltEvent::material_cut("test-material");
+
+        if let QuiltEvent::MaterialCut(ref evt) = cut_event {
+            assert_eq!(evt.material_id.as_str(), "test-material");
+        } else {
+            panic!("Expected MaterialCut event");
+        }
+
+        let display = format!("{}", cut_event);
+        assert!(display.contains("MaterialCut"));
+        assert!(display.contains("test-material"));
     }
 }

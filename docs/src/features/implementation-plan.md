@@ -125,16 +125,18 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 ### ✅ Milestone 5: "Basic Cutting Actor Creation"
 
-**Goal:** Create a minimal Cutting Actor that listens for events
+**Goal:** Create a minimal Cutting Actor that listens for events and sets up internal backpressure queue
 **Implementation Time:** 2-3 days
 **Status:** Completed
 
 1. ✅ Create Cutting Actor skeleton (1-2 days)
 
-   - ✅ Implement simple actor that subscribes to MaterialDiscovered events
-   - ✅ Add logging for received events
-   - ✅ Create basic actor lifecycle (start/stop)
-   - ✅ Do not implement actual material processing yet
+   - ✅ Implement simple actor that subscribes to MaterialDiscovered events from the shared `EventBus`
+   - ✅ Set up internal bounded `mpsc` channel (sender/receiver pair)
+   - ✅ Spawn internal 'Listener Task': receives events from `EventBus`, filters for `MaterialDiscovered`, logs receipt, tries sending to internal `mpsc` queue (no blocking/backpressure handling yet)
+   - ✅ Spawn internal 'Processor Task': receives from internal `mpsc` queue, logs receipt (no processing yet)
+   - ✅ Add logging for received events on both tasks
+   - ✅ Create basic actor lifecycle (start/stop) including task cleanup
 
 2. ✅ Set up actor monitoring (1 day)
    - ✅ Add heartbeat logging for the actor
@@ -144,30 +146,31 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Cutting Actor received X MaterialDiscovered events" in logs without processing them
 
-### Milestone 6: "Material Text Cutting Implementation"
+### ✅ Milestone 6: "Material Text Cutting Implementation"
 
-**Goal:** Implement the text-based document cutting functionality that transforms discovered materials into meaningful cuts
-**Implementation Time:** 3-4 days
+**Goal:** Implement the text-based document cutting functionality within the Cutting Actor's processor task
+**Implementation Time:** ~4 days (Completed)
+**Status:** ✅ Completed
 
-1. Integrate text-splitter crate (1 day)
+1. ✅ Integrate text-splitter crate (1 day)
 
-   - Add text-splitter dependency to Cargo.toml
-   - Create TextCutter implementation using TextSplitter
-   - Configure with default token sizes (target: 300, min: 150, max: 800)
+   - ✅ Add text-splitter dependency to Cargo.toml
+   - ✅ Create TextCutter implementation using TextSplitter
+   - ✅ Configure with default token sizes (target: 300, min: 150, max: 800)
 
-2. Implement basic cutting process (1-2 days)
+2. ✅ Integrate with TextSplitter for content chunking (within Processor Task)
 
-   - Add text extraction from materials
-   - Integrate with TextSplitter for content chunking
-   - Create MaterialCut model from text-splitter chunks
-   - Implement error handling with fallback strategy
+   - ✅ Use TextCutter to split file content into chunks (within Processor Task)
+   - ✅ Implement error handling with fallback strategy (within Processor Task)
+   - ✅ Handle backpressure: Listener task uses `await send()` and handles `EventBus` lag (`RecvError::Lagged`)
 
-3. Implement Cut event publishing (1 day)
+3. ✅ Implement State Update and Event Publishing (within Material Registry) (1 day)
 
-   - Add MaterialCut event creation and publishing
-   - Update material status in registry (Processing → Cut)
-   - Implement error reporting for failed cuts
-   - Add metrics for cut creation (count, size distribution)
+   - ✅ Update material status in registry (Discovered → Cut or Discovered → Error) via `update_material_status`.
+   - ✅ Implement MaterialCut event creation and publishing _within the registry_ upon successful transition to `Cut` state.
+   - ✅ Implement ProcessingError event creation and publishing _within the registry_ upon transition to `Error` state, inferring the stage (`Cutting`) from the previous state.
+   - ✅ Implement error reporting for failed cuts via the `Error` state transition.
+   - ✅ Add metrics for cut creation (count, size distribution)
 
 **Demonstration:** Running `main` shows "Created X cuts from Y materials using TextSplitter" with detailed metrics in logs
 
@@ -193,15 +196,17 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 ### Milestone 8: "Basic Swatching Actor Creation"
 
-**Goal:** Create a minimal Swatching Actor that listens for cut events
+**Goal:** Create a minimal Swatching Actor that listens for cut events and sets up internal backpressure queue
 **Implementation Time:** 2-3 days
 
 1. Create Swatching Actor skeleton (1-2 days)
 
-   - Implement simple actor that subscribes to MaterialCut events
-   - Add logging for received events
-   - Create basic actor lifecycle management
-   - Do not implement swatch creation yet
+   - Implement simple actor that subscribes to MaterialCut events from the shared `EventBus`
+   - Set up internal bounded `mpsc` channel
+   - Spawn internal 'Listener Task': receives events, filters for `MaterialCut`, logs receipt, tries sending to internal queue
+   - Spawn internal 'Processor Task': receives from internal queue, logs receipt (no processing yet)
+   - Add logging for received events on both tasks
+   - Create basic actor lifecycle management including task cleanup
 
 2. Set up event flow monitoring (1 day)
    - Add event flow tracking between actors
@@ -213,21 +218,21 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 ### Milestone 9: "Swatching Actor Processes Cuts"
 
-**Goal:** Implement actual swatch creation in the Swatching Actor
+**Goal:** Implement actual swatch creation in the Swatching Actor's processor task
 **Implementation Time:** 3-4 days
 
 1. Add swatch creation functionality (2 days)
 
-   - Implement metadata extraction
-   - Create content analysis features
-   - Add embedding generation with async processing
+   - Implement metadata extraction (within Processor Task)
+   - Create content analysis features (within Processor Task)
+   - Add embedding generation with async processing (within Processor Task, potentially using `spawn_blocking` or concurrent futures)
    - Keep detailed metrics of swatch creation
 
 2. Implement MaterialSwatched events (1-2 days)
-   - Add event publishing for completed swatches
-   - Create state transition in Registry
+   - Add event publishing for completed swatches (from Processor Task)
+   - Create state transition in Registry (from Processor Task)
    - Add validation through logging
-   - Implement recovery for failed swatches
+   - Implement recovery for failed swatches (basic error reporting for now)
 
 **Demonstration:** Running `main` shows "Created X swatches from Y cuts" with detailed processing metrics
 
@@ -271,7 +276,30 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` with search parameter shows "Found X swatches matching query 'Z'" with results displayed
 
-### Milestone 12: "Event and Data Persistence"
+### Milestone 12: "Reconciliation Actor Implementation"
+
+**Goal:** Implement the Reconciliation Actor to handle stuck materials and retries
+**Implementation Time:** 3-4 days
+
+1. Create Reconciliation Actor skeleton (1 day)
+
+   - Implement Actor structure
+   - Add configuration for scan interval, retry limits, timeouts per stage
+   - Set up periodic triggering using `ctx.run_interval`
+
+2. Implement Registry Scanning Logic (1-2 days)
+
+   - Query `MaterialRegistry` (or `MaterialRepository`) for materials in intermediate states (`Cutting`, `Swatching`) longer than configured timeout
+   - Implement logic to check `retry_count` against `max_retries`
+
+3. Implement Retry and Error Handling (1 day)
+   - If retries remain: update retry count/timestamp in Registry/Repository, re-publish preceding event (e.g., `MaterialDiscovered`) to shared `EventBus`
+   - If max retries exceeded: update material status to `Error` in Registry/Repository
+   - Add comprehensive logging and metrics for reconciliation actions (scans, retries, errors)
+
+**Demonstration:** Running `main` shows logs from the Reconciliation Actor identifying stuck items (if any manually created), attempting retries, and eventually marking items as Error after exceeding retries.
+
+### Milestone 13: "Event and Data Persistence" (Renumbered from 12)
 
 **Goal:** Ensure data and events persist between application runs
 **Implementation Time:** 3-4 days
@@ -299,11 +327,11 @@ Future milestones will focus on more advanced features:
 
    - Swatching Router implementation for dynamic actor scaling
      - Router actor for managing multiple Swatching Actors
-     - Queue length monitoring and health checks
+     - Queue length monitoring and health checks (both internal `mpsc` and `EventBus` lag)
      - Dynamic actor pool management
    - Enhanced caching strategies
    - Load balancing and monitoring
-   - Performance optimization based on usage patterns
+   - Performance optimization based on usage patterns (tuning queue sizes, buffer capacities)
 
 2. **Enhanced Text Processing**
 

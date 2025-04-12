@@ -2,6 +2,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::{debug, error, info};
 
+use crate::events::types::ProcessingStage;
 use crate::events::{EventBus, EventBusError, QuiltEvent};
 use crate::materials::repository::{MaterialRepository, RepositoryError};
 use crate::materials::types::{Material, MaterialStatus};
@@ -49,7 +50,9 @@ impl MaterialRegistry {
 
         // Then publish the event
         let event = QuiltEvent::material_discovered(&material);
-        self.event_bus.publish(event)?;
+        self.event_bus
+            .publish(event)
+            .map_err(RegistryError::EventBus)?;
 
         info!("Material registered successfully: {}", material.id);
         Ok(())
@@ -68,6 +71,69 @@ impl MaterialRegistry {
     /// List materials by status (passthrough to repository)
     pub async fn list_materials_by_status(&self, status: MaterialStatus) -> Vec<Material> {
         self.repository.list_materials_by_status(status).await
+    }
+
+    /// Update the status of a material in the repository
+    pub async fn update_material_status(
+        &self,
+        id: &str,
+        status: MaterialStatus,
+        error: Option<String>,
+    ) -> Result<(), RegistryError> {
+        debug!("Updating material status: {} -> {:?}", id, &status);
+
+        // Get the current material (to determine the processing stage if we're transitioning to Error)
+        let current_material = self.repository.get_material(id).await;
+        let current_status = current_material.as_ref().map(|m| m.status.clone());
+
+        // Use status.clone() to avoid moving the value
+        let status_clone = status.clone();
+
+        // Update the status in the repository
+        self.repository
+            .update_material_status(id, status, error.clone())
+            .await
+            .map_err(RegistryError::Repository)?;
+
+        debug!(
+            "Material status updated successfully: {} -> {:?}",
+            id, status_clone
+        );
+
+        // Publish appropriate events based on the new status
+        match status_clone {
+            MaterialStatus::Cut => {
+                // Material has been cut, publish a MaterialCut event
+                let event = QuiltEvent::material_cut(id);
+                self.event_bus
+                    .publish(event)
+                    .map_err(RegistryError::EventBus)?;
+                debug!("Published MaterialCut event for material: {}", id);
+            }
+            MaterialStatus::Error => {
+                // Material has encountered an error, publish a ProcessingError event
+                if let Some(error_message) = error {
+                    // Determine the processing stage based on the previous status
+                    let stage = match current_status {
+                        Some(MaterialStatus::Discovered) => ProcessingStage::Cutting,
+                        Some(MaterialStatus::Cut) => ProcessingStage::Swatching,
+                        _ => ProcessingStage::Custom("Unknown".to_string()),
+                    };
+
+                    let event =
+                        QuiltEvent::create_processing_error_event(id, stage, &error_message);
+                    self.event_bus
+                        .publish(event)
+                        .map_err(RegistryError::EventBus)?;
+                    debug!("Published ProcessingError event for material: {}", id);
+                }
+            }
+            _ => {
+                // No events to publish for other status changes
+            }
+        }
+
+        Ok(())
     }
 
     /// Get the underlying repository
@@ -116,6 +182,67 @@ mod tests {
             assert_eq!(evt.material_id.as_str(), material_id);
         } else {
             panic!("Expected MaterialDiscovered event");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_status_to_cut_publishes_event() {
+        let (registry, mut receiver) = setup_registry().await;
+
+        // Create and register a material
+        let material = Material::new("test/file.md".to_string());
+        let material_id = material.id.clone();
+        registry.register_material(material).await.unwrap();
+
+        // Consume the MaterialDiscovered event
+        let _ = receiver.recv().await.unwrap();
+
+        // Update the status to Cut
+        registry
+            .update_material_status(&material_id, MaterialStatus::Cut, None)
+            .await
+            .unwrap();
+
+        // Check that a MaterialCut event was published
+        let event = receiver.recv().await.unwrap();
+        if let QuiltEvent::MaterialCut(evt) = event {
+            assert_eq!(evt.material_id.as_str(), material_id);
+        } else {
+            panic!("Expected MaterialCut event, got {:?}", event);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_status_to_error_publishes_event() {
+        let (registry, mut receiver) = setup_registry().await;
+
+        // Create and register a material
+        let material = Material::new("test/file.md".to_string());
+        let material_id = material.id.clone();
+        registry.register_material(material).await.unwrap();
+
+        // Consume the MaterialDiscovered event
+        let _ = receiver.recv().await.unwrap();
+
+        // Update the status to Error
+        let error_message = "Test error message";
+        registry
+            .update_material_status(
+                &material_id,
+                MaterialStatus::Error,
+                Some(error_message.to_string()),
+            )
+            .await
+            .unwrap();
+
+        // Check that a ProcessingError event was published
+        let event = receiver.recv().await.unwrap();
+        if let QuiltEvent::ProcessingError(evt) = event {
+            assert_eq!(evt.material_id.as_str(), material_id);
+            assert_eq!(evt.message, error_message);
+            assert!(matches!(evt.stage, ProcessingStage::Cutting));
+        } else {
+            panic!("Expected ProcessingError event, got {:?}", event);
         }
     }
 }

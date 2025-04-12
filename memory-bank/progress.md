@@ -2,100 +2,88 @@
 
 ## Project Status
 
-The project is in the **implementation stage**, transitioning from Milestone 5 to Milestone 6. The Cutting Actor has been successfully implemented and integrated with the event system, subscribed to MaterialDiscovered events. The focus is now on implementing the actual document processing functionality in the Cutting Actor.
+The project is in the **implementation stage**. Milestone 6: "Material Text Cutting Implementation" has been completed.
+
+## Current Status
+
+- **Architecture:** Defined and documented in `@actor-model-architecture.md`, incorporating event-driven actors, a shared event bus, a central registry, internal backpressure queues for processing actors, and a reconciliation actor for resilience.
+- **Foundation:** Core repository, data structures, message channels, and basic actor framework are complete (Milestones 1-4).
+- **Discovery:** `DiscoveryActor` implemented and successfully publishing `MaterialDiscovered` events to the shared `EventBus` (Milestone 4).
+- **Cutting Actor (M5):** Basic `CuttingActor` skeleton created, subscribing to events, and implementing the internal listener/mpsc/processor pattern (Milestone 5).
+- **Cutting Logic (M6):** Completed. Integrated `text-splitter`, implemented processing logic within the `CuttingActor`'s processor task, and updated `MaterialRegistry` to handle state updates (`Discovered` -> `Cut`/`Error`) and publish corresponding events (`MaterialCut`/`ProcessingError`).
+- **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
 
 ## What Works
 
-1. **Core Architecture**:
-
-   - QuiltOrchestrator coordinates actor lifecycle and communication
-   - Actor model implemented with Actix and proper message types
-   - Thread-safe Material Registry with state management and event publishing
-   - Event-driven communication between components
-
-2. **Discovery System**:
-
-   - DirectoryScanner scans directories for materials
-   - DiscoveryActor manages discovery lifecycle
-   - Command-line parameter handling for directory, exclusions
-   - Material registration with event publishing
-
-3. **Message System**:
-
-   - Actor-specific message types for direct communication
-   - Clear separation of concerns with dedicated message types per actor
-   - Strongly typed message responses with proper error handling
-   - Actix mailbox system for message queuing and backpressure
-
-4. **Event-Driven Architecture**:
-
-   - Event Bus implemented using Tokio broadcast channels
-   - Material Registry coordinating state and events
-   - Event types defined for system communication
-   - Event monitoring in QuiltOrchestrator
-   - Proper log levels for events (debug for routine events)
-   - Comprehensive test coverage for event publishing and subscription
-
-5. **Cutting System**:
-
-   - CuttingActor subscribes to MaterialDiscovered events
-   - Processing error events for materials not found
-   - Actor lifecycle management with proper logging
-   - Integration with MaterialRegistry for material lookup
-   - Comprehensive test coverage for success and error paths
-
-6. **Supporting Infrastructure**:
-   - Structured logging with severity levels and actor details
-   - Comprehensive error types for each component
-   - Command-line interface with flexible configurations
-   - Robust test coverage across components
-   - Improved error handling for event-related operations
+- Actor system initialization and basic message handling.
+- Directory scanning and material discovery via `DiscoveryActor`.
+- Event Bus setup (`broadcast`) and event publishing/subscription.
+- Material Repository with CRUD and state management.
+- Material Registry coordinating state management and event publishing (`MaterialDiscovered`, `MaterialCut`, `ProcessingError`).
+- `CuttingActor` with internal listener/mpsc/processor pattern for backpressure.
+- Text cutting using `text-splitter` within `CuttingActor`.
+- Material status transition `Discovered` -> `Cut` or `Discovered` -> `Error` handled by `CuttingActor` via `MaterialRegistry`.
+- Event publication (`MaterialCut`, `ProcessingError`) handled by `MaterialRegistry`.
 
 ## In Progress
 
-1. **Material Processing Implementation**:
+1. **Cuts Repository Implementation (Milestone 7)**:
 
-   - Designing document cutting strategies
-   - Planning content splitting algorithms
-   - Implementing text extraction
-   - Creating cut creation logic
+   - Define `Cut` data structure.
+   - Create in-memory storage for cuts (`CutsRepository`).
+   - Implement CRUD operations.
+   - Integrate with Registry/pipeline.
+   - Create comprehensive tests.
 
-2. **Processing Pipeline Setup**:
-   - Defining the material processing workflow
-   - Planning the state transition workflow
-   - Designing the Cut data structure
-   - Preparing for CutsRepository implementation
+2. **Processing Pipeline Enhancement & Performance Optimization**:
+
+   - Implementing backpressure mechanism for large file batches (ongoing tuning).
+   - Creating controlled processing rate with work queuing (ongoing tuning).
+   - Addressing potential timeout issues in `CuttingActor` for large file batches (requires M7+).
+   - Implementing throttling mechanism for event processing (requires M7+).
+   - Optimizing memory usage during batch processing (ongoing).
+   - Adding monitoring for processing rates and queue depths (ongoing).
 
 ## Next Major Milestone
 
-**Milestone 6: "Cutting Actor Processes Materials"** - The current focus is on implementing actual document processing in the Cutting Actor.
+**Milestone 7: "Cuts Repository Implementation"** - Focus is on implementing storage for processed cuts.
 
 ## Upcoming Work
 
-1. **Document Cutting Functionality** (Milestone 6):
+1. **Cuts Repository Implementation** (Milestone 7):
 
-   - Implement text extraction and processing logic
-   - Create document splitting strategies
-   - Add cut creation from materials
-   - Keep detailed metrics of processing
+   - Create in-memory storage for cuts.
+   - Implement CRUD operations.
+   - Add integration with Registry (potentially `CuttingActor` needs to store Cut IDs).
+   - Create comprehensive tests.
 
-2. **Cut Event Publishing** (Milestone 6):
+2. **Swatching Actor Implementation** (Milestone 8):
 
-   - Add MaterialCut event publishing
-   - Create proper state transitions in Registry
-   - Add validation through logging
-   - Implement recovery for failed cuts
+   - Create basic Swatching Actor skeleton.
+   - Implement event subscription for MaterialCut events.
+   - Add actor lifecycle management and internal queue pattern.
+   - Set up event flow monitoring.
 
-3. **Cuts Repository Implementation** (Milestone 7):
+3. **Performance Improvements** (Milestone 7+):
 
-   - Create in-memory storage for cuts
-   - Implement CRUD operations
-   - Add integration with Registry
-   - Create comprehensive tests
+   - Continue tuning backpressure mechanism in `CuttingActor`.
+   - Add rate limiting for processing events.
+   - Create circuit breaker for system overload protection.
+   - Optimize memory usage during batch processing.
 
-4. **Recent Improvements**:
-   - Implemented CuttingActor with event subscription
-   - Added processing error events for error cases
-   - Created comprehensive test coverage for Cutting Actor
-   - Added integration with QuiltOrchestrator
-   - Improved error handling with detailed error messages
+## What's Left to Build (Immediate Milestones)
+
+1.  **Cuts Repository (M7):** Implement storage for cuts and integrate with the pipeline.
+2.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
+3.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+4.  **Swatch Repository (M10):** Implement storage for swatches.
+5.  **Basic Query (M11):** Simple search capability.
+6.  **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+7.  **Persistence (M13):** Implement file-based persistence for events and repositories.
+
+## Known Issues & Blockers
+
+- **Backpressure Tuning:** Internal queue sizes (`mpsc`) and Event Bus capacity need empirical tuning once the pipeline is more complete (M7+).
+- **Reconciliation Logic Details:** Specific timeouts and retry counts need finalization.
+- **Error Handling:** Needs further refinement, especially around persistence and potential reconciliation loops.
+- **`Cut` Data Model:** Precise definition needed for `Cut` data structure for M7.
