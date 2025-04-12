@@ -61,10 +61,17 @@ The project is in the **implementation stage**, transitioning from Milestone 5 t
    - Creating cut creation logic
 
 2. **Processing Pipeline Setup**:
+
    - Defining the material processing workflow
    - Planning the state transition workflow
    - Designing the Cut data structure
    - Preparing for CutsRepository implementation
+
+3. **Performance Optimization**:
+   - Addressing backpressure issue in CuttingActor for large file batches
+   - Planning throttling mechanism for event processing
+   - Designing work queue for controlled processing
+   - Identifying system bottlenecks during initial scanning
 
 ## Next Major Milestone
 
@@ -93,9 +100,18 @@ The project is in the **implementation stage**, transitioning from Milestone 5 t
    - Add integration with Registry
    - Create comprehensive tests
 
-4. **Recent Improvements**:
+4. **Performance Improvements** (Milestone 6):
+
+   - Implement backpressure mechanism in CuttingActor
+   - Add rate limiting for processing events
+   - Create circuit breaker for system overload protection
+   - Optimize memory usage during batch processing
+   - Add configurable timeouts for actor operations
+
+5. **Recent Improvements**:
    - Implemented CuttingActor with event subscription
    - Added processing error events for error cases
    - Created comprehensive test coverage for Cutting Actor
    - Added integration with QuiltOrchestrator
    - Improved error handling with detailed error messages
+   - Identified and worked around backpressure issue in the CuttingActor by excluding large document directories

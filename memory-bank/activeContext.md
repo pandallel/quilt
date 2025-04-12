@@ -80,10 +80,17 @@ The codebase currently has these key components implemented:
    - Added actor health check monitoring
 
 4. **Code Quality Improvements**:
+
    - Enhanced documentation across the codebase
    - Improved error message clarity
    - Better organized test structure with dedicated test modules
    - Added TODOs for future implementation in Milestone 6
+
+5. **Performance Issues Identified**:
+   - Discovered backpressure issue in CuttingActor when processing large batches of files
+   - Actor hits 30-second timeout when processing thousands of files simultaneously
+   - Need to implement backpressure mechanism for high-volume scenarios
+   - Added temporary workaround by excluding large document directories
 
 ## Active Decisions and Considerations
 
@@ -118,9 +125,16 @@ The codebase currently has these key components implemented:
    - How do we handle event replay for recovery scenarios?
 
 4. **State Recovery**:
+
    - How do we handle Registry state recovery after crashes?
    - Should we implement event sourcing for state reconstruction?
    - What's the strategy for state snapshots?
+
+5. **Backpressure Implementation**:
+   - How should backpressure be implemented in the CuttingActor to handle large batches?
+   - What's the appropriate throttling mechanism for event processing?
+   - Should we implement a work queue with configurable rate limiting?
+   - How can we balance responsiveness with system stability under heavy load?
 
 ## Next Steps
 
@@ -134,7 +148,14 @@ The codebase currently has these key components implemented:
    - Implement metrics collection for processing
 
 2. Add Cut event publishing:
+
    - Create MaterialCut event type
    - Implement state transitions in Registry
    - Add event validation through logging
    - Create recovery mechanisms for failed cuts
+
+3. Implement backpressure mechanism:
+   - Add throttling to CuttingActor to prevent overwhelming the system
+   - Implement work queue with controlled processing rate
+   - Add monitoring for queue depths and processing times
+   - Create circuit breaker for system protection
