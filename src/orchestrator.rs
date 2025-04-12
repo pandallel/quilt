@@ -18,7 +18,7 @@ use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
-use crate::materials::{MaterialRegistry, MaterialRepository};
+use crate::materials::{MaterialRegistry, InMemoryMaterialRepository};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -68,7 +68,7 @@ impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = InMemoryMaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 

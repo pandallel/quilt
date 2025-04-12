@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-Refactoring the `MaterialRepository` as a prerequisite for **Milestone 7.5: "SQLite Repository Implementation"**. This involves renaming the current in-memory implementation and preparing for the introduction of a trait.
+Continuing the refactoring process for **Milestone 7.5: "SQLite Repository Implementation"**. The first step of renaming `MaterialRepository` to `InMemoryMaterialRepository` is now complete. The current focus is on introducing the `MaterialRepository` trait.
 
 ## Current Implementation Status
 
@@ -18,7 +18,7 @@ The codebase currently has these key components implemented:
 
 2. **Material Repository and Registry**:
 
-   - Thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>`
+   - Thread-safe in-memory store using `Arc<RwLock<HashMap<...>>>` (`InMemoryMaterialRepository`)
    - Material state tracking with proper validation (Discovered → Cut → Swatched → Error)
    - CRUD operations with idempotence and state transition validation
    - Registry wrapping repository and providing event coordination
@@ -75,7 +75,6 @@ The codebase currently has these key components implemented:
   - Simplified `CuttingActor` to focus on processing and calling `registry.update_material_status`.
   - Updated event definitions and tests.
 - **Completed M7:**
-
   - Designed and implemented `Cut` data structure with comprehensive metadata.
   - Created `CutsRepository` trait with fully-featured async operations.
   - Implemented thread-safe in-memory repository with `InMemoryCutsRepository`.
@@ -84,17 +83,20 @@ The codebase currently has these key components implemented:
   - Fully integrated `CutsRepository` with `CuttingActor` to store processed cuts.
   - Enhanced error handling in the cutting pipeline with proper error propagation.
   - Connected the full processing chain from discovery through cutting to storage.
-
-- **Current Focus (M7.5 Refactoring):**
-  1.  **Renaming `MaterialRepository`:** Renaming the struct `MaterialRepository` to `InMemoryMaterialRepository` throughout the codebase.
-  2.  **Validation:** Need to run `cargo check` and `cargo test` to ensure the rename is complete and correct before proceeding.
+- **Milestone 7.5 Progress:**
+  - ✅ **Completed Step 1 - Renaming `MaterialRepository`:** Successfully renamed the struct `MaterialRepository` to `InMemoryMaterialRepository` throughout the codebase and verified all tests pass.
+  - **Current Focus (Step 2):** Introducing the `MaterialRepository` trait:
+    - Adding `async-trait` dependency
+    - Defining `trait MaterialRepository` in `repository.rs` using `#[async_trait]`
+    - Implementing the trait for `InMemoryMaterialRepository`
+    - Running validation tests
 
 ## Next Steps (Revised Plan)
 
-1.  **Complete `MaterialRepository` Rename & Validation:**
-    - Finish renaming `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
-    - Update all external usages.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+1.  ✅ **Complete `MaterialRepository` Rename & Validation:**
+    - ✅ Finish renaming `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
+    - ✅ Update all external usages.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
 2.  **Introduce `MaterialRepository` Trait & Validate:**
     - Add `async-trait` dependency.
     - Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.

@@ -203,11 +203,11 @@ This document outlines the incremental implementation plan for Quilt's core arch
 0.  **Prerequisites: Repository Trait Refactoring** (Required before starting SQLite work)
 
     - Refactor `MaterialRepository` using an incremental approach:
-      1. **Rename & Validate:**
-         - Rename concrete struct from `MaterialRepository` to `InMemoryMaterialRepository`
-         - Update all implementation blocks and usages within `repository.rs`
-         - Update external usages in the codebase
-         - Validate with `cargo check` and `cargo test`
+      1. ✅ **Rename & Validate:**
+         - ✅ Rename concrete struct from `MaterialRepository` to `InMemoryMaterialRepository`
+         - ✅ Update all implementation blocks and usages within `repository.rs`
+         - ✅ Update external usages in the codebase
+         - ✅ Validate with `cargo check` and `cargo test`
       2. **Add Trait & Validate:**
          - Add `async-trait` dependency
          - Define `async trait MaterialRepository` with same methods as the struct

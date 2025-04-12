@@ -486,14 +486,14 @@ async fn process_discovered_material(
 mod tests {
     use super::*;
     use crate::events::EventBus;
-    use crate::materials::types::Material;
-    use crate::materials::MaterialRepository;
+    use crate::materials::InMemoryMaterialRepository;
+    use crate::materials::Material;
+    use crate::materials::MaterialStatus;
+    use std::fs;
     use std::sync::Arc;
     use std::time::Duration;
     use tempfile::tempdir;
-    use tokio::fs;
 
-    // Helper function to initialize test logger
     fn init_test_logger() {
         let _ = env_logger::builder()
             .filter_level(log::LevelFilter::Debug)
@@ -505,136 +505,100 @@ mod tests {
     async fn test_cutting_actor_ping() {
         init_test_logger();
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = InMemoryMaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus);
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
-        let actor = CuttingActor::new("TestCuttingActor", registry, cuts_repository).start();
+        let actor = CuttingActor::new("test-cutter", registry, cuts_repository).start();
 
-        // Send ping and check response
-        let result = actor.send(Ping).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap());
+        let response = actor.send(Ping).await.unwrap();
+        assert!(response, "Ping should return true");
     }
 
     #[actix::test]
     async fn test_cutting_actor_shutdown() {
         init_test_logger();
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = InMemoryMaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus);
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
         let actor = CuttingActor::new("TestCuttingActor", registry, cuts_repository).start();
 
-        // Send shutdown
         let result = actor.send(Shutdown).await;
         assert!(result.is_ok());
 
-        // Give the actor some time to shut down
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Try to ping, should fail because actor is stopped
         let ping_result = actor.send(Ping).await;
         assert!(ping_result.is_err());
     }
 
     #[actix::test]
-    async fn test_cutting_actor_processes_discovered_material() {
+    async fn test_cutting_actor_processes_material() {
         init_test_logger();
 
-        // Create a temporary directory for test files
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let file_path = temp_dir.path().join("test_file.md");
         let file_path_str = file_path.to_string_lossy().to_string();
 
-        // Create a test file with content
         fs::write(
             &file_path,
             "# Test Document\n\nThis is a test document for cutting.",
         )
-        .await
         .expect("Failed to write test file");
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = InMemoryMaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
-        let cutting_actor =
-            CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
+        let cutting_actor = CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
 
-        // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Register a test material with the file path we created
         let material = Material::new(file_path_str.clone());
         let material_id = material.id.clone();
         registry.register_material(material).await.unwrap();
 
-        // Create and publish a test event directly
         let material = registry.get_material(&material_id).await.unwrap();
         let event = QuiltEvent::material_discovered(&material);
 
-        // Publish the event
         event_bus.publish(event).expect("Failed to publish event");
 
-        // Wait for event processing
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Verify the actor is still alive
         let ping_result = cutting_actor.send(Ping).await;
         assert!(ping_result.is_ok());
         assert!(ping_result.unwrap());
 
-        // Verify the material status was updated to Cut
         let updated_material = registry.get_material(&material_id).await.unwrap();
         assert_eq!(updated_material.status, MaterialStatus::Cut);
 
-        // Clean up
         temp_dir.close().expect("Failed to clean up temp dir");
     }
 
     #[actix::test]
-    async fn test_cutting_actor_saves_cuts_to_repository() {
+    async fn test_cutting_actor_stores_multiple_cuts() {
         init_test_logger();
 
-        // Create a temporary directory for test files
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let file_path = temp_dir.path().join("test_cuts_file.md");
         let file_path_str = file_path.to_string_lossy().to_string();
 
-        // Create a test file with content - large enough to generate multiple cuts
         fs::write(
             &file_path,
-            "# Test Document For Cuts\n\n".repeat(30) + "This is a test document for cutting with enough content to create multiple cuts.",
+            "# Test Document For Cuts\n\n".repeat(30) + "This is a test document for cutting with enough text to create multiple cuts based on token size.",
         )
-        .await
         .expect("Failed to write test file");
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = InMemoryMaterialRepository::new();
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-
-        // Create the cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor with the cuts repository
         let cutting_actor = CuttingActor::new(
             "TestCuttingActor",
             registry.clone(),
@@ -642,50 +606,39 @@ mod tests {
         )
         .start();
 
-        // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Register a test material with the file path we created
         let material = Material::new(file_path_str.clone());
         let material_id = material.id.clone();
         registry.register_material(material).await.unwrap();
 
-        // Create and publish a test event directly
         let material = registry.get_material(&material_id).await.unwrap();
         let event = QuiltEvent::material_discovered(&material);
 
-        // Publish the event
         event_bus.publish(event).expect("Failed to publish event");
 
-        // Wait for event processing
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Verify the actor is still alive
         let ping_result = cutting_actor.send(Ping).await;
         assert!(ping_result.is_ok());
         assert!(ping_result.unwrap());
 
-        // Verify the material status was updated to Cut
         let updated_material = registry.get_material(&material_id).await.unwrap();
         assert_eq!(updated_material.status, MaterialStatus::Cut);
 
-        // Verify the cuts were saved in the repository
         let cuts = cuts_repository
             .get_cuts_by_material_id(&material_id)
             .await
             .expect("Failed to get cuts from repository");
 
-        // There should be multiple cuts
         assert!(!cuts.is_empty(), "Expected at least one cut to be saved");
 
-        // Verify cut properties
         for (i, cut) in cuts.iter().enumerate() {
             assert_eq!(cut.material_id, material_id);
             assert_eq!(cut.chunk_index, i);
-            assert!(!cut.content.is_empty(), "Cut content should not be empty");
+            assert!(!cut.content.is_empty());
         }
 
-        // Clean up
         temp_dir.close().expect("Failed to clean up temp dir");
     }
 }

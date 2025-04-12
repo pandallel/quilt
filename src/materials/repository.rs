@@ -23,12 +23,12 @@ pub enum RepositoryError {
 
 /// Thread-safe in-memory store for material objects
 #[derive(Debug, Clone)]
-pub struct MaterialRepository {
+pub struct InMemoryMaterialRepository {
     /// The inner storage using a thread-safe hashmap
     materials: Arc<RwLock<HashMap<String, Material>>>,
 }
 
-impl MaterialRepository {
+impl InMemoryMaterialRepository {
     /// Create a new empty material repository
     pub fn new() -> Self {
         Self {
@@ -137,7 +137,7 @@ impl MaterialRepository {
     }
 }
 
-impl Default for MaterialRepository {
+impl Default for InMemoryMaterialRepository {
     fn default() -> Self {
         Self::new()
     }
@@ -155,7 +155,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_and_get_material() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -170,7 +170,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_duplicate_material() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -195,7 +195,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_material_status() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -223,7 +223,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_status_transition() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -245,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_transition_to_error() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -266,7 +266,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_materials() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
 
         // Create and register 3 materials with different statuses
         let material1 = create_test_material(MaterialStatus::Discovered);
@@ -301,7 +301,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_count_by_status() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
 
         // Empty repository should have 0 counts
         let counts = repo.count_by_status().await;

@@ -13,4 +13,4 @@ mod tests;
 
 pub use types::{Material, MaterialFileType, MaterialStatus};
 // Material registry will be reimplemented for actor model
-pub use repository::{MaterialRepository, RepositoryError};
+pub use repository::{InMemoryMaterialRepository, RepositoryError};

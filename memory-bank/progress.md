@@ -12,6 +12,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - **Cutting Actor (M5):** `CuttingActor` skeleton created, subscribing to events, and implementing the internal listener/mpsc/processor pattern (Milestone 5).
 - **Cutting Logic (M6):** Completed. Integrated `text-splitter`, implemented processing logic within the `CuttingActor`'s processor task, and updated `MaterialRegistry` to handle state updates (`Discovered` -> `Cut`/`Error`) and publish corresponding events (`MaterialCut`/`ProcessingError`).
 - **Cuts Repository (M7):** Completed. Implemented the full `Cut` data structure, `CutsRepository` interface with thread-safe in-memory implementation, and integration with the `CuttingActor`. The repository provides comprehensive CRUD operations, efficient indexing, and is fully connected to the processing pipeline.
+- **Repository Refactoring (M7.5 - Step 1):** Completed. Successfully renamed `struct MaterialRepository` to `struct InMemoryMaterialRepository` throughout the codebase and verified all tests pass.
 - **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
 
 ## What Works
@@ -19,7 +20,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - Actor system initialization and basic message handling.
 - Directory scanning and material discovery via `DiscoveryActor`.
 - Event Bus setup (`broadcast`) and event publishing/subscription.
-- Material Repository with CRUD and state management.
+- Material Repository (now `InMemoryMaterialRepository`) with CRUD and state management.
 - Material Registry coordinating state management and event publishing (`MaterialDiscovered`, `MaterialCut`, `ProcessingError`).
 - `CuttingActor` with internal listener/mpsc/processor pattern for backpressure.
 - Text cutting using `text-splitter` within `CuttingActor`.
@@ -32,21 +33,21 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## In Progress
 
-1.  **Milestone 7.5 Pre-Refactoring (In Progress):**
-    - Starting the prerequisite refactoring for SQLite implementation.
-    - **Current Step:** Renaming the `MaterialRepository` struct to `InMemoryMaterialRepository` across the project.
-    - **Next:** Validate the rename thoroughly via `cargo check` and `cargo test` before introducing the trait.
+1.  **Milestone 7.5 Refactoring (In Progress):**
+    - ✅ Completed Step 1: Renamed `MaterialRepository` to `struct InMemoryMaterialRepository` throughout the codebase.
+    - **Current Step:** Introducing `MaterialRepository` trait using `async-trait`.
+    - **Next:** Implementing the trait for `InMemoryMaterialRepository` and validating with tests.
 
 ## Next Major Milestone
 
-**Milestone 7.5: "SQLite Repository Implementation"** - Requires completion of prerequisite refactoring before implementation begins.
+**Milestone 7.5: "SQLite Repository Implementation"** - Repository trait introduction in progress, to be followed by SQLite implementation.
 
 ## Upcoming Work (Revised Plan)
 
-1.  **Complete `MaterialRepository` Rename & Validation:**
-    - Finish renaming `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
-    - Update all external usages.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
+1.  ✅ **Complete `MaterialRepository` Rename & Validation:**
+    - ✅ Rename `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
+    - ✅ Update all external usages.
+    - ✅ Validate with `cargo check` and `cargo test`.
 2.  **Introduce `MaterialRepository` Trait & Validate:**
     - Add `async-trait` dependency.
     - Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
@@ -74,7 +75,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## What's Left to Build (Immediate Milestones)
 
-1.  **Repository Refactoring:** Finalize trait-based repositories.
+1.  **Repository Refactoring:** Continuing trait-based refactoring; first step completed, introducing trait in progress.
 2.  **SQLite Repository Infrastructure (M7.5 - In-Memory):** Implement in-memory SQLite versions of both repositories.
 3.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
 4.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
