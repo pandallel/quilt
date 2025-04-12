@@ -22,3 +22,6 @@ pub use events::{EventBus, QuiltEvent};
 pub use materials::{Material, MaterialFileType, MaterialStatus};
 pub use materials::{MaterialRegistry, RegistryError};
 pub use materials::{MaterialRepository, RepositoryError};
+
+// Cutting and processing types
+pub use cutting::{Cut, CutsRepository, CutsRepositoryError, InMemoryCutsRepository};

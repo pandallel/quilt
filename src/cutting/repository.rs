@@ -393,4 +393,4 @@ mod tests {
         let count = repo.count_cuts_by_material_id(material_id).await.unwrap();
         assert_eq!(count, 3);
     }
-}
+} 
