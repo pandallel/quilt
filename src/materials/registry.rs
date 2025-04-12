@@ -50,7 +50,9 @@ impl MaterialRegistry {
 
         // Then publish the event
         let event = QuiltEvent::material_discovered(&material);
-        self.event_bus.publish(event).map_err(RegistryError::EventBus)?;
+        self.event_bus
+            .publish(event)
+            .map_err(RegistryError::EventBus)?;
 
         info!("Material registered successfully: {}", material.id);
         Ok(())
@@ -103,7 +105,9 @@ impl MaterialRegistry {
             MaterialStatus::Cut => {
                 // Material has been cut, publish a MaterialCut event
                 let event = QuiltEvent::material_cut(id);
-                self.event_bus.publish(event).map_err(RegistryError::EventBus)?;
+                self.event_bus
+                    .publish(event)
+                    .map_err(RegistryError::EventBus)?;
                 debug!("Published MaterialCut event for material: {}", id);
             }
             MaterialStatus::Error => {
@@ -118,7 +122,9 @@ impl MaterialRegistry {
 
                     let event =
                         QuiltEvent::create_processing_error_event(id, stage, &error_message);
-                    self.event_bus.publish(event).map_err(RegistryError::EventBus)?;
+                    self.event_bus
+                        .publish(event)
+                        .map_err(RegistryError::EventBus)?;
                     debug!("Published ProcessingError event for material: {}", id);
                 }
             }
