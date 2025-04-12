@@ -40,12 +40,13 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - `CuttingActor` correctly reads file content using absolute paths resolved by the `DiscoveryActor`.
 - `MaterialRegistry` handles state transitions (`Discovered` -> `Cut`, `Discovered` -> `Error`) and publishes corresponding events.
 - SQLite integration works for the `MaterialRepository`, selectable via command-line flag.
+- `Material` timestamps (`created_at`, `updated_at`, `status_updated_at`) are correctly managed and stored in both repository implementations.
 
 ## In Progress
 
 1. **Milestone 7.5 SQLite Implementation:**
    - ✅ Completed Repository Trait Pattern:
-     - ✅ Renamed `MaterialRepository` to `struct InMemoryMaterialRepository`
+     - ✅ Renamed `struct MaterialRepository` to `struct InMemoryMaterialRepository`
      - ✅ Introduced `MaterialRepository` trait using `async-trait`
      - ✅ Implemented the trait for `InMemoryMaterialRepository` and updated the Registry
      - ✅ Updated Actor Dependencies to use the trait
@@ -57,31 +58,31 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
      - ✅ Implemented `SqliteMaterialRepository` with comprehensive tests
      - ✅ Integrated SQLite repository with the application via the orchestrator
      - ✅ Added command-line flag for repository selection
-   - ⚠️ Identified Path Resolution Issue:
-     - File paths are currently interpreted relative to the working directory, causing errors
-     - Future enhancement needed to resolve paths relative to the scanned directory
+   - ✅ **Completed Task: Refactor Material Timestamps:**
+     - ✅ Renamed `ingested_at` to `created_at`.
+     - ✅ Added `updated_at` and `status_updated_at`.
+     - ✅ Updated repositories and tests for new timestamp handling.
    - **Next:**
-     - Implement `SqliteCutsRepository` to complete the SQLite storage backend
-     - Enhance transaction support for database operations
-     - Address path resolution issues in file processing
+     - Implement `SqliteCutsRepository` to complete the SQLite storage backend.
+     - Enhance transaction support for database operations.
 
 ## Next Major Milestone
 
-**Task: Refactor Material Timestamps** - Rename `ingested_at` to `created_at`, add `status_updated_at`, `updated_at`, and leverage `sqlx` time feature.
+**Task: Complete SQLite Implementation (M7.5)** - Implement `SqliteCutsRepository`.
 
 ## Upcoming Work (Revised Plan)
 
 1. ✅ **Complete Repository Trait Refactoring:**
    - ✅ All steps completed (1-6).
-2. **Refactor Material Timestamps (Next Task):**
-   - See goal above.
-3. **Complete SQLite Implementation:**
+2. ✅ **Refactor Material Timestamps:**
+   - ✅ Renamed `ingested_at`, added `updated_at`, `status_updated_at`.
+   - ✅ Updated repositories, schema, and tests.
+3. **Complete SQLite Implementation (Current Task):**
    - ✅ Partial completion: Added SQLx dependency, created database module, implemented `SqliteMaterialRepository`
-   - Implement `SqliteCutsRepository` using the same pattern
-   - Add transaction support for operations requiring atomicity
-   - Enhance error handling for database operations
-   - Resolve path issues in file processing
-   - Enhance the CLI options for repository selection
+   - Implement `SqliteCutsRepository` using the same pattern.
+   - Add transaction support for operations requiring atomicity.
+   - Enhance error handling for database operations.
+   - Enhance the CLI options for repository selection.
 4. **Basic Swatching Actor (M8):**
 
    - Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern
@@ -100,8 +101,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## What's Left to Build (Immediate Milestones)
 
-- Timestamp Refactoring (see plan above).
-- `SqliteCutsRepository` implementation.
+- `SqliteCutsRepository` implementation (Current Task).
 - Swatching Actor implementation (Milestone 8+).
 - Reconciliation Actor (Milestone 12).
 - Persistence for events and repositories (Milestone 13).
@@ -111,6 +111,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 - Core pipeline (Discovery -> Cutting) is functional with both in-memory and SQLite options for the material repository (cuts repository is still in-memory).
 - Basic text cutting is implemented.
+- Material timestamps are refactored and correctly managed.
 
 ## Known Issues
 

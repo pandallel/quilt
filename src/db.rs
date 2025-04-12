@@ -2,6 +2,7 @@
 
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite, SqlitePool};
 use tracing::{debug, info};
+use sqlx::Row;
 
 /// Initialize an in-memory SQLite database with required schema
 pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
@@ -29,7 +30,9 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
             id TEXT PRIMARY KEY,
             file_path TEXT NOT NULL,
             file_type TEXT NOT NULL,
-            ingested_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            status_updated_at TEXT NOT NULL,
             status TEXT NOT NULL,
             error TEXT
         )
@@ -51,12 +54,20 @@ mod tests {
     async fn test_db_initialization() {
         let pool = init_memory_db().await.expect("Failed to initialize DB");
         
-        // Check if materials table exists
-        let result = sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name='materials'")
-            .fetch_optional(&pool)
-            .await
-            .expect("Failed to query sqlite_master");
+        // Check if materials table exists and has correct columns
+        let result = sqlx::query(
+            r#"
+            SELECT name, sql FROM sqlite_master 
+            WHERE type='table' AND name='materials'
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to query sqlite_master");
             
-        assert!(result.is_some(), "Materials table not created");
+        let table_sql: String = result.get("sql");
+        assert!(table_sql.contains("created_at"), "Missing created_at column");
+        assert!(table_sql.contains("updated_at"), "Missing updated_at column");
+        assert!(table_sql.contains("status_updated_at"), "Missing status_updated_at column");
     }
 } 

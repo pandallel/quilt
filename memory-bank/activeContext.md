@@ -106,20 +106,17 @@ The codebase currently has these key components implemented:
     - Added comprehensive tests for the SQLite implementation
     - Integrated with the application by updating `QuiltOrchestrator` and CLI options
     - ⏩ **Deferred:** `SqliteCutsRepository` implementation left for future update
-- **Focus:** Finishing Milestone 7.5 (SQLite Repository) and debugging file path issues.
+- **Focus:** Finishing Milestone 7.5 (SQLite Repository) by implementing `SqliteCutsRepository`.
 - **Recent Changes:**
   - Completed trait-based repository refactoring for `MaterialRepository` and `CutsRepository`.
   - Implemented `SqliteMaterialRepository` using SQLx and integrated it.
   - Added `--in-memory` flag for repository selection.
   - Fixed the file path resolution issue: `DiscoveryActor` now converts relative paths to absolute paths before registration, ensuring `CuttingActor` receives correct paths.
+  - ✅ **Completed Task: Refactor Material Timestamps:** Renamed `ingested_at` to `created_at`, added `updated_at` and `status_updated_at`, updated repositories and tests.
 - **Next Steps:**
-  - **Refactor Material Timestamps (Immediate Next Task):** Rename `ingested_at` to `created_at`, add `status_updated_at` and `updated_at`. Leverage `sqlx` time feature for simplification.
+  - **Implement `SqliteCutsRepository` (Immediate Next Task):** Implement the SQLite backend for the `CutsRepository` trait.
   - Enhance transaction support and error handling in SQLite repositories.
-  - Implement `SqliteCutsRepository`.
   - Begin work on Milestone 8 (Basic Swatching Actor).
-- **Decisions/Considerations:**
-  - Sticking with `sqlx` for SQLite interaction.
-  - Confirmed the absolute path resolution approach is the correct fix for the file reading errors.
 
 ## Current Implementation Issues
 
@@ -137,13 +134,13 @@ The codebase currently has these key components implemented:
 
 1. **Complete SQLite Repositories (M7.5):**
 
-   - Implement `SqliteCutsRepository` to replace `InMemoryCutsRepository`
+   - ✅ Refactor Material Timestamps (Renamed `ingested_at`, added `updated_at`, `status_updated_at`)
+   - **Implement `SqliteCutsRepository` to replace `InMemoryCutsRepository` (Current Task)**
    - Refine SQLite connection management (transaction support, etc.)
    - Enhance error handling for database operations
-   - Address path resolution issues
+   - Address path resolution issues (Resolved)
 
 2. **Implement Basic Swatching Actor (M8):**
-   - **Preceded by:** Material Timestamp Refactoring Task
    - Create skeleton actor that subscribes to `MaterialCut` events
    - Implement internal listener/mpsc/processor pattern for backpressure
    - Add lifecycle management (start/stop)

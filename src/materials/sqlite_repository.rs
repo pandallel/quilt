@@ -39,18 +39,15 @@ impl SqliteMaterialRepository {
         
         let error: Option<String> = row.get("error");
         
-        // Parse ingested_at from ISO 8601 string
-        let ingested_at_str: String = row.get("ingested_at");
-        let ingested_at = OffsetDateTime::parse(&ingested_at_str, &time::format_description::well_known::Iso8601::DEFAULT)
-            .unwrap_or_else(|_| OffsetDateTime::now_utc());
-        
         Material {
             id: row.get("id"),
             file_path: row.get("file_path"),
             file_type,
             status,
             error,
-            ingested_at,
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+            status_updated_at: row.get("status_updated_at"),
         }
     }
 }
@@ -85,14 +82,16 @@ impl MaterialRepository for SqliteMaterialRepository {
         // Insert material
         let result = sqlx::query(
             r#"
-            INSERT INTO materials (id, file_path, file_type, ingested_at, status, error)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO materials (id, file_path, file_type, created_at, updated_at, status_updated_at, status, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&material.id)
         .bind(&material.file_path)
         .bind(file_type)
-        .bind(material.ingested_at.format(&time::format_description::well_known::Iso8601::DEFAULT).unwrap_or_default())
+        .bind(material.created_at)
+        .bind(material.updated_at)
+        .bind(material.status_updated_at)
         .bind(material.status.to_string())
         .bind(&material.error)
         .execute(&self.pool)
@@ -149,16 +148,20 @@ impl MaterialRepository for SqliteMaterialRepository {
             | (MaterialStatus::Cut, MaterialStatus::Error)
             | (MaterialStatus::Swatched, MaterialStatus::Error)
             | (MaterialStatus::Error, MaterialStatus::Discovered) => {
+                let now = OffsetDateTime::now_utc();
+                
                 // Update the material in the database
                 let result = sqlx::query(
                     r#"
                     UPDATE materials 
-                    SET status = ?, error = ?
+                    SET status = ?, error = ?, updated_at = ?, status_updated_at = ?
                     WHERE id = ?
                     "#,
                 )
                 .bind(new_status.to_string())
                 .bind(error_message)
+                .bind(now)
+                .bind(now)
                 .bind(id)
                 .execute(&self.pool)
                 .await;
@@ -249,6 +252,8 @@ impl MaterialRepository for SqliteMaterialRepository {
 mod tests {
     use super::*;
     use crate::db::init_memory_db;
+    use std::time::Duration;
+    use tokio::time::sleep;
     
     async fn setup() -> SqliteMaterialRepository {
         let pool = init_memory_db().await.expect("Failed to initialize test DB");
@@ -266,6 +271,7 @@ mod tests {
         let repo = setup().await;
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
+        let created_at = material.created_at;
         
         // Register the material
         repo.register_material(material).await.unwrap();
@@ -274,6 +280,9 @@ mod tests {
         let retrieved = repo.get_material(&id).await.unwrap();
         assert_eq!(retrieved.id, id);
         assert_eq!(retrieved.status, MaterialStatus::Discovered);
+        assert_eq!(retrieved.created_at, created_at);
+        assert_eq!(retrieved.updated_at, created_at);
+        assert_eq!(retrieved.status_updated_at, created_at);
     }
     
     #[tokio::test]
@@ -300,27 +309,90 @@ mod tests {
         let repo = setup().await;
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
+        let created_at = material.created_at;
         
         // Register the material
         repo.register_material(material).await.unwrap();
+        
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
         
         // Update status to Cut
         repo.update_material_status(&id, MaterialStatus::Cut, None)
             .await
             .unwrap();
             
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Cut);
+        // Verify status change and timestamps
+        let updated_after_cut = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_cut.status, MaterialStatus::Cut);
+        assert_eq!(updated_after_cut.created_at, created_at);
+        assert!(updated_after_cut.updated_at > created_at);
+        assert!(updated_after_cut.status_updated_at > created_at);
+        assert_eq!(updated_after_cut.updated_at, updated_after_cut.status_updated_at);
+        let first_update_time = updated_after_cut.updated_at; // Capture time after first update
+        
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
         
         // Update status to Swatched
         repo.update_material_status(&id, MaterialStatus::Swatched, None)
             .await
             .unwrap();
             
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Swatched);
+        // Verify status change and timestamps
+        let updated_after_swatched = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_swatched.status, MaterialStatus::Swatched);
+        assert_eq!(updated_after_swatched.created_at, created_at);
+        assert!(updated_after_swatched.updated_at >= first_update_time);
+        assert!(updated_after_swatched.status_updated_at >= first_update_time);
+        assert_eq!(updated_after_swatched.updated_at, updated_after_swatched.status_updated_at); // Should be equal after this update
+    }
+    
+    #[tokio::test]
+    async fn test_update_material_status_with_error() {
+        let repo = setup().await;
+        let material = create_test_material(MaterialStatus::Discovered);
+        let id = material.id.clone();
+        let created_at = material.created_at;
+        
+        // Register the material
+        repo.register_material(material).await.unwrap();
+        
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
+        
+        // Update status to Error with a message
+        let error_message = "Test error message".to_string();
+        repo.update_material_status(&id, MaterialStatus::Error, Some(error_message.clone()))
+            .await
+            .unwrap();
+            
+        // Verify status change, error message, and timestamps
+        let updated_after_error = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_error.status, MaterialStatus::Error);
+        assert_eq!(updated_after_error.error, Some(error_message));
+        assert_eq!(updated_after_error.created_at, created_at);
+        assert!(updated_after_error.updated_at > created_at);
+        assert!(updated_after_error.status_updated_at > created_at);
+        assert_eq!(updated_after_error.updated_at, updated_after_error.status_updated_at);
+        let first_update_time = updated_after_error.updated_at; // Capture time after first update
+        
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
+        
+        // Reset to Discovered (simulating retry)
+        repo.update_material_status(&id, MaterialStatus::Discovered, None)
+            .await
+            .unwrap();
+            
+        // Verify status change, error message cleared, and timestamps
+        let updated_after_reset = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_reset.status, MaterialStatus::Discovered);
+        assert_eq!(updated_after_reset.error, None);
+        assert_eq!(updated_after_reset.created_at, created_at);
+        assert!(updated_after_reset.updated_at >= first_update_time);
+        assert!(updated_after_reset.status_updated_at >= first_update_time);
+        assert_eq!(updated_after_reset.updated_at, updated_after_reset.status_updated_at); // Should be equal after this update
     }
     
     #[tokio::test]

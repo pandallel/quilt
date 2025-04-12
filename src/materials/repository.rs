@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use time::OffsetDateTime;
+use std::time::Duration;
+use tokio::time::sleep;
 
 use super::{Material, MaterialRepository, MaterialStatus, RepositoryError, Result};
 
@@ -68,8 +71,12 @@ impl MaterialRepository for InMemoryMaterialRepository {
             | (MaterialStatus::Cut, MaterialStatus::Error)
             | (MaterialStatus::Swatched, MaterialStatus::Error)
             | (MaterialStatus::Error, MaterialStatus::Discovered) => {
+                let now = OffsetDateTime::now_utc();
                 // Update status
                 material.status = new_status;
+                // Update timestamps
+                material.updated_at = now;
+                material.status_updated_at = now;
                 // Update error message if provided
                 if let Some(msg) = error_message {
                     material.error = Some(msg);
@@ -149,6 +156,8 @@ mod tests {
         let retrieved = repo.get_material(&id).await.unwrap();
         assert_eq!(retrieved.id, id);
         assert_eq!(retrieved.status, MaterialStatus::Discovered);
+        assert_eq!(retrieved.created_at, retrieved.updated_at);
+        assert_eq!(retrieved.created_at, retrieved.status_updated_at);
     }
 
     #[tokio::test]
@@ -181,27 +190,43 @@ mod tests {
         let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
+        let created_at = material.created_at;
 
         // Register the material
         repo.register_material(material).await.unwrap();
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Update status to Cut
         repo.update_material_status(&id, MaterialStatus::Cut, None)
             .await
             .unwrap();
 
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Cut);
+        // Verify status change and timestamps
+        let updated_after_cut = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_cut.status, MaterialStatus::Cut);
+        assert_eq!(updated_after_cut.created_at, created_at);
+        assert!(updated_after_cut.updated_at > created_at);
+        assert!(updated_after_cut.status_updated_at > created_at);
+        assert_eq!(updated_after_cut.updated_at, updated_after_cut.status_updated_at);
+        let first_update_time = updated_after_cut.updated_at; // Capture time after first update
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Update status to Swatched
         repo.update_material_status(&id, MaterialStatus::Swatched, None)
             .await
             .unwrap();
 
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Swatched);
+        // Verify status change and timestamps
+        let updated_after_swatched = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_swatched.status, MaterialStatus::Swatched);
+        assert_eq!(updated_after_swatched.created_at, created_at);
+        assert!(updated_after_swatched.updated_at >= first_update_time);
+        assert!(updated_after_swatched.status_updated_at >= first_update_time);
+        assert_eq!(updated_after_swatched.updated_at, updated_after_swatched.status_updated_at); // Should be equal after this update
     }
 
     #[tokio::test]
@@ -209,9 +234,13 @@ mod tests {
         let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
+        let created_at = material.created_at;
 
         // Register the material
         repo.register_material(material).await.unwrap();
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Update status to Error with a message
         let error_message = "Test error message".to_string();
@@ -219,20 +248,32 @@ mod tests {
             .await
             .unwrap();
 
-        // Verify status change and error message
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Error);
-        assert_eq!(updated.error, Some(error_message));
+        // Verify status change, error message, and timestamps
+        let updated_after_error = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_error.status, MaterialStatus::Error);
+        assert_eq!(updated_after_error.error, Some(error_message));
+        assert_eq!(updated_after_error.created_at, created_at);
+        assert!(updated_after_error.updated_at > created_at);
+        assert!(updated_after_error.status_updated_at > created_at);
+        assert_eq!(updated_after_error.updated_at, updated_after_error.status_updated_at);
+        let first_update_time = updated_after_error.updated_at; // Capture time after first update
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Reset to Discovered (simulating retry)
         repo.update_material_status(&id, MaterialStatus::Discovered, None)
             .await
             .unwrap();
 
-        // Verify status change and error message cleared
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Discovered);
-        assert_eq!(updated.error, None);
+        // Verify status change, error message cleared, and timestamps
+        let updated_after_reset = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_reset.status, MaterialStatus::Discovered);
+        assert_eq!(updated_after_reset.error, None);
+        assert_eq!(updated_after_reset.created_at, created_at);
+        assert!(updated_after_reset.updated_at >= first_update_time);
+        assert!(updated_after_reset.status_updated_at >= first_update_time);
+        assert_eq!(updated_after_reset.updated_at, updated_after_reset.status_updated_at); // Should be equal after this update
     }
 
     #[tokio::test]

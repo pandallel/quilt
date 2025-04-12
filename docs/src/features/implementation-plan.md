@@ -260,27 +260,26 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - Left for a future update to keep the initial changes focused
    - Current implementation uses SQLite for materials but keeps the in-memory cuts repository
 
-**Demonstration:** Running `cargo run -- --dir=./src` uses SQLite by default, while `cargo run -- --dir=./src --in-memory` uses the original in-memory store. Both successfully discover files and show the same path errors.
+**Demonstration:** Running `cargo run -- --dir=./src` uses SQLite by default, while `cargo run -- --dir=./src --in-memory` uses the original in-memory store.
 
-### Task: Refactor Material Timestamps (Next)
+### ✅ Task: Refactor Material Timestamps
 
 **Goal:** Improve timestamp tracking for materials by renaming `ingested_at` and adding status change and general update timestamps.
+**Status:** Completed
 
-**Implementation Time:** ~1 day
-
-1.  **Add Timestamps:**
-    - Rename `ingested_at` field/column to `created_at`.
-    - Add `status_updated_at` field/column.
-    - Add `updated_at` field/column.
-    - Update `Material` struct, `Material::new()`, database schema (`src/db.rs`).
-2.  **Implement Update Logic:**
-    - Update `InMemoryMaterialRepository::update_material_status` to set `status_updated_at` and `updated_at` to `now` on success.
-    - Update `SqliteMaterialRepository::update_material_status` SQL to set `status_updated_at` and `updated_at` to `now` on success.
-    - Update `SqliteMaterialRepository::register_material` SQL to insert all three timestamps.
-3.  **Leverage `sqlx` Time Feature:**
-    - Add `"time"` feature to `sqlx` dependency in `Cargo.toml`.
-    - Refactor `SqliteMaterialRepository` to use automatic `OffsetDateTime` encoding/decoding via `sqlx`, removing manual parsing/formatting.
-    - Update tests in both repositories.
+1. ✅ **Add Timestamps:**
+   - ✅ Renamed `ingested_at` field/column to `created_at`.
+   - ✅ Added `status_updated_at` field/column.
+   - ✅ Added `updated_at` field/column.
+   - ✅ Updated `Material` struct, `Material::new()`, database schema (`src/db.rs`).
+2. ✅ **Implement Update Logic:**
+   - ✅ Updated `InMemoryMaterialRepository::update_material_status` to set `status_updated_at` and `updated_at` to `now` on success.
+   - ✅ Updated `SqliteMaterialRepository::update_material_status` SQL to set `status_updated_at` and `updated_at` to `now` on success.
+   - ✅ Updated `SqliteMaterialRepository::register_material` SQL to insert all three timestamps.
+3. ✅ **Leverage `sqlx` Time Feature:**
+   - ✅ Added `"time"` feature to `sqlx` dependency in `Cargo.toml`.
+   - ✅ Refactored `SqliteMaterialRepository` to use automatic `OffsetDateTime` encoding/decoding via `sqlx`, removing manual parsing/formatting.
+   - ✅ Updated tests in both repositories.
 
 ### Milestone 8: "Basic Swatching Actor Creation"
 
