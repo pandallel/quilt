@@ -35,6 +35,11 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - Comprehensive error handling throughout the cutting pipeline.
 - Repository trait pattern implementation allowing easy swapping between storage backends.
 - Command-line option (`--in-memory`) for selecting repository type.
+- Event bus reliably transmits events (`MaterialDiscovered`, `MaterialCut`, `ProcessingError`).
+- `CuttingActor` subscribes to `MaterialDiscovered`, processes files using `TextCutter`, and stores cuts in the `InMemoryCutsRepository`.
+- `CuttingActor` correctly reads file content using absolute paths resolved by the `DiscoveryActor`.
+- `MaterialRegistry` handles state transitions (`Discovered` -> `Cut`, `Discovered` -> `Error`) and publishes corresponding events.
+- SQLite integration works for the `MaterialRepository`, selectable via command-line flag.
 
 ## In Progress
 
@@ -93,55 +98,17 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## What's Left to Build (Immediate Milestones)
 
-1. **Complete SQLite Implementation:**
+- `SqliteCutsRepository` implementation.
+- Swatching Actor implementation (Milestone 8+).
+- Reconciliation Actor (Milestone 12).
+- Persistence for events and repositories (Milestone 13).
+- Advanced features (scaling, enhanced cutting, search, UI, etc.).
 
-   - Implement `SqliteCutsRepository`
-   - Enhance transaction support and error handling
-   - Address path resolution issues in file processing
+## Current Status
 
-2. **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
+- Core pipeline (Discovery -> Cutting) is functional with both in-memory and SQLite options for the material repository (cuts repository is still in-memory).
+- Basic text cutting is implemented.
 
-3. **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+## Known Issues
 
-4. **Swatch Repository (M10):** Implement storage for swatches.
-
-5. **Basic Query (M11):** Simple search capability.
-
-6. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
-
-7. **Persistence (M13):** Implement file-based persistence for events and repositories.
-
-## Future Enhancements (Post-Core Implementation)
-
-Based on the recent code review, these enhancements have been identified for future development:
-
-1. **Cutting Enhancements:**
-
-   - Explicit backpressure handling when internal queue fills up
-   - Retry mechanisms for recoverable errors
-   - Configurable cutting parameters (chunk size, overlap)
-
-2. **Storage Improvements:**
-
-   - File-based SQLite database option (currently using in-memory)
-   - Database migration support for schema evolution
-   - Streaming implementation for very large files
-   - Efficient indexing strategies for large repositories
-   - Transaction support for atomic operations
-
-3. **Logging and Observability:**
-   - Structured logging with span contexts for better traceability
-   - Comprehensive tracing for request flows
-   - Detailed performance metrics collection
-
-## Known Issues & Blockers
-
-- **Path Resolution:** When using relative paths (e.g., `--dir=./src`), file processing fails because paths are interpreted relative to the working directory rather than the source directory.
-
-- **Database Transactions:** The current SQLite implementation performs individual queries for operations. Future work should add proper transaction support for operations that require atomicity.
-
-- **Backpressure Tuning:** Internal queue sizes (`mpsc`, currently 128 for `CuttingActor`) and Event Bus capacity need empirical tuning once the pipeline is more complete.
-
-- **Reconciliation Logic Details:** Specific timeouts and retry counts need finalization.
-
-- **Error Handling:** Continues to be refined, especially around database operations, persistence, and potential reconciliation loops.
+- `SqliteCutsRepository` is not yet implemented; cuts are only stored in memory.

@@ -252,8 +252,8 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 5. ⚠️ Known Issues
 
-   - When running with `--dir=./src`, file paths are relative to the working directory, causing errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`
-   - This is not a SQLite-specific issue but requires path resolution improvements in the future
+   - ~~When running with `--dir=./src`, file paths are relative to the working directory, causing errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`~~ **Resolved (See Below)**
+   - This issue was fixed by ensuring the `DiscoveryActor` resolves relative paths to absolute paths before registering materials. The `CuttingActor` now receives absolute paths via the `MaterialDiscoveredEvent`.
 
 6. ⏩ Defer `SqliteCutsRepository` Implementation
    - Left for a future update to keep the initial changes focused

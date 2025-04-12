@@ -106,6 +106,19 @@ The codebase currently has these key components implemented:
     - Added comprehensive tests for the SQLite implementation
     - Integrated with the application by updating `QuiltOrchestrator` and CLI options
     - ⏩ **Deferred:** `SqliteCutsRepository` implementation left for future update
+- **Focus:** Finishing Milestone 7.5 (SQLite Repository) and debugging file path issues.
+- **Recent Changes:**
+  - Completed trait-based repository refactoring for `MaterialRepository` and `CutsRepository`.
+  - Implemented `SqliteMaterialRepository` using SQLx and integrated it.
+  - Added `--in-memory` flag for repository selection.
+  - Fixed the file path resolution issue: `DiscoveryActor` now converts relative paths to absolute paths before registration, ensuring `CuttingActor` receives correct paths.
+- **Next Steps:**
+  - Implement `SqliteCutsRepository`.
+  - Enhance transaction support and error handling in SQLite repositories.
+  - Begin work on Milestone 8 (Basic Swatching Actor).
+- **Decisions/Considerations:**
+  - Sticking with `sqlx` for SQLite interaction.
+  - Confirmed the absolute path resolution approach is the correct fix for the file reading errors.
 
 ## Current Implementation Issues
 
