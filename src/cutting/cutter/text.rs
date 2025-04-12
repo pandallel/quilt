@@ -1,9 +1,9 @@
+use cuid2::create_id;
 use text_splitter::TextSplitter;
 use thiserror::Error;
-use cuid2::create_id;
 
-use crate::events::types::MaterialId;
 use super::config::CutterConfig;
+use crate::events::types::MaterialId;
 
 /// Errors that can occur during text cutting
 #[derive(Error, Debug)]
@@ -38,21 +38,18 @@ impl TextCutter {
         Self { config }
     }
 
-    /// Create a new TextCutter with default configuration
-    pub fn default() -> Self {
-        Self {
-            config: CutterConfig::default(),
-        }
-    }
-
     /// Cut text into chunks according to the configuration
-    pub fn cut(&self, text: &str, material_id: Option<MaterialId>) -> Result<Vec<ChunkInfo>, CutterError> {
+    pub fn cut(
+        &self,
+        text: &str,
+        material_id: Option<MaterialId>,
+    ) -> Result<Vec<ChunkInfo>, CutterError> {
         // Create text splitter with our configuration
         let splitter = TextSplitter::new(self.config.min_size..=self.config.max_size);
 
         // Split the text and collect chunks
         let chunks = splitter.chunks(text);
-        
+
         // Convert to our format with sequence numbers
         let result: Vec<ChunkInfo> = chunks
             .enumerate()
@@ -63,8 +60,17 @@ impl TextCutter {
                 material_id: material_id.clone(),
             })
             .collect();
-        
+
         Ok(result)
+    }
+}
+
+impl Default for TextCutter {
+    /// Create a new TextCutter with default configuration
+    fn default() -> Self {
+        Self {
+            config: CutterConfig::default(),
+        }
     }
 }
 
@@ -84,7 +90,7 @@ mod tests {
         let cutter = TextCutter::default();
         let text = "This is a short text.";
         let result = cutter.cut(text, None).unwrap();
-        
+
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].content, text);
         assert_eq!(result[0].sequence, 0);
@@ -96,17 +102,17 @@ mod tests {
         let cutter = TextCutter::default();
         let text = "This is a sentence. ".repeat(50);
         let result = cutter.cut(&text, None).unwrap();
-        
+
         // Verify we get multiple chunks
         assert!(result.len() > 1);
-        
+
         // Verify sequence numbers are in order
         for (i, chunk) in result.iter().enumerate() {
             assert_eq!(chunk.sequence, i);
-            
+
             // Each chunk should have content
             assert!(!chunk.content.is_empty());
-            
+
             // Chunk should be a subset of original text
             assert!(text.contains(&chunk.content));
         }
@@ -118,21 +124,21 @@ mod tests {
         let cutter = TextCutter::new(config);
         let text = "Testing with a custom configuration.".repeat(10);
         let material_id = Some(MaterialId::new("test-material".to_string()));
-        
+
         let result = cutter.cut(&text, material_id.clone()).unwrap();
 
         // Verify we get chunks
         assert!(!result.is_empty());
-        
+
         // Verify material_id is set correctly
         for chunk in &result {
             assert_eq!(chunk.material_id, material_id);
-            
+
             // Each chunk should have content
             assert!(!chunk.content.is_empty());
-            
+
             // Chunk should be a subset of original text
             assert!(text.contains(&chunk.content));
         }
     }
-} 
+}

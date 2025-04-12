@@ -28,4 +28,4 @@ impl CutterConfig {
             max_size,
         }
     }
-} 
+}

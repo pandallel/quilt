@@ -6,7 +6,7 @@ pub mod cutter;
 
 pub use actor::messages;
 pub use actor::CuttingActor;
-pub use cutter::{TextCutter, CutterConfig};
+pub use cutter::{CutterConfig, TextCutter};
 
 #[cfg(test)]
 mod tests;

@@ -78,17 +78,20 @@ impl MaterialRegistry {
         error: Option<String>,
     ) -> Result<(), RegistryError> {
         debug!("Updating material status: {} -> {:?}", id, &status);
-        
+
         // Use status.clone() to avoid moving the value
         let status_clone = status.clone();
-        
+
         // Update the status in the repository
         self.repository
             .update_material_status(id, status, error)
             .await
             .map_err(RegistryError::Repository)?;
-        
-        debug!("Material status updated successfully: {} -> {:?}", id, status_clone);
+
+        debug!(
+            "Material status updated successfully: {} -> {:?}",
+            id, status_clone
+        );
         Ok(())
     }
 
