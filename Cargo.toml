@@ -15,7 +15,7 @@ cuid2 = "0.1.2"
 time = { version = "0.3", features = ["serde", "macros"] }
 walkdir = "2.4.0"
 thiserror = "2.0.12"
-tokio = { version = "1.44.2", features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.44.2", features = ["macros", "rt", "rt-multi-thread", "sync", "time", "fs"] }
 # Actor system
 actix = "0.13.1"
 # Command-line argument parsing
@@ -26,10 +26,10 @@ env_logger = "0.11.8"
 # Structured logging
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+text-splitter = "0.24.1"
 
 [dev-dependencies]
-tempfile = "3.10.1"  # For creating temporary test directories
-tokio = { version = "1.44.2", features = ["macros", "rt", "rt-multi-thread", "sync", "time", "test-util"] }
+tempfile = "3.8.0"
 futures = "0.3"      # For noop_waker_ref and other testing utilities
 
 # We'll add more dependencies as we implement features 
