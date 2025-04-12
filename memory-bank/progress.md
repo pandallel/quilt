@@ -33,14 +33,18 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## In Progress
 
-1.  **Milestone 7.5 Refactoring (In Progress):**
+1.  **Milestone 7.5 Refactoring (Completed Repository Trait Introduction):**
     - ✅ Completed Step 1: Renamed `MaterialRepository` to `struct InMemoryMaterialRepository` throughout the codebase.
-    - **Current Step:** Introducing `MaterialRepository` trait using `async-trait`.
-    - **Next:** Implementing the trait for `InMemoryMaterialRepository` and validating with tests.
+    - ✅ Completed Step 2: Introduced `MaterialRepository` trait using `async-trait`.
+    - ✅ Completed Step 3: Implemented the trait for `InMemoryMaterialRepository` and updated the Registry.
+    - ✅ Completed Step 4: Updated Actor Dependencies to use the trait.
+    - ✅ Completed Step 5: Moved trait definitions to `mod.rs` for better organization.
+    - ✅ Completed Step 6: Applied the same pattern to the `CutsRepository`.
+    - **Next:** Implementing SQLite-backed repositories for both materials and cuts.
 
 ## Next Major Milestone
 
-**Milestone 7.5: "SQLite Repository Implementation"** - Repository trait introduction in progress, to be followed by SQLite implementation.
+**Milestone 7.5: "SQLite Repository Implementation"** - Repository trait refactoring completed, now moving to SQLite implementation.
 
 ## Upcoming Work (Revised Plan)
 
@@ -48,30 +52,36 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
     - ✅ Rename `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
     - ✅ Update all external usages.
     - ✅ Validate with `cargo check` and `cargo test`.
-2.  **Introduce `MaterialRepository` Trait & Validate:**
-    - Add `async-trait` dependency.
-    - Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
-    - Implement the trait for `InMemoryMaterialRepository`.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
-3.  **Refactor `MaterialRegistry` & Validate:**
-    - Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
-    - Update dependent code and tests.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
-4.  **Refactor Dependent Actors/Tests & Validate:**
-    - Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
-5.  **(Optional Cleanup) Move Trait & Validate:**
-    - Move trait/error definitions to `mod.rs`.
-    - **Validate:** Ensure `cargo check` and `cargo test` pass.
-6.  **Implement SQLite Repositories (M7.5 - In-Memory):**
-    - Implement `SqliteMaterialRepository` and `SqliteCutsRepository` (using `:memory:`).
-    - Integrate and test.
-7.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
-8.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
-9.  **Swatch Repository (M10):** Implement storage for swatches.
-10. **Basic Query (M11):** Simple search capability.
-11. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
-12. **Persistence (M13):** Implement file-based persistence for events and repositories.
+2.  ✅ **Introduce `MaterialRepository` Trait & Validate:**
+    - ✅ Add `async-trait` dependency.
+    - ✅ Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
+    - ✅ Implement the trait for `InMemoryMaterialRepository`.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
+3.  ✅ **Refactor `MaterialRegistry` & Validate:**
+    - ✅ Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
+    - ✅ Update dependent code and tests.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
+4.  ✅ **Refactor Dependent Actors/Tests & Validate:**
+    - ✅ Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
+5.  ✅ **(Completed Cleanup) Move Trait & Validate:**
+    - ✅ Move trait/error definitions to `mod.rs`.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
+6.  ✅ **Apply Repository Trait Pattern to CutsRepository:**
+    - ✅ Define `trait CutsRepository` in appropriate location.
+    - ✅ Update the `CuttingActor` to use the trait.
+    - ✅ **Validate:** Ensure `cargo check` and `cargo test` pass.
+7.  **Implement SQLite Repositories (M7.5):**
+    - Add SQLite infrastructure (rusqlite, migrations)
+    - Implement `SqliteMaterialRepository` and `SqliteCutsRepository` (using `:memory:` for testing)
+    - Integrate and test with the existing system
+    - Implement on-disk persistence
+8.  **Basic Swatching Actor (M8):** Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern.
+9.  **Swatching Logic (M9):** Implement swatch creation within the `SwatchingActor`'s processor task.
+10. **Swatch Repository (M10):** Implement storage for swatches.
+11. **Basic Query (M11):** Simple search capability.
+12. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+13. **Persistence (M13):** Implement file-based persistence for events and repositories.
 
 ## What's Left to Build (Immediate Milestones)
 

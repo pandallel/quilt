@@ -195,57 +195,62 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` logs "Stored X cuts in repository" with metrics on storage operations
 
-### Milestone 7.5: "SQLite Repository Implementation"
+### Milestone 7.5: SQLite Repository Implementation
 
-**Goal:** Replace in-memory repositories with SQLite-backed implementations to enable persistence and vector search capability
-**Implementation Time:** 3-4 days
+#### Prerequisites: Repository Trait Refactoring
 
-0.  **Prerequisites: Repository Trait Refactoring** (Required before starting SQLite work)
+1. ✅ Rename and validate Material Repository
+   - ✅ Rename `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
+   - ✅ Update all external usages.
+   - ✅ Validate with `cargo check` and `cargo test`.
+2. ✅ Add trait for Material Repository
+   - ✅ Add `async-trait` dependency.
+   - ✅ Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
+   - ✅ Implement the trait for `InMemoryMaterialRepository`.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+3. ✅ Update the Registry to use the trait
+   - ✅ Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
+   - ✅ Update dependent code and tests.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+4. ✅ Update Actor Dependencies
+   - ✅ Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+5. ✅ Move trait definitions to mod.rs
+   - ✅ Move trait/error definitions to `mod.rs`.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+6. ✅ Apply Repository Trait Pattern to CutsRepository
+   - ✅ Define `trait CutsRepository` in appropriate location.
+   - ✅ Update the `CuttingActor` to use the trait.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
 
-    - Refactor `MaterialRepository` using an incremental approach:
-      1. ✅ **Rename & Validate:**
-         - ✅ Rename concrete struct from `MaterialRepository` to `InMemoryMaterialRepository`
-         - ✅ Update all implementation blocks and usages within `repository.rs`
-         - ✅ Update external usages in the codebase
-         - ✅ Validate with `cargo check` and `cargo test`
-      2. **Add Trait & Validate:**
-         - Add `async-trait` dependency
-         - Define `async trait MaterialRepository` with same methods as the struct
-         - Implement the trait for `InMemoryMaterialRepository`
-         - Validate with `cargo check` and `cargo test`
-      3. **Update Registry & Validate:**
-         - Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`
-         - Validate with `cargo check` and `cargo test`
-      4. **Update Actor Dependencies & Validate:**
-         - Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization
-         - Modify `CuttingActor::new` to use `Arc<dyn CutsRepository>`
-         - Validate with `cargo check` and `cargo test`
-      5. **(Optional) Refine Organization & Validate:**
-         - Move trait definitions to `mod.rs` if desired
-         - Validate with `cargo check` and `cargo test`
+#### SQLite Implementation
 
-1.  Add SQLite infrastructure (1 day)
+1. Add SQLite dependencies
 
-- Create connection management module
+   - Add `rusqlite` to Cargo.toml.
+   - Add basic initialization and tests.
+
+2. Create connection management module
+
 - Implement schema definition
 - Add basic migration framework
 - Set up SQLite-vec extension for vector operations
 
-2. Implement SQLite Material Repository (1 day)
+3. Implement SQLite Material Repository (1 day)
 
    - Create SQLite-backed implementation of MaterialRepository
    - Preserve existing trait interface for backward compatibility
    - Implement proper transaction handling
    - Add comprehensive tests comparing with in-memory implementation
 
-3. Implement SQLite Cuts Repository (1 day)
+4. Implement SQLite Cuts Repository (1 day)
 
    - Create SQLite-backed implementation of CutsRepository
    - Ensure performance for batch operations
    - Optimize for material-based queries
    - Set up indexes for common query patterns
 
-4. Add Repository Factory (0.5-1 day)
+5. Add Repository Factory (0.5-1 day)
    - Create factory pattern for repository instantiation
    - Allow runtime selection between in-memory and SQLite
    - Add configuration options for connection settings
