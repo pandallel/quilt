@@ -4,6 +4,7 @@ use crate::materials::{MaterialRegistry, RegistryError, RepositoryError};
 use actix::prelude::*;
 use log::{debug, error, info};
 use std::path::Path;
+use std::path::PathBuf;
 
 /// Configuration for directory scanning
 ///
@@ -280,7 +281,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 
             // Perform scan
             info!("Starting scan in directory: {}", scan_config.directory);
-            let scan_results = scanner
+            let mut scan_results = scanner
                 .scan()
                 .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e)))?;
 
@@ -290,6 +291,18 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
                 scan_results.found.len(),
                 scan_results.failed.len()
             );
+
+            // Convert relative paths to absolute paths before registration
+            let base_dir = PathBuf::from(&scan_config.directory);
+            for material in &mut scan_results.found {
+                let absolute_path = base_dir.join(&material.file_path);
+                // Update the file path in the material object
+                material.file_path = absolute_path.to_string_lossy().into_owned();
+                debug!(
+                    "Updated material '{}' path to absolute: {}",
+                    material.id, material.file_path
+                );
+            }
 
             // Create DiscoveryActor with the same registry to use its methods
             let discovery_actor = DiscoveryActor {
