@@ -191,7 +191,8 @@ No major known issues related to completed milestones.
 - **Transaction Support:** **Complete:** Implemented transaction support for batch operations in both SQLite repositories.
 - **SwatchingActor Design:** **Complete:** Implemented using the dual-task pattern (listener/processor) for backpressure handling.
 - **MaterialCut Event Structure:** The current implementation includes the material ID in the event. The `SwatchingActor` will retrieve the cuts using the material ID via the `CutsRepository`.
-- **Swatch Data Model (M9):** Design the `Swatch` data structure, deferring embedding storage details slightly until M10 (SQLite implementation).
+- **Swatch Data Model (M9):** **Complete:** Implemented `Swatch` struct with comprehensive fields (id, cut_id, material_id, embedding, model information, dimensions, timestamps, metadata) and the `SwatchRepository` trait with full CRUD and search operations.
+- **SQLite Swatch Repository (M10):** Need to implement the `SwatchRepository` trait for SQLite with proper table schema and foreign key relationships.
 - **Embedding Strategy (M11):** Need to choose and integrate an embedding approach (e.g., `rust-bert`, ONNX).
 - **Batch Processing:** Consider whether to process cuts individually or in batches for embedding generation.
 - **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for both `CuttingActor` and `SwatchingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.

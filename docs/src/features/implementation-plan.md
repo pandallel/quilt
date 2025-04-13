@@ -307,16 +307,21 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Swatching Actor received X MaterialCut events" in logs without processing them
 
-### Milestone 9: "Define Swatch Structures & Repository Trait"
+### ✅ Milestone 9: "Define Swatch Structures & Repository Trait"
 
 **Goal:** Define the core data structures and persistence contract for swatches.
 **Implementation Time:** ~1 day
+**Status:** ✅ Completed
 
-1. Define Swatch data structures (1 day)
-   - Define `Swatch` struct (e.g., in `src/swatching/types.rs` or a new `src/swatches` module) with necessary fields (id, material_id, cut_ids, embedding `Vec<f32>`, metadata).
-   - Define `SwatchRepository` trait (e.g., in `src/swatches/repository.rs`) with async CRUD methods using `#[async_trait::async_trait]`.
+1. ✅ Define Swatch data structures (1 day)
+   - ✅ Define `Swatch` struct in `src/swatching/swatch.rs` with necessary fields (id, cut_id, material_id, embedding `Vec<f32>`, model_name, model_version, dimensions, metadata).
+   - ✅ Define `SwatchRepository` trait in `src/swatching/repository.rs` with comprehensive async CRUD and search methods using `#[async_trait::async_trait]`.
+   - ✅ Add appropriate error types and result type alias for repository operations.
+   - ✅ Update module exports in `src/swatching/mod.rs` to expose the new types.
+   - ✅ Add `serde` and `serde_json` dependencies for metadata serialization.
+   - ✅ Implement comprehensive unit tests for the `Swatch` struct.
 
-**Demonstration:** Code compiles with the new `Swatch` type and `SwatchRepository` trait definitions.
+**Demonstration:** Code compiles with the new `Swatch` type and `SwatchRepository` trait definitions, including similarity search method signatures for future implementation.
 
 ### Milestone 10: "Implement SQLite Swatch Repository"
 

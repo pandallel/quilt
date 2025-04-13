@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**. Milestone 8: "Basic Swatching Actor Creation" has been completed, adding a new actor to the pipeline that listens for `MaterialCut` events. The next step is Milestone 9: "Define Swatch Structures & Repository Trait", the first step in the newly refined plan for implementing swatching.
+The project is in the **implementation stage**. Milestone 9: "Define Swatch Structures & Repository Trait" has been completed, adding the `Swatch` struct and `SwatchRepository` trait to support the embedding functionality. The next step is Milestone 10: "Implement SQLite Swatch Repository."
 
 ## Current Status
 
@@ -77,6 +77,7 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
      - ✅ Ensured proper transaction handling for batch operations
 
 2. ✅ **Milestone 8 Swatching Actor Creation:**
+
    - ✅ Created Swatching Actor:
      - ✅ Implemented actor structure with proper message types
      - ✅ Set up subscription to `MaterialCut` events from the EventBus
@@ -89,9 +90,23 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
      - ✅ Included in shutdown sequence with proper ordering
      - ✅ Added tests validating the actor's operation
 
+3. ✅ **Milestone 9: Define Swatch Structures & Repository Trait**
+   - ✅ Defined `Swatch` struct in `src/swatching/swatch.rs`:
+     - ✅ Added fields for id, cut_id, material_id, embedding vector, model information, and metadata
+     - ✅ Implemented constructor methods `new()` and `with_details()`
+     - ✅ Added full unit test coverage
+   - ✅ Defined `SwatchRepository` trait in `src/swatching/repository.rs`:
+     - ✅ Created comprehensive interface with CRUD operations and batch methods
+     - ✅ Added relationship-based queries (by cut_id, material_id)
+     - ✅ Defined semantic search methods with similarity scoring
+     - ✅ Created appropriate error types and result type alias
+   - ✅ Set up infrastructure:
+     - ✅ Updated module exports in `src/swatching/mod.rs`
+     - ✅ Added `serde` and `serde_json` dependencies for metadata serialization
+
 ## Next Major Milestone
 
-**Milestone 9: Define Swatch Structures & Repository Trait** - Define the `Swatch` struct and `SwatchRepository` trait.
+**Milestone 10: Implement SQLite Swatch Repository** - Create the SQLite implementation of the `SwatchRepository` trait.
 
 ## Upcoming Work (Revised Plan)
 
@@ -114,41 +129,37 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
    - ✅ Integrated with QuiltOrchestrator
    - ✅ Added comprehensive testing
 
-5. **Define Swatch Structures & Repo Trait (M9):**
+5. **Implement SQLite Swatch Repository (M10):**
 
-   - Define `Swatch` struct.
-   - Define `SwatchRepository` trait.
-
-6. **Implement SQLite Swatch Repository (M10):**
-
-   - Implement `SqliteSwatchRepository`.
-   - Add tests.
+   - Define `swatches` table schema in `src/db.rs` with foreign key constraints.
+   - Implement `SqliteSwatchRepository` using the `SwatchRepository` trait.
+   - Add comprehensive tests.
    - Integrate with orchestrator.
 
-7. **Implement Swatching Actor Logic & Event (M11):**
+6. **Implement Swatching Actor Logic & Event (M11):**
 
    - Add logic to `SwatchingActor` processor to **generate actual embeddings** and create swatches.
    - Use `SwatchRepository` to save swatches.
    - Update registry status to `Swatched`.
    - Define and publish `MaterialSwatched` event.
 
-8. **Implement Basic Semantic Search (M12):**
+7. **Implement Basic Semantic Search (M12):**
 
    - Integrate vector search extension into repository.
    - Implement search function and basic query interface.
    - Add tests.
 
-9. **Implement Reconciliation Actor (M13):**
+8. **Implement Reconciliation Actor (M13):**
 
    - Implement actor for handling stuck items and retries.
 
-10. **Implement Event Log Persistence (M14):**
+9. **Implement Event Log Persistence (M14):**
 
 - Implement file-based persistence for the event log.
 
 ## What's Left to Build (Immediate Milestones)
 
-- Define Swatch Structures & Repo Trait (Milestone 9).
+- ✅ Define Swatch Structures & Repo Trait (Milestone 9).
 - Implement SQLite Swatch Repository (Milestone 10).
 - Implement Swatching Actor Logic & Event (Milestone 11).
 - Implement Basic Semantic Search (Milestone 12).
@@ -163,8 +174,9 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
 - Basic text cutting is implemented and working.
 - Material and cut timestamps are properly managed.
 - Swatching actor is receiving events from the cutting stage and logging them.
-- The next step (M9) is to define the data structures (`Swatch`) and repository trait (`SwatchRepository`) needed for swatching.
+- The `Swatch` struct and `SwatchRepository` trait have been defined.
+- The next step (M10) is to implement the SQLite storage backend for swatches.
 
 ## Known Issues
 
-- No major issues at this time. All milestones up to M8 have been successfully completed.
+- No major issues at this time. All milestones up to M9 have been successfully completed.
