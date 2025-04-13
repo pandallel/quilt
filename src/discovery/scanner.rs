@@ -119,7 +119,7 @@ impl DirectoryScanner {
                             results.found.push(material);
                         }
                         Err(material) => {
-                            results.failed.push(material);
+                            results.failed.push(*material);
                         }
                     }
                 }
@@ -142,7 +142,7 @@ impl DirectoryScanner {
     }
 
     /// Process a directory entry into a Material, tracking any issues
-    fn process_entry(&self, entry: walkdir::DirEntry) -> Result<Material, Material> {
+    fn process_entry(&self, entry: walkdir::DirEntry) -> Result<Material, Box<Material>> {
         // Try to generate the relative path
         let path_result = entry.path().strip_prefix(&self.base_dir);
 
@@ -158,7 +158,7 @@ impl DirectoryScanner {
                 let mut material = Material::new(full_path);
                 material.status = MaterialStatus::Error;
                 material.error = Some("Failed to generate relative path".to_string());
-                Err(material)
+                Err(Box::new(material))
             }
         }
     }

@@ -35,7 +35,7 @@ pub mod messages {
 
         /// Generic cutting error
         #[error("Cutting operation failed: {0}")]
-        OperationFailed(String),
+        OperationFailed(Box<str>),
 
         /// File error
         #[error("File operation failed: {0}")]
@@ -365,7 +365,7 @@ pub async fn process_discovered_material(
     let chunks = cutter
         .cut(&content, Some(material_id.clone()))
         .map_err(|e| {
-            error!("{}: Failed to cut content: {}", actor_name, e.to_string());
+            error!("{}: Failed to cut content: {}", actor_name, e);
             messages::CuttingError::CuttingError(e)
         })?;
 
@@ -392,9 +392,9 @@ pub async fn process_discovered_material(
         error!(
             "{}: Failed to save cuts to repository: {}",
             actor_name,
-            e.to_string()
+            e
         );
-        messages::CuttingError::OperationFailed(e.to_string())
+        messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
     })?;
 
     // Update the material status to Cut
@@ -410,9 +410,9 @@ pub async fn process_discovered_material(
             error!(
                 "{}: Failed to update material status: {}",
                 actor_name,
-                e.to_string()
+                e
             );
-            messages::CuttingError::OperationFailed(e.to_string())
+            messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
         })?;
 
     info!(

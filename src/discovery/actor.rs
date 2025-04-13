@@ -38,23 +38,23 @@ pub mod messages {
     pub enum DiscoveryError {
         /// Directory not found error
         #[error("Directory not found: {0}")]
-        DirectoryNotFound(String),
+        DirectoryNotFound(Box<str>),
 
         /// Permission error during discovery
         #[error("Permission denied while accessing directory: {0}")]
-        PermissionDenied(String),
+        PermissionDenied(Box<str>),
 
         /// Generic discovery error
         #[error("Discovery operation failed: {0}")]
-        OperationFailed(String),
+        OperationFailed(Box<str>),
 
         /// Scanner error
         #[error("Scanner error: {0}")]
-        ScannerError(String),
+        ScannerError(Box<str>),
 
         /// Repository error
         #[error("Repository error: {0}")]
-        RepositoryError(String),
+        RepositoryError(Box<str>),
     }
 
     /// Command to start discovery using the provided configuration
@@ -140,7 +140,7 @@ impl DiscoveryActor {
 
         if !path.exists() {
             return Err(messages::DiscoveryError::DirectoryNotFound(
-                path.display().to_string(),
+                path.display().to_string().into_boxed_str(),
             ));
         }
 
@@ -148,7 +148,7 @@ impl DiscoveryActor {
             return Err(messages::DiscoveryError::OperationFailed(format!(
                 "Path exists but is not a directory: {}",
                 path.display()
-            )));
+            ).into_boxed_str()));
         }
 
         // Basic access check - more sophisticated checks could be added
@@ -158,7 +158,7 @@ impl DiscoveryActor {
                 "Cannot read directory {}: {}",
                 path.display(),
                 e
-            ))),
+            ).into_boxed_str())),
         }
     }
 
@@ -207,7 +207,7 @@ impl DiscoveryActor {
                     return Err(messages::DiscoveryError::RepositoryError(format!(
                         "Failed to register material: {}",
                         err
-                    )));
+                    ).into_boxed_str()));
                 }
             }
         }
@@ -275,7 +275,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 
             // Create scanner
             let scanner = DirectoryScanner::new(&scan_config.directory)
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e)))?
+                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str()))?
                 .ignore_hidden(scan_config.ignore_hidden)
                 .exclude(scan_config.exclude_patterns);
 
@@ -283,7 +283,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
             info!("Starting scan in directory: {}", scan_config.directory);
             let mut scan_results = scanner
                 .scan()
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e)))?;
+                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str()))?;
 
             // Log the basic results
             info!(

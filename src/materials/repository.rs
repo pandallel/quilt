@@ -134,6 +134,7 @@ impl Default for InMemoryMaterialRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::time::{sleep, Duration};
 
     fn create_test_material(status: MaterialStatus) -> Material {
         let mut material = Material::new("test/path.md".to_string());

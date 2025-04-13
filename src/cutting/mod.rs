@@ -26,13 +26,13 @@ mod tests;
 #[derive(Error, Debug)]
 pub enum CutsRepositoryError {
     #[error("Cut with id {0} not found")]
-    CutNotFound(String),
+    CutNotFound(Box<str>),
 
     #[error("Cut with id {0} already exists")]
-    CutAlreadyExists(String),
+    CutAlreadyExists(Box<str>),
 
     #[error("Operation failed: {0}")]
-    OperationFailed(String),
+    OperationFailed(Box<str>),
 }
 
 /// Result type for cuts repository operations

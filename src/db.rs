@@ -67,6 +67,7 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sqlx::Row;
 
     #[tokio::test]
     async fn test_db_initialization() {

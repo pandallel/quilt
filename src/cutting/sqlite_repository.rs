@@ -52,12 +52,12 @@ impl CutsRepository for SqliteCutsRepository {
 
         match existing {
             Ok(Some(_)) => {
-                return Err(CutsRepositoryError::CutAlreadyExists(cut_id));
+                return Err(CutsRepositoryError::CutAlreadyExists(cut_id.into_boxed_str()));
             }
             Ok(None) => {} // Cut doesn't exist, continue
             Err(e) => {
                 error!("Database error checking for existing cut: {}", e);
-                return Err(CutsRepositoryError::OperationFailed(e.to_string()));
+                return Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()));
             }
         }
 
@@ -86,7 +86,7 @@ impl CutsRepository for SqliteCutsRepository {
             }
             Err(e) => {
                 error!("Failed to save cut: {}", e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -101,7 +101,7 @@ impl CutsRepository for SqliteCutsRepository {
             Ok(tx) => tx,
             Err(e) => {
                 error!("Failed to begin transaction: {}", e);
-                return Err(CutsRepositoryError::OperationFailed(e.to_string()));
+                return Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()));
             }
         };
 
@@ -117,7 +117,7 @@ impl CutsRepository for SqliteCutsRepository {
                     if let Err(e) = tx.rollback().await {
                         error!("Failed to rollback transaction: {}", e);
                     }
-                    return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone()));
+                    return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone().into_boxed_str()));
                 }
                 Ok(None) => {} // Cut doesn't exist, continue
                 Err(e) => {
@@ -125,7 +125,7 @@ impl CutsRepository for SqliteCutsRepository {
                         error!("Failed to rollback transaction: {}", rollback_err);
                     }
                     error!("Database error checking for existing cut: {}", e);
-                    return Err(CutsRepositoryError::OperationFailed(e.to_string()));
+                    return Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()));
                 }
             }
         }
@@ -154,14 +154,14 @@ impl CutsRepository for SqliteCutsRepository {
                     error!("Failed to rollback transaction: {}", rollback_err);
                 }
                 error!("Failed to save cut: {}", e);
-                return Err(CutsRepositoryError::OperationFailed(e.to_string()));
+                return Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()));
             }
         }
 
         // Commit transaction
         if let Err(e) = tx.commit().await {
             error!("Failed to commit transaction: {}", e);
-            return Err(CutsRepositoryError::OperationFailed(e.to_string()));
+            return Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()));
         }
 
         info!("Saved {} cuts in batch", cuts.len());
@@ -179,7 +179,7 @@ impl CutsRepository for SqliteCutsRepository {
             Ok(None) => Ok(None),
             Err(e) => {
                 error!("Error fetching cut {}: {}", cut_id, e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -197,7 +197,7 @@ impl CutsRepository for SqliteCutsRepository {
             }
             Err(e) => {
                 error!("Error fetching cuts for material {}: {}", material_id, e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -207,7 +207,7 @@ impl CutsRepository for SqliteCutsRepository {
         let cut = self.get_cut_by_id(cut_id).await?;
 
         if cut.is_none() {
-            return Err(CutsRepositoryError::CutNotFound(cut_id.to_string()));
+            return Err(CutsRepositoryError::CutNotFound(cut_id.to_string().into_boxed_str()));
         }
 
         // Delete the cut
@@ -223,7 +223,7 @@ impl CutsRepository for SqliteCutsRepository {
             }
             Err(e) => {
                 error!("Failed to delete cut: {}", e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -254,7 +254,7 @@ impl CutsRepository for SqliteCutsRepository {
             }
             Err(e) => {
                 error!("Failed to delete cuts for material {}: {}", material_id, e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -272,7 +272,7 @@ impl CutsRepository for SqliteCutsRepository {
             }
             Err(e) => {
                 error!("Error counting cuts for material {}: {}", material_id, e);
-                Err(CutsRepositoryError::OperationFailed(e.to_string()))
+                Err(CutsRepositoryError::OperationFailed(e.to_string().into_boxed_str()))
             }
         }
     }
@@ -344,7 +344,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(CutsRepositoryError::CutAlreadyExists(id)) = result {
-            assert_eq!(id, cut.id);
+            assert_eq!(id, cut.id.into_boxed_str());
         } else {
             panic!("Expected CutAlreadyExists error");
         }

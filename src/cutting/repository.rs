@@ -43,7 +43,7 @@ impl CutsRepository for InMemoryCutsRepository {
         // Check if the cut already exists
         let mut cuts = self.cuts_by_id.write().await;
         if cuts.contains_key(&cut_id) {
-            return Err(CutsRepositoryError::CutAlreadyExists(cut_id));
+            return Err(CutsRepositoryError::CutAlreadyExists(cut_id.into_boxed_str()));
         }
 
         // Insert the cut
@@ -72,7 +72,7 @@ impl CutsRepository for InMemoryCutsRepository {
         // Check for duplicates first
         for cut in &cuts {
             if cuts_by_id.contains_key(&cut.id) {
-                return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone()));
+                return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone().into_boxed_str()));
             }
         }
 
@@ -126,7 +126,7 @@ impl CutsRepository for InMemoryCutsRepository {
         let material_id = if let Some(cut) = cuts_by_id.get(&cut_id) {
             cut.material_id.clone()
         } else {
-            return Err(CutsRepositoryError::CutNotFound(cut_id.to_string()));
+            return Err(CutsRepositoryError::CutNotFound(cut_id.into_boxed_str()));
         };
 
         // Remove from the primary map
@@ -223,7 +223,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(CutsRepositoryError::CutAlreadyExists(id)) = result {
-            assert_eq!(id, cut.id);
+            assert_eq!(id, cut.id.into_boxed_str());
         } else {
             panic!("Expected CutAlreadyExists error");
         }
