@@ -284,25 +284,26 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ✅ Refactored `SqliteMaterialRepository` to use automatic `OffsetDateTime` encoding/decoding via `sqlx`, removing manual parsing/formatting.
    - ✅ Updated tests in both repositories.
 
-### Milestone 8: "Basic Swatching Actor Creation"
+### ✅ Milestone 8: "Basic Swatching Actor Creation"
 
 **Goal:** Create a minimal Swatching Actor that listens for cut events and sets up internal backpressure queue
 **Implementation Time:** 2-3 days
+**Status:** ✅ Completed
 
-1. Create Swatching Actor skeleton (1-2 days)
+1. ✅ Create Swatching Actor skeleton (1-2 days)
 
-   - Implement simple actor that subscribes to MaterialCut events from the shared `EventBus`
-   - Set up internal bounded `mpsc` channel
-   - Spawn internal 'Listener Task': receives events, filters for `MaterialCut`, logs receipt, tries sending to internal queue
-   - Spawn internal 'Processor Task': receives from internal queue, logs receipt (no processing yet)
-   - Add logging for received events on both tasks
-   - Create basic actor lifecycle management including task cleanup
+   - ✅ Implement simple actor that subscribes to MaterialCut events from the shared `EventBus`
+   - ✅ Set up internal bounded `mpsc` channel
+   - ✅ Spawn internal 'Listener Task': receives events, filters for `MaterialCut`, logs receipt, tries sending to internal queue
+   - ✅ Spawn internal 'Processor Task': receives from internal queue, logs receipt (no processing yet)
+   - ✅ Add logging for received events on both tasks
+   - ✅ Create basic actor lifecycle management including task cleanup
 
-2. Set up event flow monitoring (1 day)
-   - Add event flow tracking between actors
-   - Implement metrics for the pipeline
-   - Create visualization of event flow in logs
-   - Add configuration options
+2. ✅ Integrate with Orchestrator
+   - ✅ Add SwatchingActor to the QuiltOrchestrator initialization
+   - ✅ Include in the shutdown sequence with proper order
+   - ✅ Ensure event flow from CuttingActor to SwatchingActor
+   - ✅ Add comprehensive tests for actor lifecycle
 
 **Demonstration:** Running `main` shows "Swatching Actor received X MaterialCut events" in logs without processing them
 

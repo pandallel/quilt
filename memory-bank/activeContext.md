@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-**Milestone 7.5: "SQLite Repository Implementation"** is now fully complete with the implementation of both `SqliteMaterialRepository` and `SqliteCutsRepository`. We're now shifting focus to **Milestone 8: "Basic Swatching Actor Creation"**.
+**Milestone 8: "Basic Swatching Actor Creation"** is now complete with the implementation of the `SwatchingActor` and its integration into the `QuiltOrchestrator`. We're now shifting focus to **Milestone 9: "Swatching Actor Processes Cuts"**.
 
 ## Current Implementation Status
 
@@ -13,6 +13,7 @@ The codebase currently has these key components implemented:
    - Common actor module with Ping and Shutdown messages
    - DiscoveryActor with lifecycle management
    - CuttingActor with event subscription and processing
+   - SwatchingActor with event subscription
    - QuiltOrchestrator implementing the Orchestrator pattern
    - Proper Actix/Tokio runtime integration with #[actix::main]
 
@@ -72,12 +73,21 @@ The codebase currently has these key components implemented:
    - Full integration with CuttingActor for storing processed cuts
 
 8. **Database Infrastructure**:
+
    - Added SQLite support via `sqlx` with in-memory database capability
    - Created database initialization module in `src/db.rs` with schemas for both materials and cuts tables
    - Implemented table schema creation with proper foreign key constraints
    - Added connection pooling with transaction support
    - Implemented efficient conversion between SQLite rows and domain objects
    - Added comprehensive tests for database operations
+
+9. **Swatching System**:
+   - SwatchingActor that subscribes to MaterialCut events
+   - Implemented internal listener/mpsc/processor pattern for backpressure
+   - Added proper error handling with SwatchingError types
+   - Integrated with QuiltOrchestrator
+   - Added lifecycle management (start/stop)
+   - Added event flow from CuttingActor to SwatchingActor
 
 ## Recent Changes & Current Focus
 
@@ -102,9 +112,17 @@ The codebase currently has these key components implemented:
   - ✅ **Implemented SQLite Cuts Repository:** Created `SqliteCutsRepository` with all required operations, proper foreign key constraints, transaction support, and comprehensive tests.
   - ✅ **Fixed Path Resolution Issues:** Ensured that `DiscoveryActor` converts relative paths to absolute paths before registration, fixing path resolution issues.
   - ✅ **Enhanced Application Integration:** Updated `QuiltOrchestrator` to support SQLite for both materials and cuts repositories.
-- **Focus:** Shifting to Milestone 8 (Basic Swatching Actor Creation).
+- **Completed Milestone 8:**
+  - ✅ **Created SwatchingActor:** Implemented a minimal actor that listens for MaterialCut events via the EventBus.
+  - ✅ **Set up Internal Processing Pattern:** Implemented the internal listener/mpsc/processor pattern for backpressure.
+  - ✅ **Added Actor Lifecycle Management:** Implemented proper start/stop functionality and resource cleanup.
+  - ✅ **Integrated with Orchestrator:** Added SwatchingActor to the QuiltOrchestrator's actor initialization and shutdown sequence.
+  - ✅ **Added Event Handling:** Set up the actor to listen for MaterialCut events and log receipt.
+  - ✅ **Implemented Error Handling:** Added SwatchingError types for different failure scenarios.
+  - ✅ **Added Testing:** Created comprehensive unit tests validating the actor's functionality.
+- **Focus:** Shifting to Milestone 9 (Swatching Actor Processes Cuts).
 - **Next Steps:**
-  - **Implement Basic Swatching Actor (M8):** Create a minimal actor that listens for MaterialCut events and sets up internal backpressure queue.
+  - **Implement Swatching Processing Logic (M9):** Create the logic to process cuts and generate embeddings.
 
 ## Current Implementation Issues
 
@@ -130,12 +148,22 @@ The codebase currently has these key components implemented:
    - ✅ Enhance error handling for database operations
    - ✅ Address path resolution issues
 
-2. **Implement Basic Swatching Actor (M8):**
-   - Create skeleton actor that subscribes to `MaterialCut` events
-   - Implement internal listener/mpsc/processor pattern for backpressure
-   - Add lifecycle management (start/stop)
-   - Setup event flow monitoring
-   - Add logging for received events
+2. ✅ **Implement Basic Swatching Actor (M8):**
+
+   - ✅ Create skeleton actor that subscribes to `MaterialCut` events
+   - ✅ Implement internal listener/mpsc/processor pattern for backpressure
+   - ✅ Add lifecycle management (start/stop)
+   - ✅ Setup event flow from cutting to swatching
+   - ✅ Add logging for received events
+   - ✅ Integrate with QuiltOrchestrator
+
+3. **Implement Swatching Logic (M9):**
+   - Design `Swatch` data structure with appropriate metadata
+   - Implement logic to retrieve cuts from `CutsRepository`
+   - Add embedding generation functionality
+   - Create state transition logic (`Cut` → `Swatched` or `Cut` → `Error`)
+   - Implement event publishing for completed swatches
+   - Add comprehensive error handling
 
 ## Active Decisions & Considerations
 
@@ -143,9 +171,12 @@ The codebase currently has these key components implemented:
 - **Repository Selection:** **Complete:** Added command-line flag `--in-memory` to allow runtime selection between SQLite and in-memory repositories for both materials and cuts.
 - **Path Resolution:** **Resolved:** Fixed path handling by ensuring `DiscoveryActor` resolves relative paths to absolute paths before registering materials.
 - **Transaction Support:** **Complete:** Implemented transaction support for batch operations in both SQLite repositories.
-- **SwatchingActor Design:** Determine the optimal structure for the `SwatchingActor` based on lessons learned from `CuttingActor`. Will likely follow the same dual-task pattern (listener/processor) for backpressure handling.
-- **MaterialCut Event Structure:** The current implementation includes the material ID in the event. The `SwatchingActor` will retrieve the cuts using the material ID.
-- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
+- **SwatchingActor Design:** **Complete:** Implemented using the dual-task pattern (listener/processor) for backpressure handling.
+- **MaterialCut Event Structure:** The current implementation includes the material ID in the event. The `SwatchingActor` will retrieve the cuts using the material ID via the `CutsRepository`.
+- **Swatch Data Model:** Design the `Swatch` data structure and determine how to store embeddings efficiently.
+- **Embedding Strategy:** Determine which embedding technique/library to use (e.g., simple TF-IDF, or more advanced embedding model).
+- **Batch Processing:** Consider whether to process cuts individually or in batches for embedding generation.
+- **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for both `CuttingActor` and `SwatchingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
 - **Error Handling:** Continue refining error types and handling, particularly around persistence (M13) and potential reconciliation loops.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
