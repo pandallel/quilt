@@ -351,10 +351,38 @@ pub async fn process_discovered_material(
 
     // Read the content from the file
     debug!("{}: Reading file content: {}", actor_name, file_path);
-    let content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
-        error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
-        messages::CuttingError::FileError(e)
-    })?;
+    let content = match tokio::fs::read_to_string(&file_path).await {
+        Ok(content) => content,
+        Err(e) => {
+            let error_msg = format!("Failed to read file: {}", e);
+            error!("{}: {}", actor_name, error_msg);
+
+            // Update material status to Error
+            if let Err(update_err) = registry
+                .update_material_status(
+                    material_id.as_str(),
+                    MaterialStatus::Error,
+                    Some(error_msg.clone()),
+                )
+                .await
+            {
+                error!(
+                    "{}: Failed to update material status to Error for '{}': {}",
+                    actor_name,
+                    material_id.as_str(),
+                    update_err
+                );
+            } else {
+                debug!(
+                    "{}: Updated material '{}' status to Error due to file read failure",
+                    actor_name,
+                    material_id.as_str()
+                );
+            }
+
+            return Err(messages::CuttingError::FileError(e));
+        }
+    };
 
     // Cut the content into chunks
     debug!(
@@ -362,12 +390,38 @@ pub async fn process_discovered_material(
         actor_name,
         material_id.as_str()
     );
-    let chunks = cutter
-        .cut(&content, Some(material_id.clone()))
-        .map_err(|e| {
-            error!("{}: Failed to cut content: {}", actor_name, e);
-            messages::CuttingError::CuttingError(e)
-        })?;
+    let chunks = match cutter.cut(&content, Some(material_id.clone())) {
+        Ok(chunks) => chunks,
+        Err(e) => {
+            let error_msg = format!("Failed to cut content: {}", e);
+            error!("{}: {}", actor_name, error_msg);
+
+            // Update material status to Error
+            if let Err(update_err) = registry
+                .update_material_status(
+                    material_id.as_str(),
+                    MaterialStatus::Error,
+                    Some(error_msg.clone()),
+                )
+                .await
+            {
+                error!(
+                    "{}: Failed to update material status to Error for '{}': {}",
+                    actor_name,
+                    material_id.as_str(),
+                    update_err
+                );
+            } else {
+                debug!(
+                    "{}: Updated material '{}' status to Error due to cutting failure",
+                    actor_name,
+                    material_id.as_str()
+                );
+            }
+
+            return Err(messages::CuttingError::CuttingError(e));
+        }
+    };
 
     debug!("{}: Cut material into {} chunks", actor_name, chunks.len());
 
@@ -388,10 +442,37 @@ pub async fn process_discovered_material(
 
     // Store the cuts in the repository
     debug!("{}: Saving {} cuts to repository", actor_name, cuts.len());
-    cuts_repository.save_cuts(&cuts).await.map_err(|e| {
-        error!("{}: Failed to save cuts to repository: {}", actor_name, e);
-        messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
-    })?;
+    if let Err(e) = cuts_repository.save_cuts(&cuts).await {
+        let error_msg = format!("Failed to save cuts to repository: {}", e);
+        error!("{}: {}", actor_name, error_msg);
+
+        // Update material status to Error
+        if let Err(update_err) = registry
+            .update_material_status(
+                material_id.as_str(),
+                MaterialStatus::Error,
+                Some(error_msg.clone()),
+            )
+            .await
+        {
+            error!(
+                "{}: Failed to update material status to Error for '{}': {}",
+                actor_name,
+                material_id.as_str(),
+                update_err
+            );
+        } else {
+            debug!(
+                "{}: Updated material '{}' status to Error due to repository save failure",
+                actor_name,
+                material_id.as_str()
+            );
+        }
+
+        return Err(messages::CuttingError::OperationFailed(
+            e.to_string().into_boxed_str(),
+        ));
+    }
 
     // Update the material status to Cut
     debug!(
