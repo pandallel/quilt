@@ -4,8 +4,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use time::OffsetDateTime;
-use std::time::Duration;
-use tokio::time::sleep;
 
 use super::{Material, MaterialRepository, MaterialStatus, RepositoryError, Result};
 

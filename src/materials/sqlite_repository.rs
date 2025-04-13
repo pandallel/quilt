@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use sqlx::{Row, SqlitePool};
 use time::OffsetDateTime;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use super::{Material, MaterialFileType, MaterialRepository, MaterialStatus, RepositoryError, Result};
 

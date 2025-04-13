@@ -2,7 +2,6 @@ use std::fmt::Debug;
 
 use async_trait::async_trait;
 use sqlx::{Row, SqlitePool};
-use time::OffsetDateTime;
 use tracing::{debug, error, info};
 
 use super::{Cut, CutsRepository, CutsRepositoryError, Result};

@@ -1,8 +1,7 @@
 //! Database utilities for SQLite setup and connection management
 
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite, SqlitePool};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Sqlite, SqlitePool};
 use tracing::{debug, info};
-use sqlx::Row;
 
 /// Initialize an in-memory SQLite database with required schema
 pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
