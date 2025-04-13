@@ -3,17 +3,22 @@
 
 use std::fmt::Debug;
 use thiserror::Error;
+use time::OffsetDateTime;
+
+use async_trait::async_trait;
 
 pub mod actor;
 pub mod cut;
 pub mod cutter;
 pub mod repository;
+pub mod sqlite_repository;
 
 pub use actor::messages;
 pub use actor::CuttingActor;
 pub use cut::Cut;
 pub use cutter::{CutterConfig, TextCutter};
 pub use repository::InMemoryCutsRepository;
+pub use sqlite_repository::SqliteCutsRepository;
 
 #[cfg(test)]
 mod tests;
@@ -35,37 +40,26 @@ pub enum CutsRepositoryError {
 pub type Result<T> = std::result::Result<T, CutsRepositoryError>;
 
 /// Repository trait for managing cuts
+#[async_trait]
 pub trait CutsRepository: Send + Sync + Debug + 'static {
     /// Save a cut to the repository
-    fn save_cut(&self, cut: &Cut) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn save_cut(&self, cut: &Cut) -> Result<()>;
 
     /// Save multiple cuts in a batch operation
-    fn save_cuts(&self, cuts: &[Cut]) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn save_cuts(&self, cuts: &[Cut]) -> Result<()>;
 
     /// Get a cut by its ID
-    fn get_cut_by_id(
-        &self,
-        cut_id: &str,
-    ) -> impl std::future::Future<Output = Result<Option<Cut>>> + Send;
+    async fn get_cut_by_id(&self, cut_id: &str) -> Result<Option<Cut>>;
 
     /// Get all cuts for a specific material
-    fn get_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Cut>>> + Send;
+    async fn get_cuts_by_material_id(&self, material_id: &str) -> Result<Vec<Cut>>;
 
     /// Delete a cut by its ID
-    fn delete_cut(&self, cut_id: &str) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn delete_cut(&self, cut_id: &str) -> Result<()>;
 
     /// Delete all cuts for a material
-    fn delete_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    async fn delete_cuts_by_material_id(&self, material_id: &str) -> Result<()>;
 
     /// Count cuts for a material
-    fn count_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<usize>> + Send;
+    async fn count_cuts_by_material_id(&self, material_id: &str) -> Result<usize>;
 }

@@ -13,7 +13,7 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
-use crate::cutting::{CuttingActor, InMemoryCutsRepository};
+use crate::cutting::{CuttingActor, CutsRepository, InMemoryCutsRepository, SqliteCutsRepository};
 use crate::db::init_memory_db;
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
@@ -60,7 +60,7 @@ pub struct QuiltOrchestrator {
     cutting: Option<Addr<CuttingActor>>,
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
-    cuts_repository: Arc<InMemoryCutsRepository>,
+    cuts_repository: Arc<dyn CutsRepository>,
     // Future actors:
     // swatching: Option<Addr<SwatchingActor>>,
 }
@@ -71,8 +71,7 @@ impl QuiltOrchestrator {
         let event_bus = Arc::new(EventBus::new());
         
         // Initialize repositories
-        // We're still using InMemoryCutsRepository since SqliteCutsRepository is not implemented yet
-        let cuts_repository = Arc::new(InMemoryCutsRepository::new());
+        let cuts_repository: Arc<dyn CutsRepository> = Arc::new(InMemoryCutsRepository::new());
         
         // Create the registry with InMemoryMaterialRepository as fallback
         // If SQLite initialization fails, we'll fall back to the in-memory repository
@@ -96,8 +95,8 @@ impl QuiltOrchestrator {
         let pool = init_memory_db().await?;
         
         // Create repositories
-        let material_repository: Arc<dyn MaterialRepository> = Arc::new(SqliteMaterialRepository::new(pool));
-        let cuts_repository = Arc::new(InMemoryCutsRepository::new());
+        let material_repository: Arc<dyn MaterialRepository> = Arc::new(SqliteMaterialRepository::new(pool.clone()));
+        let cuts_repository: Arc<dyn CutsRepository> = Arc::new(SqliteCutsRepository::new(pool));
         
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());

@@ -38,6 +38,11 @@ impl TextCutter {
         Self { config }
     }
 
+    /// Get a reference to the cutter configuration
+    pub fn config(&self) -> &CutterConfig {
+        &self.config
+    }
+
     /// Cut text into chunks according to the configuration
     pub fn cut(
         &self,
