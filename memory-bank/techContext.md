@@ -5,8 +5,14 @@
 - **Rust**: The primary programming language for the project
 - **Actix**: Actor framework for managing actor lifecycle
 - **Tokio**: Async runtime and concurrency primitives
-- **Tokio-broadcast**: Event distribution for the Event Bus
-- **RwLock**: Thread-safe state management
+- **`tokio::sync::broadcast`**: Event distribution for the Event Bus
+- **`tokio::sync::mpsc`**: Internal actor queues for backpressure
+- **`tokio::sync::RwLock` / `Mutex`**: Thread-safe state management
+- **`clap`**: Command-line argument parsing
+- **`env_logger`**: Logging setup
+- **`thiserror`**: Structured error handling
+- **`sqlx`**: Asynchronous SQL interaction (for SQLite persistence)
+- **`text-splitter`**: Text chunking for the cutting process
 
 ## Architecture Components
 
@@ -16,134 +22,40 @@ Quilt uses Actix for actor lifecycle management, leveraging its robust features:
 
 - **Actor Trait**: For defining actor behavior and message handling
 - **Message Types**: Strongly typed with `#[derive(Message)]` macro
-- **Handler Implementation**: Using `ResponseFuture` for async processing
-- **Actor Lifecycle**: Proper startup and shutdown management
+- **Handler Implementation**: Using `ResponseFuture` or `async move` blocks for async processing
+- **Actor Lifecycle**: Proper startup (`started`) and shutdown (`stopping`, `stopped`) management via `Context`.
+- **Common Utilities**: Shared messages (`Ping`, `Shutdown`) and error types (`ActorError`) are defined in `src/actors/mod.rs` for reuse.
 
 ### Event Bus
 
-The Event Bus is implemented using Tokio's broadcast channels:
-
-```rust
-pub struct EventBus {
-    material_tx: broadcast::Sender<MaterialEvent>,
-    system_tx: broadcast::Sender<SystemEvent>,
-    error_tx: broadcast::Sender<ErrorEvent>,
-}
-
-impl EventBus {
-    pub fn new(capacity: usize) -> Self {
-        let (material_tx, _) = broadcast::channel(capacity);
-        let (system_tx, _) = broadcast::channel(capacity);
-        let (error_tx, _) = broadcast::channel(capacity);
-
-        Self {
-            material_tx,
-            system_tx,
-            error_tx,
-        }
-    }
-
-    pub fn subscribe_to_material_events(&self) -> broadcast::Receiver<MaterialEvent> {
-        self.material_tx.subscribe()
-    }
-
-    // Other methods for subscription and publishing
-}
-```
+The Event Bus is implemented using Tokio's broadcast channels for decoupled communication.
 
 ### Material Registry
 
-The Material Registry coordinates state management and event publishing:
+The Material Registry coordinates state management and event publishing.
 
-```rust
-pub struct MaterialRegistry {
-    materials: Arc<RwLock<HashMap<String, Material>>>,
-    event_bus: Arc<EventBus>,
-    repository: Arc<dyn MaterialRepository>,
-}
+### Material & Cuts Repositories
 
-impl MaterialRegistry {
-    pub async fn register_material(&self, material: Material) -> Result<(), RegistryError> {
-        // Update state
-        let mut materials = self.materials.write().await;
-        materials.insert(material.id.clone(), material.clone());
+The Repository traits handle persistence operations.
 
-        // Persist change
-        self.repository.save(&material).await?;
+- **Concrete Implementations**: `SqliteMaterialRepository`, `InMemoryMaterialRepository`, `SqliteCutsRepository`, `InMemoryCutsRepository` provide actual storage logic.
 
-        // Publish event
-        self.event_bus.publish_material_event(MaterialEvent::Discovered {
-            material_id: material.id.clone(),
-            file_path: material.file_path.clone(),
-        })?;
+### Orchestrator (`QuiltOrchestrator`)
 
-        Ok(())
-    }
-
-    // Other methods for state management
-}
-```
-
-### Material Repository
-
-The Repository handles persistence operations:
-
-```rust
-#[async_trait]
-pub trait MaterialRepository: Send + Sync + 'static {
-    async fn save(&self, material: &Material) -> Result<()>;
-    async fn load(&self, id: &str) -> Result<Option<Material>>;
-    async fn delete(&self, id: &str) -> Result<()>;
-}
-```
+- Manages application lifecycle: initializes actors, event bus, registry, repositories.
+- Handles configuration parsing (`clap`) and dependency injection (selecting repositories).
+- Coordinates startup, main processing flow (e.g., starting discovery), and shutdown.
+- Uses `tokio::time::timeout` for managing potentially long-running operations.
 
 ### Event Types
 
-The system uses domain events for communication:
+The system uses a unified domain event enum (`QuiltEvent`) for communication via the Event Bus.
 
-```rust
-// Strongly typed material identifier
-pub struct MaterialId(String);
+### Cutting Strategy (`TextCutter`)
 
-pub enum MaterialEvent {
-    Discovered {
-        material_id: MaterialId,
-        file_path: String,
-    },
-    Cut {
-        material_id: MaterialId,
-        cut_ids: Vec<String>,
-    },
-    Swatched {
-        material_id: MaterialId,
-        swatch_id: String,
-    },
-}
-
-pub enum SystemEvent {
-    HealthCheck { actor_id: String },
-    Shutdown,
-}
-
-pub enum ErrorEvent {
-    ProcessingFailed {
-        material_id: MaterialId,
-        stage: ProcessingStage,
-        error: String,
-    },
-    PersistenceFailed {
-        material_id: MaterialId,
-        operation: String,
-        error: String,
-    },
-}
-
-pub enum ProcessingStage {
-    Discovery,
-    Cutting,
-    Swatching,
-}
-```
+- Responsible for splitting material content into chunks (`Cut`s).
+- Uses the `text-splitter` crate.
+- May employ different splitting strategies based on file type (Markdown, Code, Plain Text).
 
 ## Development Environment
 
@@ -159,7 +71,7 @@ pub enum ProcessingStage {
 
 - **Build**: `cargo build`
 - **Test**: `cargo test`
-- **Run**: `cargo run -- --discovery-dir=/path/to/scan`
+- **Run**: `cargo run -- --dir <path> [--in-memory] [--exclude <pattern>...] [--include-hidden]`
 
 ### Continuous Integration
 
@@ -174,7 +86,8 @@ The system is being implemented incrementally, with focused milestones:
 2. **Event Infrastructure**: Event Bus, Material Registry, event types
 3. **Actor Evolution**: Updating actors to use event-driven approach
 4. **Processing Pipeline**: Implementing the full material processing pipeline
-5. **Persistence**: Adding durable storage and recovery mechanisms
+5. **Persistence**: Adding durable storage (SQLite) and recovery mechanisms
+6. **Orchestration**: Implementing `QuiltOrchestrator` for lifecycle management
 
 Each milestone focuses on providing tangible, demonstrable progress that can be validated through concrete log messages and metrics.
 
@@ -189,10 +102,16 @@ quilt/
 │   └── book.toml # mdBook configuration
 ├── memory-bank/ # Memory Bank
 ├── src/         # Source code
-│   ├── actors/  # Actor system components
-│   ├── discovery/ # Discovery actor module
-│   ├── materials/ # Material processing
-│   └── main.rs  # Application entry point
+│   ├── actors/  # Common actor definitions (messages, errors)
+│   ├── cutting/ # Cutting actor, logic, repository trait/impls
+│   ├── db.rs    # Database initialization (e.g., SQLite pool)
+│   ├── discovery/ # Discovery actor, logic, scanner
+│   ├── events/  # Event definitions (e.g., QuiltEvent) and EventBus
+│   ├── lib.rs   # Library root (re-exports)
+│   ├── main.rs  # Application entry point, arg parsing (clap)
+│   ├── materials/ # Material registry, repository trait/impls, types
+│   ├── orchestrator.rs # QuiltOrchestrator implementation
+│   └── swatching/ # Swatching actor, logic (potentially future)
 ├── test_dir/    # Test directory
 ├── Cargo.toml   # Project manifest
 └── README.md    # Project overview
@@ -238,37 +157,7 @@ impl Actor for DiscoveryActor {
 }
 ```
 
-### Message Channel System
+### Message Types & Communication
 
-The message system uses Tokio's MPSC channels with capacity of 100 messages for direct actor-to-actor communication.
-
-### Message Types
-
-Each actor has its own specific message types for direct communication:
-
-pub struct MaterialDiscovered {
-pub material: Material, // Full material for initial registration
-}
-
-pub struct CutMaterial {
-pub material_id: String, // Reference to original material
-pub cut_ids: Vec<String>, // IDs of the generated cuts
-}
-
-pub struct MaterialSwatched {
-pub material_id: String, // Reference to original material
-pub cut_id: String, // Reference to the cut that was processed
-pub swatch_id: String, // ID of the generated swatch
-}
-
-pub struct ProcessingError {
-pub material_id: String,
-pub stage: ProcessingStage,
-pub error: String,
-}
-
-pub enum ProcessingStage {
-Discovery,
-Cutting,
-Swatching,
-}
+- **Event Bus (`QuiltEvent`)**: Primary mechanism for decoupled communication between stages (e.g., Discovery -> Registry -> EventBus -> CuttingActor). Events are published via the shared `EventBus` (using `tokio::sync::broadcast`).
+- **Actix Messages**: Used for direct requests/responses between actors or components (e.g., `Orchestrator` sending `StartDiscovery` to `DiscoveryActor`, sending `Ping` for health checks). Defined using `#[derive(Message)]` and handled via `impl Handler<...>`.

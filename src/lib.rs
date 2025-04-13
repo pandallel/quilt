@@ -11,6 +11,7 @@ pub mod discovery;
 pub mod events;
 pub mod materials;
 pub mod orchestrator;
+pub mod swatching;
 
 // Re-export the core types for users of the library
 // Material discovery and processing types
@@ -26,6 +27,9 @@ pub use materials::{MaterialRegistry, RegistryError};
 
 // Cutting and processing types
 pub use cutting::{Cut, CutsRepository, CutsRepositoryError, InMemoryCutsRepository};
+
+// Swatching types
+pub use swatching::{SwatchingActor, SwatchingError};
 
 // Database functionality
 pub use db::init_memory_db;

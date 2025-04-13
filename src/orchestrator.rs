@@ -22,6 +22,7 @@ use crate::events::EventBus;
 use crate::materials::{
     InMemoryMaterialRepository, MaterialRegistry, MaterialRepository, SqliteMaterialRepository,
 };
+use crate::swatching::SwatchingActor;
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -60,11 +61,10 @@ impl From<Box<dyn std::error::Error>> for OrchestratorError {
 pub struct QuiltOrchestrator {
     discovery: Option<Addr<DiscoveryActor>>,
     cutting: Option<Addr<CuttingActor>>,
+    swatching: Option<Addr<SwatchingActor>>,
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
     cuts_repository: Arc<dyn CutsRepository>,
-    // Future actors:
-    // swatching: Option<Addr<SwatchingActor>>,
 }
 
 impl QuiltOrchestrator {
@@ -83,6 +83,7 @@ impl QuiltOrchestrator {
         Self {
             discovery: None,
             cutting: None,
+            swatching: None,
             registry,
             event_bus,
             cuts_repository,
@@ -107,6 +108,7 @@ impl QuiltOrchestrator {
         Ok(Self {
             discovery: None,
             cutting: None,
+            swatching: None,
             registry,
             event_bus,
             cuts_repository,
@@ -198,8 +200,11 @@ impl QuiltOrchestrator {
         debug!("Initialized cutting actor");
         self.cutting = Some(cutting_addr);
 
-        // Future: Initialize other actors
-        // self.swatching = Some(SwatchingActor::new(self.registry.clone()).start());
+        // Initialize swatching actor
+        let swatching_actor = SwatchingActor::new("main-swatching", self.event_bus.clone());
+        let swatching_addr = swatching_actor.start();
+        debug!("Initialized swatching actor");
+        self.swatching = Some(swatching_addr);
 
         Ok(())
     }
@@ -291,7 +296,7 @@ impl QuiltOrchestrator {
     async fn shutdown_actors_with_timeout(&self, timeout_duration: Duration) {
         info!("Shutting down actors...");
 
-        // Helper function to shutdown an actor with consistent error handling
+        // Helper function to shutdown an actor with timeout
         async fn shutdown_actor_with_timeout<A>(
             actor_name: &str,
             actor_addr: &Option<Addr<A>>,
@@ -302,22 +307,29 @@ impl QuiltOrchestrator {
             <A as Actor>::Context: ToEnvelope<A, Shutdown>,
         {
             if let Some(addr) = actor_addr {
+                info!("Sending shutdown to {}...", actor_name);
                 match timeout(timeout_duration, addr.send(Shutdown)).await {
-                    Ok(Ok(_)) => info!("{} actor shut down successfully", actor_name),
-                    Ok(Err(e)) => error!("Failed to send shutdown to {} actor: {}", actor_name, e),
-                    Err(_) => error!("Timeout shutting down {} actor", actor_name),
+                    Ok(result) => {
+                        if result.is_ok() {
+                            info!("{} shutdown completed", actor_name);
+                        } else {
+                            error!("{} shutdown failed: {:?}", actor_name, result);
+                        }
+                    }
+                    Err(_) => {
+                        error!(
+                            "{} shutdown timed out after {:?}",
+                            actor_name, timeout_duration
+                        );
+                    }
                 }
             }
         }
 
-        // Shutdown discovery actor
-        shutdown_actor_with_timeout("Discovery", &self.discovery, timeout_duration).await;
-
-        // Shutdown cutting actor
-        shutdown_actor_with_timeout("Cutting", &self.cutting, timeout_duration).await;
-
-        // Future: Add other actors here using the same pattern
-        // shutdown_actor_with_timeout("Swatching", &self.swatching, timeout_duration).await;
+        // Shutdown in reverse order of initialization
+        shutdown_actor_with_timeout("swatching", &self.swatching, timeout_duration).await;
+        shutdown_actor_with_timeout("cutting", &self.cutting, timeout_duration).await;
+        shutdown_actor_with_timeout("discovery", &self.discovery, timeout_duration).await;
 
         info!("All actors shut down");
 

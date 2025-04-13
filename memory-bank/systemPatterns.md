@@ -62,6 +62,12 @@ graph TB
 - **Event Subscription**: Actors subscribe to relevant event channels
 - **Backpressure Handling**: Controlling event consumption rate
 
+### Dependency Injection and Repository Pattern
+
+- **Repository Traits**: Defined traits (`MaterialRepository`, `CutsRepository`) abstract persistence logic.
+- **Concrete Implementations**: Provided implementations for different backends (`SqliteMaterialRepository`, `InMemoryMaterialRepository`, `SqliteCutsRepository`, `InMemoryCutsRepository`).
+- **Dynamic Selection**: The `QuiltOrchestrator` injects the appropriate repository implementation (SQLite or In-Memory) based on application configuration (e.g., command-line flags).
+
 ### Material Processing Flow
 
 ```mermaid
@@ -153,6 +159,12 @@ classDiagram
 
 ## Technical Decisions
 
+### Configuration Management
+
+- **Command-Line Arguments**: Uses the `clap` crate to parse command-line arguments (`Args` struct in `main.rs`).
+- **Configuration Structs**: Uses structs like `OrchestratorConfig` to hold application settings.
+- **Logging**: Initializes logging via `env_logger` based on environment variables (`RUST_LOG`).
+
 ### Event Bus Implementation
 
 - **Tokio Broadcast Channels**: Using `tokio::sync::broadcast` for event distribution with a default capacity of 128
@@ -170,12 +182,19 @@ classDiagram
 - **Event Processing**: Subscribing to events during actor initialization
 - **Async Processing**: Using `ResponseFuture` for long-running operations
 - **Supervision**: Implementing proper error handling and recovery strategies
+- **Common Utilities**: Shared messages (`Ping`, `Shutdown`) and error types (`ActorError`) are defined in `src/actors/mod.rs` for reuse.
+- **Health Checks**: Uses a `Ping` message, often coordinated by the `QuiltOrchestrator`, to verify actor readiness.
+- **Timeouts**: Employs `tokio::time::timeout` in the `QuiltOrchestrator` to manage actor operations and prevent indefinite blocking during startup, discovery, and shutdown.
 
 ### State Management
 
 - **Thread-Safe Registry**: Using Tokio's RwLock for thread-safe state access
 - **Atomic Operations**: Ensuring state changes and event publishing are atomic
 - **Persistence Layer**: Separate repository for persistent storage
+
+### Error Handling Framework
+
+- **Structured Errors**: Utilizes the `thiserror` crate to define specific, typed error enums (e.g., `OrchestratorError`, `ActorError`, `DiscoveryError`, `CuttingError`, `CutsRepositoryError`) for different modules and operations.
 
 ### Concurrency Safety
 
@@ -192,6 +211,7 @@ The system is being implemented incrementally, with each milestone providing a t
 3. Creating processing actors that subscribe to events and implement internal backpressure queues
 4. Implementing the full pipeline with proper event flow
 5. Adding query capabilities and persistence
+6. Implementing the `QuiltOrchestrator` for lifecycle management.
 
 ## Additional Details
 
@@ -206,6 +226,7 @@ The system is being implemented incrementally, with each milestone providing a t
 - **Internal Queues:** Bounded `tokio::sync::mpsc` channels within `CuttingActor` and `SwatchingActor` to buffer work and provide backpressure between internal listener/processor tasks.
 - **Material Registry:** Central coordinator for state (`status`, `last_status_update`, `retry_count`), persistence orchestration, and primary event publishing.
 - **Material Repository:** Trait defining persistence operations (implemented initially with an in-memory store).
+- **Cuts Repository:** Trait (`CutsRepository`) defining persistence operations for generated cuts, with SQLite (`SqliteCutsRepository`) and in-memory (`InMemoryCutsRepository`) implementations.
 
 ### Backpressure & Resilience
 
@@ -221,5 +242,12 @@ The system is being implemented incrementally, with each milestone providing a t
 
 ### Implementation
 
-- Built using Actix for actor management and Tokio for async runtime, channels (`broadcast`, `mpsc`), and synchronization.
+- Built using Actix for actor management and Tokio for async runtime, channels (`broadcast`, `mpsc`), synchronization, and timeouts.
+- Configuration managed via `clap` and `env_logger`.
+- Structured error handling implemented using `thiserror`.
+- Repositories selected and injected via the `QuiltOrchestrator`.
 - Detailed implementation patterns and considerations are documented in `docs/src/features/actor-model-architecture.md`.
+
+### Orchestrator Pattern
+
+- **`QuiltOrchestrator`**: A central struct manages the application lifecycle, including actor initialization, configuration, event bus setup, repository injection, starting the main process (discovery), and coordinating shutdown.
