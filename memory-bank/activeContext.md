@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-**Milestone 8: "Basic Swatching Actor Creation"** is now complete with the implementation of the `SwatchingActor` and its integration into the `QuiltOrchestrator`. We're now shifting focus to **Milestone 9: "Swatching Actor Processes Cuts"**.
+**Milestone 8: "Basic Swatching Actor Creation"** is now complete with the implementation of the `SwatchingActor` and its integration into the `QuiltOrchestrator`. We're now shifting focus to **Milestone 9: "Define Swatch Structures & Repository Trait"** as the next step in the newly broken-down swatching implementation.
 
 ## Current Implementation Status
 
@@ -88,6 +88,7 @@ The codebase currently has these key components implemented:
    - Integrated with QuiltOrchestrator
    - Added lifecycle management (start/stop)
    - Added event flow from CuttingActor to SwatchingActor
+   - **Does NOT** yet process cuts into swatches.
 
 ## Recent Changes & Current Focus
 
@@ -120,23 +121,15 @@ The codebase currently has these key components implemented:
   - ✅ **Added Event Handling:** Set up the actor to listen for MaterialCut events and log receipt.
   - ✅ **Implemented Error Handling:** Added SwatchingError types for different failure scenarios.
   - ✅ **Added Testing:** Created comprehensive unit tests validating the actor's functionality.
-- **Focus:** Shifting to Milestone 9 (Swatching Actor Processes Cuts).
+- **Focus:** Shifting to Milestone 9 ("Define Swatch Structures & Repository Trait").
 - **Next Steps:**
-  - **Implement Swatching Processing Logic (M9):** Create the logic to process cuts and generate embeddings.
+  - **Define Swatch Structures & Repository Trait (M9):** Define `Swatch` struct and `SwatchRepository` trait.
+  - **Implement SQLite Swatch Repository (M10):** Create SQLite persistence for swatches.
+  - **Implement Swatching Actor Logic (M11):** Add logic to `SwatchingActor` to process cuts into placeholder swatches, use the repository, update the registry, and publish `MaterialSwatched` event.
 
 ## Current Implementation Issues
 
-1. ~~**Path Resolution Issues:**~~
-
-   - ~~When running the application with relative paths (e.g., `--dir=./src`), file processing fails with errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`.~~
-   - ~~This is because the paths are interpreted relative to the current working directory rather than the source directory.~~
-   - ~~A future enhancement should implement proper path resolution to fix this issue.~~
-   - **Resolved:** The issue was fixed by ensuring the `DiscoveryActor` resolves relative paths to absolute paths before registering materials.
-
-2. ~~**Database Transaction Handling:**~~
-   - ~~The current SQLite implementation performs individual queries for operations.~~
-   - ~~Future work should add proper transaction support for operations that require atomicity.~~
-   - **Resolved:** Transaction support has been implemented for batch operations in both repositories.
+No major known issues related to completed milestones.
 
 ## Next Steps (Revised Plan)
 
@@ -157,13 +150,38 @@ The codebase currently has these key components implemented:
    - ✅ Add logging for received events
    - ✅ Integrate with QuiltOrchestrator
 
-3. **Implement Swatching Logic (M9):**
-   - Design `Swatch` data structure with appropriate metadata
-   - Implement logic to retrieve cuts from `CutsRepository`
-   - Add embedding generation functionality
-   - Create state transition logic (`Cut` → `Swatched` or `Cut` → `Error`)
-   - Implement event publishing for completed swatches
-   - Add comprehensive error handling
+3. **Define Swatch Structures & Repo Trait (M9):**
+
+   - Define `Swatch` struct and `SwatchRepository` trait.
+
+4. **Implement SQLite Swatch Repository (M10):**
+
+   - Create `swatches` table schema.
+   - Implement `SqliteSwatchRepository` struct.
+   - Add tests.
+   - Integrate repository into `QuiltOrchestrator` and `SwatchingActor`.
+
+5. **Implement Swatching Actor Logic & Event (M11):**
+
+   - Implement logic to retrieve cuts, **generate actual embeddings**, create swatches, save to repo.
+   - Update registry status to `Swatched`.
+   - Define and publish `MaterialSwatched` event.
+   - Update integration tests.
+
+6. **Implement Basic Semantic Search (M12):**
+
+   - Integrate vector search extension (e.g., `sqlite-vec`) into `SqliteSwatchRepository`.
+   - Implement similarity search function.
+   - Add basic query interface.
+   - Add tests.
+
+7. **Implement Reconciliation Actor (M13):**
+
+   - Implement actor to handle stuck materials and retries.
+
+8. **Implement Event Log Persistence (M14):**
+
+   - Implement file-based persistence for the event log.
 
 ## Active Decisions & Considerations
 
@@ -173,14 +191,15 @@ The codebase currently has these key components implemented:
 - **Transaction Support:** **Complete:** Implemented transaction support for batch operations in both SQLite repositories.
 - **SwatchingActor Design:** **Complete:** Implemented using the dual-task pattern (listener/processor) for backpressure handling.
 - **MaterialCut Event Structure:** The current implementation includes the material ID in the event. The `SwatchingActor` will retrieve the cuts using the material ID via the `CutsRepository`.
-- **Swatch Data Model:** Design the `Swatch` data structure and determine how to store embeddings efficiently.
-- **Embedding Strategy:** Determine which embedding technique/library to use (e.g., simple TF-IDF, or more advanced embedding model).
+- **Swatch Data Model (M9):** **Complete:** Implemented `Swatch` struct with comprehensive fields (id, cut_id, material_id, embedding, model information, dimensions, timestamps, metadata) and the `SwatchRepository` trait with full CRUD and search operations.
+- **SQLite Swatch Repository (M10):** Need to implement the `SwatchRepository` trait for SQLite with proper table schema and foreign key relationships.
+- **Embedding Strategy (M11):** Need to choose and integrate an embedding approach (e.g., `rust-bert`, ONNX).
 - **Batch Processing:** Consider whether to process cuts individually or in batches for embedding generation.
 - **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for both `CuttingActor` and `SwatchingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
-- **Error Handling:** Continue refining error types and handling, particularly around persistence (M13) and potential reconciliation loops.
+- **Error Handling:** Continue refining error types and handling, particularly around persistence (M14) and potential reconciliation loops.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
-- **Vector Search Integration:** Consider `sqlite-vec` integration when implementing advanced search capabilities.
+- **Vector Search Integration (M12):** Integrate `sqlite-vec` or similar. Implement basic search function.
 - **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
   - Explicit backpressure handling when the internal queue fills up.
   - Retry mechanisms for recoverable errors with exponential backoff.

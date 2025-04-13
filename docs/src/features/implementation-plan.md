@@ -307,67 +307,73 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows "Swatching Actor received X MaterialCut events" in logs without processing them
 
-### Milestone 9: "Swatching Actor Processes Cuts"
+### ✅ Milestone 9: "Define Swatch Structures & Repository Trait"
 
-**Goal:** Implement actual swatch creation in the Swatching Actor's processor task
-**Implementation Time:** 3-4 days
+**Goal:** Define the core data structures and persistence contract for swatches.
+**Implementation Time:** ~1 day
+**Status:** ✅ Completed
 
-1. Add swatch creation functionality (2 days)
+1. ✅ Define Swatch data structures (1 day)
+   - ✅ Define `Swatch` struct in `src/swatching/swatch.rs` with necessary fields (id, cut_id, material_id, embedding `Vec<f32>`, model_name, model_version, dimensions, metadata).
+   - ✅ Define `SwatchRepository` trait in `src/swatching/repository.rs` with comprehensive async CRUD and search methods using `#[async_trait::async_trait]`.
+   - ✅ Add appropriate error types and result type alias for repository operations.
+   - ✅ Update module exports in `src/swatching/mod.rs` to expose the new types.
+   - ✅ Add `serde` and `serde_json` dependencies for metadata serialization.
+   - ✅ Implement comprehensive unit tests for the `Swatch` struct.
 
-   - Implement metadata extraction (within Processor Task)
-   - Create content analysis features (within Processor Task)
-   - Add embedding generation with async processing (within Processor Task, potentially using `spawn_blocking` or concurrent futures)
-   - Keep detailed metrics of swatch creation
+**Demonstration:** Code compiles with the new `Swatch` type and `SwatchRepository` trait definitions, including similarity search method signatures for future implementation.
 
-2. Implement MaterialSwatched events (1-2 days)
-   - Add event publishing for completed swatches (from Processor Task)
-   - Create state transition in Registry (from Processor Task)
-   - Add validation through logging
-   - Implement recovery for failed swatches (basic error reporting for now)
+### Milestone 10: "Implement SQLite Swatch Repository"
 
-**Demonstration:** Running `main` shows "Created X swatches from Y cuts" with detailed processing metrics
+**Goal:** Implement the SQLite persistence layer for swatches, anticipating future `sqlite-vec` use.
+**Implementation Time:** ~2 days
 
-### Milestone 10: "Swatch Repository and Complete Pipeline"
+1. Implement SQLite Repository (2 days)
+   - Define `swatches` table schema in `src/db.rs`, including a field for embeddings (e.g., `BLOB`) and foreign key to `materials`. Update DB initialization.
+   - Implement `SqliteSwatchRepository` struct implementing the `SwatchRepository` trait using `sqlx`.
+   - Add comprehensive unit tests for `SqliteSwatchRepository` operations.
+   - Update `QuiltOrchestrator` to initialize and manage the `SqliteSwatchRepository` (unaffected by `--in-memory` flag). Inject the `Arc<dyn SwatchRepository>` into `SwatchingActor` upon creation.
 
-**Goal:** Complete the storage and finalize the processing pipeline
-**Implementation Time:** 2-3 days
+**Demonstration:** Unit tests for `SqliteSwatchRepository` pass. Application runs, injecting the repository into `SwatchingActor`.
 
-1. Implement SwatchRepository (1-2 days)
+### Milestone 11: "Implement Swatching Actor Logic & Event"
 
-   - Create in-memory storage for swatches
-   - Implement CRUD operations
-   - Add indexing for efficient retrieval
-   - Create comprehensive tests
+**Goal:** Connect the Swatching Actor to retrieve cuts, generate **actual embeddings**, create swatches, store them via the repository, update registry status, and publish the `MaterialSwatched` event.
+**Implementation Time:** ~3-4 days (Increased due to embedding integration)
 
-2. Validate full event pipeline (1 day)
-   - Add end-to-end metrics for the pipeline
-   - Create visualization of complete material flow
-   - Add system health checks
-   - Implement recovery for pipeline failures
+1. Implement Embedding Generation (1-2 days)
+   - Choose and integrate an embedding strategy (e.g., `rust-bert`, ONNX runtime with a sentence transformer model).
+   - Implement logic within the `SwatchingActor`'s processor task to generate embeddings for retrieved `Cut`s.
+2. Implement Swatching Logic (Integration) (1-2 days)
+   - Modify `SwatchingActor`'s processor task:
+     - Retrieve `Cut`s using injected `CutsRepository`.
+     - Use the implemented embedding generation logic.
+     - Create `Swatch` instances with actual embeddings.
+     - Save `Swatch` instances using injected `SwatchRepository`.
+     - Call `MaterialRegistry` to update material status to `Swatched` (or `Error`).
+3. Implement MaterialSwatched Event (1 day)
+   - Define `MaterialSwatched` event variant in `QuiltEvent` enum.
+   - Update `MaterialRegistry` to publish `MaterialSwatched` event upon successful transition to `Swatched` state.
+   - Add/update integration tests for the `SwatchingActor` covering cut retrieval, embedding generation, swatch saving, registry update, and event publication.
 
-**Demonstration:** Running `main` displays "Full pipeline metrics: X discovered → Y cut → Z swatched" with complete flow statistics
+**Demonstration:** Running `main` shows "Created X swatches with embeddings..." logs, material status updates to `Swatched`, and `MaterialSwatched` events are published. Integration tests verify embedding creation and storage.
 
-### Milestone 11: "Basic Query Capability"
+### Milestone 12: "Implement Basic Semantic Search"
 
-**Goal:** Enable simple searching of swatches
-**Implementation Time:** 2-3 days
+**Goal:** Implement basic vector similarity search using the stored swatches and embeddings.
+**Implementation Time:** ~2-3 days
 
-1. Implement basic search functionality (1-2 days)
+1. Integrate Vector Search Extension (1 day)
+   - Integrate `sqlite-vec` or a similar vector search extension with the SQLite setup (`src/db.rs`).
+   - Update the `swatches` table schema and `SqliteSwatchRepository` (from M10) to store and index the embedding vectors correctly for search.
+2. Implement Search Logic (1-2 days)
+   - Add a function or method (e.g., in `SqliteSwatchRepository` or a new query service) to perform vector similarity search.
+   - Implement a basic query interface (e.g., a new command-line argument or internal function) that takes query text, generates its embedding, and performs the search.
+   - Add tests for the vector search functionality.
 
-   - Add simple text indexing in SwatchRepository
-   - Create basic query API
-   - Implement search results formatter
-   - Add search metrics
+**Demonstration:** Running the application with a search query performs semantic search and returns relevant swatch IDs/content based on vector similarity.
 
-2. Integrate with the main application (1 day)
-   - Add search command to the interface
-   - Create results display
-   - Add error handling for searches
-   - Implement logging for search operations
-
-**Demonstration:** Running `main` with search parameter shows "Found X swatches matching query 'Z'" with results displayed
-
-### Milestone 12: "Reconciliation Actor Implementation"
+### Milestone 13: "Reconciliation Actor Implementation"
 
 **Goal:** Implement the Reconciliation Actor to handle stuck materials and retries
 **Implementation Time:** 3-4 days
@@ -390,10 +396,10 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` shows logs from the Reconciliation Actor identifying stuck items (if any manually created), attempting retries, and eventually marking items as Error after exceeding retries.
 
-### Milestone 13: "Event and Data Persistence" (Renumbered from 12)
+### Milestone 14: "Event and Data Persistence"
 
-**Goal:** Ensure data and events persist between application runs
-**Implementation Time:** 3-4 days
+**Goal:** Ensure data and events persist between application runs (Focus on event log, repository persistence is largely covered by SQLite)
+**Implementation Time:** 2-3 days
 
 1. Implement event logging (1-2 days)
 
@@ -402,19 +408,25 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - Implement event replay on startup
    - Add validation for event consistency
 
-2. Add repository persistence (1-2 days)
-   - Implement serialization for repository data
-   - Create file-based storage
-   - Add startup/shutdown procedures
-   - Create recovery mechanisms
+2. Add repository persistence (1 day)
+   - ⏩ Defer file-based serialization for repositories; SQLite handles persistence.
+   - Add startup/shutdown procedures for event log
+   - Create recovery mechanisms for event log
 
-**Demonstration:** Stopping and restarting `main` shows "Recovered X events and restored system state" with intact data
+**Demonstration:** Stopping and restarting `main` shows "Recovered X events..." with intact data in SQLite and replayed events.
 
 ## Future Milestones
 
 Future milestones will focus on more advanced features:
 
-1. **Scaling and Performance**
+1. **Embedding Generation & Vector Search**
+
+   - Integration with embedding models (e.g., Sentence Transformers via ONNX or similar)
+   - Vector storage integration (e.g., `sqlite-vec`) with `SqliteSwatchRepository`
+   - Implementation of vector similarity search logic
+   - Query API for semantic search
+
+2. **Scaling and Performance**
 
    - Swatching Router implementation for dynamic actor scaling
      - Router actor for managing multiple Swatching Actors
@@ -424,7 +436,7 @@ Future milestones will focus on more advanced features:
    - Load balancing and monitoring
    - Performance optimization based on usage patterns (tuning queue sizes, buffer capacities)
 
-2. **Cutting Enhancements**
+3. **Cutting Enhancements**
 
    - Improve backpressure handling
      - Add explicit backpressure strategy when internal queue fills up
@@ -438,7 +450,7 @@ Future milestones will focus on more advanced features:
      - Make cutting parameters configurable (chunk size, overlap)
      - Allow runtime configuration updates
 
-3. **Storage and Persistence Improvements**
+4. **Storage and Persistence Improvements**
 
    - Implement disk-based repository options for cuts and materials
    - Add streaming processing for very large files
@@ -446,7 +458,7 @@ Future milestones will focus on more advanced features:
    - Implement data compression for storage efficiency
    - Add data integrity validation and repair mechanisms
 
-4. **Enhanced Logging and Observability**
+5. **Enhanced Logging and Observability**
 
    - Implement structured logging with span contexts
    - Create comprehensive tracing for request flows
@@ -454,17 +466,11 @@ Future milestones will focus on more advanced features:
    - Implement health monitoring dashboards
    - Create alerting for system issues
 
-5. **Enhanced Text Processing**
+6. **Enhanced Text Processing**
 
    - Language detection
    - Text classification
    - Entity extraction
-
-6. **Embedding and Vector Search**
-
-   - Integration with embedding models
-   - Vector storage for semantic search
-   - Similarity search implementation
 
 7. **Advanced Search and Queries**
 
