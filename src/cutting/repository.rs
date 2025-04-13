@@ -43,7 +43,9 @@ impl CutsRepository for InMemoryCutsRepository {
         // Check if the cut already exists
         let mut cuts = self.cuts_by_id.write().await;
         if cuts.contains_key(&cut_id) {
-            return Err(CutsRepositoryError::CutAlreadyExists(cut_id.into_boxed_str()));
+            return Err(CutsRepositoryError::CutAlreadyExists(
+                cut_id.into_boxed_str(),
+            ));
         }
 
         // Insert the cut
@@ -72,7 +74,9 @@ impl CutsRepository for InMemoryCutsRepository {
         // Check for duplicates first
         for cut in &cuts {
             if cuts_by_id.contains_key(&cut.id) {
-                return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone().into_boxed_str()));
+                return Err(CutsRepositoryError::CutAlreadyExists(
+                    cut.id.clone().into_boxed_str(),
+                ));
             }
         }
 

@@ -389,11 +389,7 @@ pub async fn process_discovered_material(
     // Store the cuts in the repository
     debug!("{}: Saving {} cuts to repository", actor_name, cuts.len());
     cuts_repository.save_cuts(&cuts).await.map_err(|e| {
-        error!(
-            "{}: Failed to save cuts to repository: {}",
-            actor_name,
-            e
-        );
+        error!("{}: Failed to save cuts to repository: {}", actor_name, e);
         messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
     })?;
 
@@ -407,11 +403,7 @@ pub async fn process_discovered_material(
         .update_material_status(material_id.as_str(), MaterialStatus::Cut, None)
         .await
         .map_err(|e| {
-            error!(
-                "{}: Failed to update material status: {}",
-                actor_name,
-                e
-            );
+            error!("{}: Failed to update material status: {}", actor_name, e);
             messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
         })?;
 

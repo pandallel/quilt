@@ -145,20 +145,17 @@ impl DiscoveryActor {
         }
 
         if !path.is_dir() {
-            return Err(messages::DiscoveryError::OperationFailed(format!(
-                "Path exists but is not a directory: {}",
-                path.display()
-            ).into_boxed_str()));
+            return Err(messages::DiscoveryError::OperationFailed(
+                format!("Path exists but is not a directory: {}", path.display()).into_boxed_str(),
+            ));
         }
 
         // Basic access check - more sophisticated checks could be added
         match path.read_dir() {
             Ok(_) => Ok(()),
-            Err(e) => Err(messages::DiscoveryError::PermissionDenied(format!(
-                "Cannot read directory {}: {}",
-                path.display(),
-                e
-            ).into_boxed_str())),
+            Err(e) => Err(messages::DiscoveryError::PermissionDenied(
+                format!("Cannot read directory {}: {}", path.display(), e).into_boxed_str(),
+            )),
         }
     }
 
@@ -204,10 +201,9 @@ impl DiscoveryActor {
                 }
                 Err(err) => {
                     error!("Failed to register material: {}", err);
-                    return Err(messages::DiscoveryError::RepositoryError(format!(
-                        "Failed to register material: {}",
-                        err
-                    ).into_boxed_str()));
+                    return Err(messages::DiscoveryError::RepositoryError(
+                        format!("Failed to register material: {}", err).into_boxed_str(),
+                    ));
                 }
             }
         }
@@ -275,15 +271,17 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 
             // Create scanner
             let scanner = DirectoryScanner::new(&scan_config.directory)
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str()))?
+                .map_err(|e| {
+                    messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str())
+                })?
                 .ignore_hidden(scan_config.ignore_hidden)
                 .exclude(scan_config.exclude_patterns);
 
             // Perform scan
             info!("Starting scan in directory: {}", scan_config.directory);
-            let mut scan_results = scanner
-                .scan()
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str()))?;
+            let mut scan_results = scanner.scan().map_err(|e| {
+                messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str())
+            })?;
 
             // Log the basic results
             info!(
