@@ -240,8 +240,8 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
    - ✅ Create `src/materials/sqlite_repository.rs` for `SqliteMaterialRepository`
    - ✅ Implement `MaterialRepository` trait with SQLite backend
-   - Add proper row to struct conversion. Rename `ingested_at` column/field to `created_at`. Add `status_updated_at` and `updated_at` columns/fields.
-   - Utilize `sqlx`\'s `"time"` feature for automatic `OffsetDateTime` encoding/decoding (removes manual parsing/formatting).
+   - ✅ Add proper row to struct conversion. Rename `ingested_at` column/field to `created_at`. Add `status_updated_at` and `updated_at` columns/fields.
+   - ✅ Utilize `sqlx`\'s `"time"` feature for automatic `OffsetDateTime` encoding/decoding (removes manual parsing/formatting).
    - ✅ Add comprehensive tests comparing with in-memory implementation
 
 4. ✅ Update app integration
@@ -256,11 +256,14 @@ This document outlines the incremental implementation plan for Quilt's core arch
    - ~~When running with `--dir=./src`, file paths are relative to the working directory, causing errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`~~ **Resolved (See Below)**
    - This issue was fixed by ensuring the `DiscoveryActor` resolves relative paths to absolute paths before registering materials. The `CuttingActor` now receives absolute paths via the `MaterialDiscoveredEvent`.
 
-6. ⏩ Defer `SqliteCutsRepository` Implementation
-   - Left for a future update to keep the initial changes focused
-   - Current implementation uses SQLite for materials but keeps the in-memory cuts repository
+6. ✅ Implement SqliteCutsRepository
+   - ✅ Create schema for cuts table in `src/db.rs`
+   - ✅ Implement `SqliteCutsRepository` in `src/cutting/sqlite_repository.rs`
+   - ✅ Add comprehensive tests for all repository operations
+   - ✅ Update `QuiltOrchestrator` to use `SqliteCutsRepository` when in SQLite mode
+   - ✅ Ensure proper foreign key constraints with materials table
 
-**Demonstration:** Running `cargo run -- --dir=./src` uses SQLite by default, while `cargo run -- --dir=./src --in-memory` uses the original in-memory store.
+**Demonstration:** Running `cargo run -- --dir=./src` uses SQLite by default for both materials and cuts, while `cargo run -- --dir=./src --in-memory` uses the original in-memory stores.
 
 ### ✅ Task: Refactor Material Timestamps
 

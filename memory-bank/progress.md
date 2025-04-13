@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**. Milestone 6: "Material Text Cutting Implementation" and Milestone 7: "Cuts Repository Implementation" have been completed. Milestone 7.5: "SQLite Repository Implementation" is partially completed, with successful implementation of trait-based repositories and a SQLite-backed Material Repository.
+The project is in the **implementation stage**. Milestone 6: "Material Text Cutting Implementation" and Milestone 7: "Cuts Repository Implementation" have been completed. Milestone 7.5: "SQLite Repository Implementation" has now been fully completed with successful implementation of trait-based repositories and SQLite implementations for both Material and Cuts repositories.
 
 ## Current Status
 
@@ -13,7 +13,7 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - **Cutting Logic (M6):** Completed. Integrated `text-splitter`, implemented processing logic within the `CuttingActor`'s processor task, and updated `MaterialRegistry` to handle state updates (`Discovered` -> `Cut`/`Error`) and publish corresponding events (`MaterialCut`/`ProcessingError`).
 - **Cuts Repository (M7):** Completed. Implemented the full `Cut` data structure, `CutsRepository` interface with thread-safe in-memory implementation, and integration with the `CuttingActor`. The repository provides comprehensive CRUD operations, efficient indexing, and is fully connected to the processing pipeline.
 - **Repository Refactoring (M7.5):** Completed. Transformed repositories to use the trait-based pattern. Successfully renamed `struct MaterialRepository` to `struct InMemoryMaterialRepository`, introduced `trait MaterialRepository` and `trait CutsRepository`, and updated all dependent code.
-- **SQLite Repository (M7.5 - Partial):** Implemented `SqliteMaterialRepository` using SQLx, with in-memory database support. Added command-line option to select between SQLite and in-memory repositories. The `SqliteCutsRepository` implementation was deferred to the next phase.
+- **SQLite Repository (M7.5):** Fully completed. Implemented both `SqliteMaterialRepository` and `SqliteCutsRepository` using SQLx, with in-memory database support. Added command-line option to select between SQLite and in-memory repositories.
 - **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
 
 ## What Works
@@ -30,17 +30,20 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 - Material status transition `Discovered` -> `Cut` or `Discovered` -> `Error` handled by `CuttingActor` via `MaterialRegistry`.
 - Event publication (`MaterialCut`, `ProcessingError`) handled by `MaterialRegistry`.
 - `Cut` data structure with complete metadata (id, material_id, chunk_index, content, token_count, byte offsets).
-- `CutsRepository` with in-memory implementation for storing, retrieving, and managing cuts.
+- `CutsRepository` with two implementations:
+  - `InMemoryCutsRepository` for in-memory storage
+  - `SqliteCutsRepository` for SQLite-backed persistent storage
 - Full integration of the cutting pipeline from discovery to storage (Material discovery → Cutting → Repository storage).
 - Comprehensive error handling throughout the cutting pipeline.
 - Repository trait pattern implementation allowing easy swapping between storage backends.
 - Command-line option (`--in-memory`) for selecting repository type.
 - Event bus reliably transmits events (`MaterialDiscovered`, `MaterialCut`, `ProcessingError`).
-- `CuttingActor` subscribes to `MaterialDiscovered`, processes files using `TextCutter`, and stores cuts in the `InMemoryCutsRepository`.
+- `CuttingActor` subscribes to `MaterialDiscovered`, processes files using `TextCutter`, and stores cuts in the repository.
 - `CuttingActor` correctly reads file content using absolute paths resolved by the `DiscoveryActor`.
 - `MaterialRegistry` handles state transitions (`Discovered` -> `Cut`, `Discovered` -> `Error`) and publishes corresponding events.
-- SQLite integration works for the `MaterialRepository`, selectable via command-line flag.
+- SQLite integration works for both the `MaterialRepository` and `CutsRepository`, selectable via command-line flag.
 - `Material` timestamps (`created_at`, `updated_at`, `status_updated_at`) are correctly managed and stored in both repository implementations.
+- Foreign key constraints between materials and cuts tables ensure data integrity.
 
 ## In Progress
 
@@ -58,17 +61,20 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
      - ✅ Implemented `SqliteMaterialRepository` with comprehensive tests
      - ✅ Integrated SQLite repository with the application via the orchestrator
      - ✅ Added command-line flag for repository selection
-   - ✅ **Completed Task: Refactor Material Timestamps:**
+   - ✅ Completed Refactor Material Timestamps:
      - ✅ Renamed `ingested_at` to `created_at`.
      - ✅ Added `updated_at` and `status_updated_at`.
      - ✅ Updated repositories and tests for new timestamp handling.
-   - **Next:**
-     - Implement `SqliteCutsRepository` to complete the SQLite storage backend.
-     - Enhance transaction support for database operations.
+   - ✅ Implemented SqliteCutsRepository:
+     - ✅ Created cuts table schema with proper foreign key constraints
+     - ✅ Implemented SqliteCutsRepository with all required methods
+     - ✅ Added comprehensive tests for all operations
+     - ✅ Integrated with the application via the orchestrator
+     - ✅ Ensured proper transaction handling for batch operations
 
 ## Next Major Milestone
 
-**Task: Complete SQLite Implementation (M7.5)** - Implement `SqliteCutsRepository`.
+**Milestone 8: Basic Swatching Actor Creation** - Implement a minimal Swatching Actor that listens for cut events.
 
 ## Upcoming Work (Revised Plan)
 
@@ -77,12 +83,12 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 2. ✅ **Refactor Material Timestamps:**
    - ✅ Renamed `ingested_at`, added `updated_at`, `status_updated_at`.
    - ✅ Updated repositories, schema, and tests.
-3. **Complete SQLite Implementation (Current Task):**
-   - ✅ Partial completion: Added SQLx dependency, created database module, implemented `SqliteMaterialRepository`
-   - Implement `SqliteCutsRepository` using the same pattern.
-   - Add transaction support for operations requiring atomicity.
-   - Enhance error handling for database operations.
-   - Enhance the CLI options for repository selection.
+3. ✅ **Complete SQLite Implementation:**
+   - ✅ Added SQLx dependency, created database module, implemented `SqliteMaterialRepository`
+   - ✅ Implemented `SqliteCutsRepository` with proper foreign key constraints
+   - ✅ Added transaction support for operations requiring atomicity
+   - ✅ Enhanced error handling for database operations
+   - ✅ Enhanced the CLI options for repository selection
 4. **Basic Swatching Actor (M8):**
 
    - Create skeleton actor, subscribe to `MaterialCut` events, implement internal queue pattern
@@ -101,7 +107,6 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## What's Left to Build (Immediate Milestones)
 
-- `SqliteCutsRepository` implementation (Current Task).
 - Swatching Actor implementation (Milestone 8+).
 - Reconciliation Actor (Milestone 12).
 - Persistence for events and repositories (Milestone 13).
@@ -109,10 +114,11 @@ The project is in the **implementation stage**. Milestone 6: "Material Text Cutt
 
 ## Current Status
 
-- Core pipeline (Discovery -> Cutting) is functional with both in-memory and SQLite options for the material repository (cuts repository is still in-memory).
+- Core pipeline (Discovery -> Cutting) is fully functional with both in-memory and SQLite options for both material and cuts repositories.
 - Basic text cutting is implemented.
-- Material timestamps are refactored and correctly managed.
+- Material and cut timestamps are properly managed.
+- SQLite implementation is complete with proper foreign key constraints and transaction handling.
 
 ## Known Issues
 
-- `SqliteCutsRepository` is not yet implemented; cuts are only stored in memory.
+- No major issues at this time. SQLite implementation is fully functional for both repositories.

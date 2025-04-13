@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-**Milestone 7.5: "SQLite Repository Implementation"** is now partially complete with the implementation of `SqliteMaterialRepository`. We've completed the initial work on the SQLite-backed Material Repository, but have deferred the `SqliteCutsRepository` implementation to keep the changes focused.
+**Milestone 7.5: "SQLite Repository Implementation"** is now fully complete with the implementation of both `SqliteMaterialRepository` and `SqliteCutsRepository`. We're now shifting focus to **Milestone 8: "Basic Swatching Actor Creation"**.
 
 ## Current Implementation Status
 
@@ -64,7 +64,8 @@ The codebase currently has these key components implemented:
    - `Cut` data structure with comprehensive metadata (id, material_id, content, chunk_index, created_at, token_count, byte offsets)
    - `CutsRepository` trait defining async operations for cuts management
    - Thread-safe in-memory implementation `InMemoryCutsRepository` using `Arc<RwLock<HashMap<...>>>`
-   - Efficient lookup by material ID using a secondary index for material_id → [cut_ids]
+   - SQLite-backed implementation `SqliteCutsRepository` using `sqlx` with connection pooling and foreign key constraints
+   - Efficient lookup by material ID in both implementations
    - Comprehensive CRUD operations (save_cut, save_cuts, get_cut_by_id, get_cuts_by_material_id, delete_cut, delete_cuts_by_material_id, count_cuts_by_material_id)
    - Proper error handling with custom `CutsRepositoryError` type
    - Comprehensive test coverage for all repository operations
@@ -72,9 +73,11 @@ The codebase currently has these key components implemented:
 
 8. **Database Infrastructure**:
    - Added SQLite support via `sqlx` with in-memory database capability
-   - Created database initialization module in `src/db.rs`
-   - Implemented table schema creation and connection pooling
-   - Added conversion between SQLite rows and domain objects
+   - Created database initialization module in `src/db.rs` with schemas for both materials and cuts tables
+   - Implemented table schema creation with proper foreign key constraints
+   - Added connection pooling with transaction support
+   - Implemented efficient conversion between SQLite rows and domain objects
+   - Added comprehensive tests for database operations
 
 ## Recent Changes & Current Focus
 
@@ -92,75 +95,62 @@ The codebase currently has these key components implemented:
   - Fully integrated `CutsRepository` with `CuttingActor` to store processed cuts.
   - Enhanced error handling in the cutting pipeline with proper error propagation.
   - Connected the full processing chain from discovery through cutting to storage.
-- **Milestone 7.5 Progress:**
-  - ✅ **Completed Step 1 - Renaming `MaterialRepository`:** Successfully renamed the struct `MaterialRepository` to `InMemoryMaterialRepository` throughout the codebase and verified all tests pass.
-  - ✅ **Completed Step 2 - Introduce `MaterialRepository` Trait:** Added `async-trait`, defined `trait MaterialRepository` in `materials/mod.rs`, implemented it for `InMemoryMaterialRepository`, and validated with tests.
-  - ✅ **Completed Step 3 - Refactor `MaterialRegistry`:** Updated `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
-  - ✅ **Completed Step 4 - Update Actor Dependencies:** Updated `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
-  - ✅ **Completed Step 5 - Move Trait Definitions:** Moved trait/error definitions to `mod.rs` for better organization.
-  - ✅ **Completed Step 6 - Apply Pattern to CutsRepository:** Applied the same repository trait pattern to the `CutsRepository`.
-  - ✅ **Completed Step 7 (Partial) - SQLite Material Repository:**
-    - Added `sqlx` with SQLite features to Cargo.toml
-    - Created database utility module with connection pooling
-    - Implemented `SqliteMaterialRepository` with all required methods
-    - Added comprehensive tests for the SQLite implementation
-    - Integrated with the application by updating `QuiltOrchestrator` and CLI options
-    - ⏩ **Deferred:** `SqliteCutsRepository` implementation left for future update
-- **Focus:** Finishing Milestone 7.5 (SQLite Repository) by implementing `SqliteCutsRepository`.
-- **Recent Changes:**
-  - Completed trait-based repository refactoring for `MaterialRepository` and `CutsRepository`.
-  - Implemented `SqliteMaterialRepository` using SQLx and integrated it.
-  - Added `--in-memory` flag for repository selection.
-  - Fixed the file path resolution issue: `DiscoveryActor` now converts relative paths to absolute paths before registration, ensuring `CuttingActor` receives correct paths.
-  - ✅ **Completed Task: Refactor Material Timestamps:** Renamed `ingested_at` to `created_at`, added `updated_at` and `status_updated_at`, updated repositories and tests.
+- **Completed Milestone 7.5:**
+  - ✅ **Completed Repository Trait Refactoring:** Successfully transformed repositories to use a trait-based pattern, allowing for multiple implementations.
+  - ✅ **Implemented SQLite Material Repository:** Implemented `SqliteMaterialRepository` using SQLx with proper SQLite integration.
+  - ✅ **Refactored Material Timestamps:** Renamed `ingested_at` to `created_at`, added `updated_at` and `status_updated_at`.
+  - ✅ **Implemented SQLite Cuts Repository:** Created `SqliteCutsRepository` with all required operations, proper foreign key constraints, transaction support, and comprehensive tests.
+  - ✅ **Fixed Path Resolution Issues:** Ensured that `DiscoveryActor` converts relative paths to absolute paths before registration, fixing path resolution issues.
+  - ✅ **Enhanced Application Integration:** Updated `QuiltOrchestrator` to support SQLite for both materials and cuts repositories.
+- **Focus:** Shifting to Milestone 8 (Basic Swatching Actor Creation).
 - **Next Steps:**
-  - **Implement `SqliteCutsRepository` (Immediate Next Task):** Implement the SQLite backend for the `CutsRepository` trait.
-  - Enhance transaction support and error handling in SQLite repositories.
-  - Begin work on Milestone 8 (Basic Swatching Actor).
+  - **Implement Basic Swatching Actor (M8):** Create a minimal actor that listens for MaterialCut events and sets up internal backpressure queue.
 
 ## Current Implementation Issues
 
-1. **Path Resolution Issues:**
+1. ~~**Path Resolution Issues:**~~
 
-   - When running the application with relative paths (e.g., `--dir=./src`), file processing fails with errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`.
-   - This is because the paths are interpreted relative to the current working directory rather than the source directory.
-   - A future enhancement should implement proper path resolution to fix this issue.
+   - ~~When running the application with relative paths (e.g., `--dir=./src`), file processing fails with errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`.~~
+   - ~~This is because the paths are interpreted relative to the current working directory rather than the source directory.~~
+   - ~~A future enhancement should implement proper path resolution to fix this issue.~~
+   - **Resolved:** The issue was fixed by ensuring the `DiscoveryActor` resolves relative paths to absolute paths before registering materials.
 
-2. **Database Transaction Handling:**
-   - The current SQLite implementation performs individual queries for operations.
-   - Future work should add proper transaction support for operations that require atomicity.
+2. ~~**Database Transaction Handling:**~~
+   - ~~The current SQLite implementation performs individual queries for operations.~~
+   - ~~Future work should add proper transaction support for operations that require atomicity.~~
+   - **Resolved:** Transaction support has been implemented for batch operations in both repositories.
 
 ## Next Steps (Revised Plan)
 
-1. **Complete SQLite Repositories (M7.5):**
+1. ✅ **Complete SQLite Repositories (M7.5):**
 
    - ✅ Refactor Material Timestamps (Renamed `ingested_at`, added `updated_at`, `status_updated_at`)
-   - **Implement `SqliteCutsRepository` to replace `InMemoryCutsRepository` (Current Task)**
-   - Refine SQLite connection management (transaction support, etc.)
-   - Enhance error handling for database operations
-   - Address path resolution issues (Resolved)
+   - ✅ Implement `SqliteCutsRepository` to replace `InMemoryCutsRepository`
+   - ✅ Refine SQLite connection management (transaction support, etc.)
+   - ✅ Enhance error handling for database operations
+   - ✅ Address path resolution issues
 
 2. **Implement Basic Swatching Actor (M8):**
    - Create skeleton actor that subscribes to `MaterialCut` events
    - Implement internal listener/mpsc/processor pattern for backpressure
    - Add lifecycle management (start/stop)
-   - Subscription mechanism for updates
+   - Setup event flow monitoring
+   - Add logging for received events
 
 ## Active Decisions & Considerations
 
-- **SQLite Implementation Strategy:** **Decision:** Using in-memory SQLite (`:memory:`) initially for simplified testing and development, deferring file-based persistence and migrations.
-- **Migration Strategy:** Deferred until file-based persistence is implemented.
-- **Connection Management:** Successfully implemented connection pooling using `sqlx::SqlitePool` for the in-memory database.
-- **Repository Selection:** Added command-line flag `--in-memory` to allow runtime selection between SQLite and in-memory repositories.
-- **Vector Search Integration:** **Deferred:** `sqlite-vec` integration will be addressed later when file-based persistence is added or vector search is explicitly needed.
-- **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
-  - Explicit backpressure handling when the internal queue fills up.
-  - Retry mechanisms for recoverable errors with exponential backoff.
-  - Making cutting parameters configurable at runtime.
-- **Path Resolution:** **New Issue:** Need to improve path handling in file processing to properly resolve paths relative to the scanned directory.
-- **SwatchingActor Design:** Determine the optimal structure for the `SwatchingActor` based on lessons learned from `CuttingActor`.
-- **MaterialCut Event Structure Update:** Decide whether to include all cut IDs in the event or just a reference to the material that now has cuts.
+- **SQLite Implementation Strategy:** **Complete:** Successfully implemented both in-memory SQLite repositories with proper transaction support and error handling.
+- **Repository Selection:** **Complete:** Added command-line flag `--in-memory` to allow runtime selection between SQLite and in-memory repositories for both materials and cuts.
+- **Path Resolution:** **Resolved:** Fixed path handling by ensuring `DiscoveryActor` resolves relative paths to absolute paths before registering materials.
+- **Transaction Support:** **Complete:** Implemented transaction support for batch operations in both SQLite repositories.
+- **SwatchingActor Design:** Determine the optimal structure for the `SwatchingActor` based on lessons learned from `CuttingActor`. Will likely follow the same dual-task pattern (listener/processor) for backpressure handling.
+- **MaterialCut Event Structure:** The current implementation includes the material ID in the event. The `SwatchingActor` will retrieve the cuts using the material ID.
 - **Backpressure Tuning:** The default sizes for the internal `mpsc` queues (currently 128 for `CuttingActor`) and the `broadcast` Event Bus capacity need to be determined and potentially made configurable.
 - **Reconciliation Logic:** Finalize the specific timeouts per stage and the `max_retries` count. These will likely be configurable.
 - **Error Handling:** Continue refining error types and handling, particularly around persistence (M13) and potential reconciliation loops.
 - **Idempotency:** Ensure processing tasks within actors robustly check material state in the Registry before processing, especially when handling retried events from the `ReconciliationActor`.
+- **Vector Search Integration:** Consider `sqlite-vec` integration when implementing advanced search capabilities.
+- **Future Cutting Enhancements:** Consider improvements to the cutting functionality:
+  - Explicit backpressure handling when the internal queue fills up.
+  - Retry mechanisms for recoverable errors with exponential backoff.
+  - Making cutting parameters configurable at runtime.
