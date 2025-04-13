@@ -2,7 +2,7 @@
 
 ## Project Status
 
-The project is in the **implementation stage**. Milestone 8: "Basic Swatching Actor Creation" has been completed, adding a new actor to the pipeline that listens for `MaterialCut` events. The SwatchingActor is integrated into the orchestrator and follows the same backpressure pattern as the CuttingActor.
+The project is in the **implementation stage**. Milestone 8: "Basic Swatching Actor Creation" has been completed, adding a new actor to the pipeline that listens for `MaterialCut` events. The next step is Milestone 9: "Define Swatch Structures & Repository Trait", the first step in the newly refined plan for implementing swatching.
 
 ## Current Status
 
@@ -14,8 +14,8 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
 - **Cuts Repository (M7):** Completed. Implemented the full `Cut` data structure, `CutsRepository` interface with thread-safe in-memory implementation, and integration with the `CuttingActor`. The repository provides comprehensive CRUD operations, efficient indexing, and is fully connected to the processing pipeline.
 - **Repository Refactoring (M7.5):** Completed. Transformed repositories to use the trait-based pattern. Successfully renamed `struct MaterialRepository` to `struct InMemoryMaterialRepository`, introduced `trait MaterialRepository` and `trait CutsRepository`, and updated all dependent code.
 - **SQLite Repository (M7.5):** Fully completed. Implemented both `SqliteMaterialRepository` and `SqliteCutsRepository` using SQLx, with in-memory database support. Added command-line option to select between SQLite and in-memory repositories.
-- **Swatching Actor (M8):** Completed. Implemented `SwatchingActor` that subscribes to `MaterialCut` events and follows the same internal listener/mpsc/processor pattern used in the `CuttingActor` for backpressure handling. The actor is fully integrated with the `QuiltOrchestrator`.
-- **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 12).
+- **Swatching Actor (M8):** Completed. Implemented `SwatchingActor` that subscribes to `MaterialCut` events and follows the same internal listener/mpsc/processor pattern used in the `CuttingActor` for backpressure handling. The actor is fully integrated with the `QuiltOrchestrator`. **Does not yet process cuts.**
+- **Reconciliation:** Actor design included in architecture, implementation planned (Milestone 13).
 
 ## What Works
 
@@ -46,7 +46,7 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
 - `Material` timestamps (`created_at`, `updated_at`, `status_updated_at`) are correctly managed and stored in both repository implementations.
 - Foreign key constraints between materials and cuts tables ensure data integrity.
 - `SwatchingActor` subscribes to `MaterialCut` events and logs receipt.
-- Event flow from `CuttingActor` through EventBus to `SwatchingActor` is established and functional.
+- Event flow from `CuttingActor` through EventBus to `SwatchingActor` is established and functional. SwatchingActor logs event receipt.
 
 ## In Progress
 
@@ -91,7 +91,7 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
 
 ## Next Major Milestone
 
-**Milestone 9: Swatching Actor Processes Cuts** - Implement actual swatch creation in the SwatchingActor's processor task.
+**Milestone 9: Define Swatch Structures & Repository Trait** - Define the `Swatch` struct and `SwatchRepository` trait.
 
 ## Upcoming Work (Revised Plan)
 
@@ -114,31 +114,47 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
    - ✅ Integrated with QuiltOrchestrator
    - ✅ Added comprehensive testing
 
-5. **Swatching Logic (M9):**
+5. **Define Swatch Structures & Repo Trait (M9):**
 
-   - Design `Swatch` data structure with appropriate metadata
-   - Implement logic to retrieve cuts from `CutsRepository`
-   - Add embedding generation functionality
-   - Create state transition logic (`Cut` → `Swatched` or `Cut` → `Error`)
-   - Implement event publishing for completed swatches
-   - Add comprehensive error handling
+   - Define `Swatch` struct.
+   - Define `SwatchRepository` trait.
 
-6. **Swatch Repository (M10):** Implement storage for swatches.
+6. **Implement SQLite Swatch Repository (M10):**
 
-7. **Basic Query (M11):** Simple search capability.
+   - Implement `SqliteSwatchRepository`.
+   - Add tests.
+   - Integrate with orchestrator.
 
-8. **Reconciliation Actor (M12):** Implement the actor for handling stuck items and retries.
+7. **Implement Swatching Actor Logic & Event (M11):**
 
-9. **Persistence (M13):** Implement file-based persistence for events and repositories.
+   - Add logic to `SwatchingActor` processor to **generate actual embeddings** and create swatches.
+   - Use `SwatchRepository` to save swatches.
+   - Update registry status to `Swatched`.
+   - Define and publish `MaterialSwatched` event.
+
+8. **Implement Basic Semantic Search (M12):**
+
+   - Integrate vector search extension into repository.
+   - Implement search function and basic query interface.
+   - Add tests.
+
+9. **Implement Reconciliation Actor (M13):**
+
+   - Implement actor for handling stuck items and retries.
+
+10. **Implement Event Log Persistence (M14):**
+
+- Implement file-based persistence for the event log.
 
 ## What's Left to Build (Immediate Milestones)
 
-- Swatching processing logic (Milestone 9).
-- Swatch repository (Milestone 10).
-- Query capabilities (Milestone 11).
-- Reconciliation Actor (Milestone 12).
-- Persistence for events and repositories (Milestone 13).
-- Advanced features (scaling, enhanced cutting, search, UI, etc.).
+- Define Swatch Structures & Repo Trait (Milestone 9).
+- Implement SQLite Swatch Repository (Milestone 10).
+- Implement Swatching Actor Logic & Event (Milestone 11).
+- Implement Basic Semantic Search (Milestone 12).
+- Reconciliation Actor (Milestone 13).
+- Event Log Persistence (Milestone 14).
+- Advanced features (scaling, enhanced cutting, UI, etc.).
 
 ## Current Status
 
@@ -146,8 +162,8 @@ The project is in the **implementation stage**. Milestone 8: "Basic Swatching Ac
 - Both in-memory and SQLite options for material and cuts repositories are available.
 - Basic text cutting is implemented and working.
 - Material and cut timestamps are properly managed.
-- Swatching actor is receiving events from the cutting stage.
-- The next step is to implement actual swatch creation from cuts.
+- Swatching actor is receiving events from the cutting stage and logging them.
+- The next step (M9) is to define the data structures (`Swatch`) and repository trait (`SwatchRepository`) needed for swatching.
 
 ## Known Issues
 
