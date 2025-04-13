@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use time::OffsetDateTime;
+use tokio::sync::RwLock;
 
 use super::{Material, MaterialRepository, MaterialStatus, RepositoryError, Result};
 
@@ -207,7 +207,10 @@ mod tests {
         assert_eq!(updated_after_cut.created_at, created_at);
         assert!(updated_after_cut.updated_at > created_at);
         assert!(updated_after_cut.status_updated_at > created_at);
-        assert_eq!(updated_after_cut.updated_at, updated_after_cut.status_updated_at);
+        assert_eq!(
+            updated_after_cut.updated_at,
+            updated_after_cut.status_updated_at
+        );
         let first_update_time = updated_after_cut.updated_at; // Capture time after first update
 
         // Small delay to ensure timestamps will be different
@@ -224,7 +227,10 @@ mod tests {
         assert_eq!(updated_after_swatched.created_at, created_at);
         assert!(updated_after_swatched.updated_at >= first_update_time);
         assert!(updated_after_swatched.status_updated_at >= first_update_time);
-        assert_eq!(updated_after_swatched.updated_at, updated_after_swatched.status_updated_at); // Should be equal after this update
+        assert_eq!(
+            updated_after_swatched.updated_at,
+            updated_after_swatched.status_updated_at
+        ); // Should be equal after this update
     }
 
     #[tokio::test]
@@ -253,7 +259,10 @@ mod tests {
         assert_eq!(updated_after_error.created_at, created_at);
         assert!(updated_after_error.updated_at > created_at);
         assert!(updated_after_error.status_updated_at > created_at);
-        assert_eq!(updated_after_error.updated_at, updated_after_error.status_updated_at);
+        assert_eq!(
+            updated_after_error.updated_at,
+            updated_after_error.status_updated_at
+        );
         let first_update_time = updated_after_error.updated_at; // Capture time after first update
 
         // Small delay to ensure timestamps will be different
@@ -271,7 +280,10 @@ mod tests {
         assert_eq!(updated_after_reset.created_at, created_at);
         assert!(updated_after_reset.updated_at >= first_update_time);
         assert!(updated_after_reset.status_updated_at >= first_update_time);
-        assert_eq!(updated_after_reset.updated_at, updated_after_reset.status_updated_at); // Should be equal after this update
+        assert_eq!(
+            updated_after_reset.updated_at,
+            updated_after_reset.status_updated_at
+        ); // Should be equal after this update
     }
 
     #[tokio::test]

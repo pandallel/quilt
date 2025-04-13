@@ -28,7 +28,7 @@ impl CutterConfig {
             max_size,
         }
     }
-    
+
     /// Estimate token count from text content
     /// This is a simple approximation - words divided by 0.75
     /// (assuming ~4 characters per word, ~3 words per token)
@@ -36,7 +36,7 @@ impl CutterConfig {
         // Very simple tokenization - just count words and divide by 0.75
         // This is just a rough approximation
         let word_count = content.split_whitespace().count();
-        
+
         // Ensure we return at least 1 token for non-empty content
         if word_count > 0 {
             (word_count as f32 * 0.75).ceil() as usize

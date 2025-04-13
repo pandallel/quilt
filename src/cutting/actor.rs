@@ -330,29 +330,31 @@ pub async fn process_discovered_material(
         .get_material(material_id.as_str())
         .await
         .ok_or_else(|| messages::CuttingError::MaterialNotFound(material_id.clone()))?;
-        
+
     // Skip if the material is not in Discovered status
     if material.status != MaterialStatus::Discovered {
         info!(
             "{}: Skipping material {} with status {:?} (not Discovered)",
-            actor_name, material_id.as_str(), material.status
+            actor_name,
+            material_id.as_str(),
+            material.status
         );
         return Ok(());
     }
 
     info!(
         "{}: Retrieved material '{}' with path: {}",
-        actor_name, material_id.as_str(), material.file_path
+        actor_name,
+        material_id.as_str(),
+        material.file_path
     );
 
     // Read the content from the file
     debug!("{}: Reading file content: {}", actor_name, file_path);
-    let content = tokio::fs::read_to_string(&file_path)
-        .await
-        .map_err(|e| {
-            error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
-            messages::CuttingError::FileError(e)
-        })?;
+    let content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
+        error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
+        messages::CuttingError::FileError(e)
+    })?;
 
     // Cut the content into chunks
     debug!(
@@ -360,20 +362,14 @@ pub async fn process_discovered_material(
         actor_name,
         material_id.as_str()
     );
-    let chunks = cutter.cut(&content, Some(material_id.clone())).map_err(|e| {
-        error!(
-            "{}: Failed to cut content: {}",
-            actor_name,
-            e.to_string()
-        );
-        messages::CuttingError::CuttingError(e)
-    })?;
+    let chunks = cutter
+        .cut(&content, Some(material_id.clone()))
+        .map_err(|e| {
+            error!("{}: Failed to cut content: {}", actor_name, e.to_string());
+            messages::CuttingError::CuttingError(e)
+        })?;
 
-    debug!(
-        "{}: Cut material into {} chunks",
-        actor_name,
-        chunks.len()
-    );
+    debug!("{}: Cut material into {} chunks", actor_name, chunks.len());
 
     // Convert chunks to Cut objects
     let cuts: Vec<Cut> = chunks
@@ -391,11 +387,7 @@ pub async fn process_discovered_material(
         .collect();
 
     // Store the cuts in the repository
-    debug!(
-        "{}: Saving {} cuts to repository",
-        actor_name,
-        cuts.len()
-    );
+    debug!("{}: Saving {} cuts to repository", actor_name, cuts.len());
     cuts_repository.save_cuts(&cuts).await.map_err(|e| {
         error!(
             "{}: Failed to save cuts to repository: {}",
@@ -412,11 +404,7 @@ pub async fn process_discovered_material(
         material_id.as_str()
     );
     registry
-        .update_material_status(
-            material_id.as_str(),
-            MaterialStatus::Cut,
-            None,
-        )
+        .update_material_status(material_id.as_str(), MaterialStatus::Cut, None)
         .await
         .map_err(|e| {
             error!(
@@ -438,11 +426,11 @@ pub async fn process_discovered_material(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cutting::InMemoryCutsRepository;
     use crate::events::EventBus;
     use crate::materials::InMemoryMaterialRepository;
     use crate::materials::Material;
     use crate::materials::MaterialStatus;
-    use crate::cutting::InMemoryCutsRepository;
     use std::fs;
     use std::sync::Arc;
     use std::time::Duration;

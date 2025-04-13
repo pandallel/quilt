@@ -24,7 +24,7 @@ struct Args {
     /// Patterns to exclude from scanning (can be provided multiple times)
     #[arg(short, long)]
     exclude: Vec<String>,
-    
+
     /// Use in-memory repository instead of SQLite
     #[arg(long)]
     in_memory: bool,
@@ -53,10 +53,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ignore Hidden: {}
         Exclude Patterns: {:?}
         Repository: {}",
-        config.discovery_dir, 
-        config.ignore_hidden, 
+        config.discovery_dir,
+        config.ignore_hidden,
         config.exclude_patterns,
-        if args.in_memory { "In-Memory" } else { "SQLite" }
+        if args.in_memory {
+            "In-Memory"
+        } else {
+            "SQLite"
+        }
     );
 
     // Run the orchestrator with the appropriate repository

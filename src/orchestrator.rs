@@ -13,13 +13,15 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
-use crate::cutting::{CuttingActor, CutsRepository, InMemoryCutsRepository, SqliteCutsRepository};
+use crate::cutting::{CutsRepository, CuttingActor, InMemoryCutsRepository, SqliteCutsRepository};
 use crate::db::init_memory_db;
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
-use crate::materials::{InMemoryMaterialRepository, MaterialRegistry, MaterialRepository, SqliteMaterialRepository};
+use crate::materials::{
+    InMemoryMaterialRepository, MaterialRegistry, MaterialRepository, SqliteMaterialRepository,
+};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -69,10 +71,10 @@ impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration
     pub fn new() -> Self {
         let event_bus = Arc::new(EventBus::new());
-        
+
         // Initialize repositories
         let cuts_repository: Arc<dyn CutsRepository> = Arc::new(InMemoryCutsRepository::new());
-        
+
         // Create the registry with InMemoryMaterialRepository as fallback
         // If SQLite initialization fails, we'll fall back to the in-memory repository
         let repository: Arc<dyn MaterialRepository> = Arc::new(InMemoryMaterialRepository::new());
@@ -90,14 +92,15 @@ impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with SQLite repositories
     pub async fn with_sqlite() -> Result<Self, Box<dyn std::error::Error>> {
         let event_bus = Arc::new(EventBus::new());
-        
+
         // Initialize SQLite
         let pool = init_memory_db().await?;
-        
+
         // Create repositories
-        let material_repository: Arc<dyn MaterialRepository> = Arc::new(SqliteMaterialRepository::new(pool.clone()));
+        let material_repository: Arc<dyn MaterialRepository> =
+            Arc::new(SqliteMaterialRepository::new(pool.clone()));
         let cuts_repository: Arc<dyn CutsRepository> = Arc::new(SqliteCutsRepository::new(pool));
-        
+
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
 

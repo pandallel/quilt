@@ -18,13 +18,13 @@ impl SqliteCutsRepository {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-    
+
     /// Convert a database row to a Cut
     fn row_to_cut(row: sqlx::sqlite::SqliteRow) -> Cut {
         let token_count: Option<i64> = row.get("token_count");
         let byte_offset_start: Option<i64> = row.get("byte_offset_start");
         let byte_offset_end: Option<i64> = row.get("byte_offset_end");
-        
+
         Cut {
             id: row.get("id"),
             material_id: row.get("material_id"),
@@ -49,12 +49,12 @@ impl CutsRepository for SqliteCutsRepository {
             .bind(&cut_id)
             .fetch_optional(&self.pool)
             .await;
-            
+
         match existing {
             Ok(Some(_)) => {
                 return Err(CutsRepositoryError::CutAlreadyExists(cut_id));
-            },
-            Ok(None) => {}, // Cut doesn't exist, continue
+            }
+            Ok(None) => {} // Cut doesn't exist, continue
             Err(e) => {
                 error!("Database error checking for existing cut: {}", e);
                 return Err(CutsRepositoryError::OperationFailed(e.to_string()));
@@ -78,12 +78,12 @@ impl CutsRepository for SqliteCutsRepository {
         .bind(cut.byte_offset_end.map(|v| v as i64))
         .execute(&self.pool)
         .await;
-        
+
         match result {
             Ok(_) => {
                 debug!("Saved cut: {} for material: {}", cut_id, material_id);
                 Ok(())
-            },
+            }
             Err(e) => {
                 error!("Failed to save cut: {}", e);
                 Err(CutsRepositoryError::OperationFailed(e.to_string()))
@@ -111,15 +111,15 @@ impl CutsRepository for SqliteCutsRepository {
                 .bind(&cut.id)
                 .fetch_optional(&mut *tx)
                 .await;
-                
+
             match existing {
                 Ok(Some(_)) => {
                     if let Err(e) = tx.rollback().await {
                         error!("Failed to rollback transaction: {}", e);
                     }
                     return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone()));
-                },
-                Ok(None) => {}, // Cut doesn't exist, continue
+                }
+                Ok(None) => {} // Cut doesn't exist, continue
                 Err(e) => {
                     if let Err(rollback_err) = tx.rollback().await {
                         error!("Failed to rollback transaction: {}", rollback_err);
@@ -148,7 +148,7 @@ impl CutsRepository for SqliteCutsRepository {
             .bind(cut.byte_offset_end.map(|v| v as i64))
             .execute(&mut *tx)
             .await;
-            
+
             if let Err(e) = result {
                 if let Err(rollback_err) = tx.rollback().await {
                     error!("Failed to rollback transaction: {}", rollback_err);
@@ -173,7 +173,7 @@ impl CutsRepository for SqliteCutsRepository {
             .bind(cut_id)
             .fetch_optional(&self.pool)
             .await;
-            
+
         match result {
             Ok(Some(row)) => Ok(Some(Self::row_to_cut(row))),
             Ok(None) => Ok(None),
@@ -189,14 +189,12 @@ impl CutsRepository for SqliteCutsRepository {
             .bind(material_id)
             .fetch_all(&self.pool)
             .await;
-            
+
         match result {
             Ok(rows) => {
-                let cuts = rows.into_iter()
-                    .map(Self::row_to_cut)
-                    .collect();
+                let cuts = rows.into_iter().map(Self::row_to_cut).collect();
                 Ok(cuts)
-            },
+            }
             Err(e) => {
                 error!("Error fetching cuts for material {}: {}", material_id, e);
                 Err(CutsRepositoryError::OperationFailed(e.to_string()))
@@ -207,22 +205,22 @@ impl CutsRepository for SqliteCutsRepository {
     async fn delete_cut(&self, cut_id: &str) -> Result<()> {
         // First check if the cut exists
         let cut = self.get_cut_by_id(cut_id).await?;
-        
+
         if cut.is_none() {
             return Err(CutsRepositoryError::CutNotFound(cut_id.to_string()));
         }
-        
+
         // Delete the cut
         let result = sqlx::query("DELETE FROM cuts WHERE id = ?")
             .bind(cut_id)
             .execute(&self.pool)
             .await;
-            
+
         match result {
             Ok(_) => {
                 debug!("Deleted cut: {}", cut_id);
                 Ok(())
-            },
+            }
             Err(e) => {
                 error!("Failed to delete cut: {}", e);
                 Err(CutsRepositoryError::OperationFailed(e.to_string()))
@@ -233,18 +231,18 @@ impl CutsRepository for SqliteCutsRepository {
     async fn delete_cuts_by_material_id(&self, material_id: &str) -> Result<()> {
         // Count cuts for the material first to check if any exist
         let count = self.count_cuts_by_material_id(material_id).await?;
-        
+
         // If no cuts exist, return early (not an error)
         if count == 0 {
             return Ok(());
         }
-        
+
         // Delete all cuts for the material
         let result = sqlx::query("DELETE FROM cuts WHERE material_id = ?")
             .bind(material_id)
             .execute(&self.pool)
             .await;
-            
+
         match result {
             Ok(result) => {
                 info!(
@@ -253,7 +251,7 @@ impl CutsRepository for SqliteCutsRepository {
                     material_id
                 );
                 Ok(())
-            },
+            }
             Err(e) => {
                 error!("Failed to delete cuts for material {}: {}", material_id, e);
                 Err(CutsRepositoryError::OperationFailed(e.to_string()))
@@ -266,12 +264,12 @@ impl CutsRepository for SqliteCutsRepository {
             .bind(material_id)
             .fetch_one(&self.pool)
             .await;
-            
+
         match result {
             Ok(row) => {
                 let count: i64 = row.get("count");
                 Ok(count as usize)
-            },
+            }
             Err(e) => {
                 error!("Error counting cuts for material {}: {}", material_id, e);
                 Err(CutsRepositoryError::OperationFailed(e.to_string()))
@@ -284,10 +282,10 @@ impl CutsRepository for SqliteCutsRepository {
 mod tests {
     use super::*;
     use crate::db::init_memory_db;
-    
+
     async fn setup() -> SqliteCutsRepository {
         let pool = init_memory_db().await.expect("Failed to initialize DB");
-        
+
         // Create test materials first to satisfy foreign key constraints
         sqlx::query(
             r#"
@@ -304,10 +302,10 @@ mod tests {
         .execute(&pool)
         .await
         .expect("Failed to insert test materials");
-        
+
         SqliteCutsRepository::new(pool)
     }
-    
+
     fn create_test_cut(material_id: &str, chunk_index: usize) -> Cut {
         Cut::new(
             material_id.to_string(),
@@ -315,7 +313,7 @@ mod tests {
             format!("Content for chunk {}", chunk_index),
         )
     }
-    
+
     #[tokio::test]
     async fn test_save_and_get_cut() {
         let repo = setup().await;
@@ -356,24 +354,26 @@ mod tests {
     async fn test_save_and_get_cuts_by_material() {
         let repo = setup().await;
         let material_id = "material2";
-        
+
         // Create multiple cuts for the same material
         let cut1 = create_test_cut(material_id, 0);
         let cut2 = create_test_cut(material_id, 1);
         let cut3 = create_test_cut(material_id, 2);
-        
+
         // Save all cuts
-        repo.save_cuts(&[cut1.clone(), cut2.clone(), cut3.clone()]).await.unwrap();
-        
+        repo.save_cuts(&[cut1.clone(), cut2.clone(), cut3.clone()])
+            .await
+            .unwrap();
+
         // Retrieve cuts for the material
         let cuts = repo.get_cuts_by_material_id(material_id).await.unwrap();
-        
+
         // Check results
         assert_eq!(cuts.len(), 3);
         assert_eq!(cuts[0].chunk_index, 0);
         assert_eq!(cuts[1].chunk_index, 1);
         assert_eq!(cuts[2].chunk_index, 2);
-        
+
         // Check content
         assert_eq!(cuts[0].content, "Content for chunk 0");
         assert_eq!(cuts[1].content, "Content for chunk 1");
@@ -385,12 +385,12 @@ mod tests {
         let repo = setup().await;
         let cut = create_test_cut("material3", 0);
         let cut_id = cut.id.clone();
-        
+
         // Save and verify
         repo.save_cut(&cut).await.unwrap();
         let retrieved = repo.get_cut_by_id(&cut_id).await.unwrap();
         assert!(retrieved.is_some());
-        
+
         // Delete and verify
         repo.delete_cut(&cut_id).await.unwrap();
         let retrieved = repo.get_cut_by_id(&cut_id).await.unwrap();
@@ -401,28 +401,28 @@ mod tests {
     async fn test_delete_cuts_by_material() {
         let repo = setup().await;
         let material_id = "material4";
-        
+
         // Create multiple cuts
         let cuts = vec![
             create_test_cut(material_id, 0),
             create_test_cut(material_id, 1),
             create_test_cut(material_id, 2),
         ];
-        
+
         // Save all cuts
         repo.save_cuts(&cuts).await.unwrap();
-        
+
         // Verify count
         let count = repo.count_cuts_by_material_id(material_id).await.unwrap();
         assert_eq!(count, 3);
-        
+
         // Delete all cuts for the material
         repo.delete_cuts_by_material_id(material_id).await.unwrap();
-        
+
         // Verify count is now 0
         let count = repo.count_cuts_by_material_id(material_id).await.unwrap();
         assert_eq!(count, 0);
-        
+
         // Verify retrieving cuts returns an empty vector
         let cuts = repo.get_cuts_by_material_id(material_id).await.unwrap();
         assert!(cuts.is_empty());
@@ -431,29 +431,26 @@ mod tests {
     #[tokio::test]
     async fn test_count_cuts() {
         let repo = setup().await;
-        
+
         // Create cuts for different materials
         let material1 = "material5";
         let material2 = "material6";
-        
+
         // Save cuts for material1
-        let cuts1 = vec![
-            create_test_cut(material1, 0),
-            create_test_cut(material1, 1),
-        ];
+        let cuts1 = vec![create_test_cut(material1, 0), create_test_cut(material1, 1)];
         repo.save_cuts(&cuts1).await.unwrap();
-        
+
         // Save cut for material2
         let cut2 = create_test_cut(material2, 0);
         repo.save_cut(&cut2).await.unwrap();
-        
+
         // Check counts
         let count1 = repo.count_cuts_by_material_id(material1).await.unwrap();
         let count2 = repo.count_cuts_by_material_id(material2).await.unwrap();
         let count3 = repo.count_cuts_by_material_id("nonexistent").await.unwrap();
-        
+
         assert_eq!(count1, 2);
         assert_eq!(count2, 1);
         assert_eq!(count3, 0);
     }
-} 
+}
