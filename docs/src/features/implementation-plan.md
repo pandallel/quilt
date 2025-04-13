@@ -195,39 +195,94 @@ This document outlines the incremental implementation plan for Quilt's core arch
 
 **Demonstration:** Running `main` logs "Stored X cuts in repository" with metrics on storage operations
 
-### Milestone 7.5: "SQLite Repository Implementation"
+### Milestone 7.5: SQLite Repository Implementation
 
-**Goal:** Replace in-memory repositories with SQLite-backed implementations to enable persistence and vector search capability
-**Implementation Time:** 3-4 days
+#### Prerequisites: Repository Trait Refactoring
 
-1. Add SQLite infrastructure (1 day)
+1. ✅ Rename and validate Material Repository
+   - ✅ Rename `struct MaterialRepository` to `struct InMemoryMaterialRepository`.
+   - ✅ Update all external usages.
+   - ✅ Validate with `cargo check` and `cargo test`.
+2. ✅ Add trait for Material Repository
+   - ✅ Add `async-trait` dependency.
+   - ✅ Define `trait MaterialRepository` in `repository.rs` using `#[async_trait]`.
+   - ✅ Implement the trait for `InMemoryMaterialRepository`.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+3. ✅ Update the Registry to use the trait
+   - ✅ Update `MaterialRegistry` to use `Arc<dyn MaterialRepository>`.
+   - ✅ Update dependent code and tests.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+4. ✅ Update Actor Dependencies
+   - ✅ Update `Orchestrator`, `CuttingActor`, `DiscoveryActor` initialization and tests.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+5. ✅ Move trait definitions to mod.rs
+   - ✅ Move trait/error definitions to `mod.rs`.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
+6. ✅ Apply Repository Trait Pattern to CutsRepository
+   - ✅ Define `trait CutsRepository` in appropriate location.
+   - ✅ Update the `CuttingActor` to use the trait.
+   - ✅ Validate: ensure `cargo check` and `cargo test` pass.
 
-   - Create connection management module
-   - Implement schema definition
-   - Add basic migration framework
-   - Set up SQLite-vec extension for vector operations
+#### SQLite Implementation
 
-2. Implement SQLite Material Repository (1 day)
+1. ✅ Add SQLite dependencies
 
-   - Create SQLite-backed implementation of MaterialRepository
-   - Preserve existing trait interface for backward compatibility
-   - Implement proper transaction handling
-   - Add comprehensive tests comparing with in-memory implementation
+   - ✅ Add `sqlx` with `sqlite`, `runtime-tokio-rustls` and `time` features to Cargo.toml.
+   - ✅ Add basic initialization and tests.
 
-3. Implement SQLite Cuts Repository (1 day)
+2. ✅ Create database setup module
 
-   - Create SQLite-backed implementation of CutsRepository
-   - Ensure performance for batch operations
-   - Optimize for material-based queries
-   - Set up indexes for common query patterns
+   - ✅ Implement `init_memory_db()` function in new `src/db.rs` module
+   - ✅ Set up schema definition for the `materials` table
+   - ✅ Add test for database initialization
 
-4. Add Repository Factory (0.5-1 day)
-   - Create factory pattern for repository instantiation
-   - Allow runtime selection between in-memory and SQLite
-   - Add configuration options for connection settings
-   - Update orchestrator to use repository factory
+3. ✅ Implement SQLite Material Repository
 
-**Demonstration:** Running `main` with SQLite repositories shows same functionality with persistence between runs
+   - ✅ Create `src/materials/sqlite_repository.rs` for `SqliteMaterialRepository`
+   - ✅ Implement `MaterialRepository` trait with SQLite backend
+   - ✅ Add proper row to struct conversion. Rename `ingested_at` column/field to `created_at`. Add `status_updated_at` and `updated_at` columns/fields.
+   - ✅ Utilize `sqlx`\'s `"time"` feature for automatic `OffsetDateTime` encoding/decoding (removes manual parsing/formatting).
+   - ✅ Add comprehensive tests comparing with in-memory implementation
+
+4. ✅ Update app integration
+
+   - ✅ Add module exports in `lib.rs`
+   - ✅ Modify `QuiltOrchestrator` to include SQLite support
+   - ✅ Add command-line option for selecting repository type
+   - ✅ Implement fallback to in-memory repository if SQLite fails
+
+5. ⚠️ Known Issues
+
+   - ~~When running with `--dir=./src`, file paths are relative to the working directory, causing errors like `Failed to read file 'materials/types.rs': No such file or directory (os error 2)`~~ **Resolved (See Below)**
+   - This issue was fixed by ensuring the `DiscoveryActor` resolves relative paths to absolute paths before registering materials. The `CuttingActor` now receives absolute paths via the `MaterialDiscoveredEvent`.
+
+6. ✅ Implement SqliteCutsRepository
+   - ✅ Create schema for cuts table in `src/db.rs`
+   - ✅ Implement `SqliteCutsRepository` in `src/cutting/sqlite_repository.rs`
+   - ✅ Add comprehensive tests for all repository operations
+   - ✅ Update `QuiltOrchestrator` to use `SqliteCutsRepository` when in SQLite mode
+   - ✅ Ensure proper foreign key constraints with materials table
+
+**Demonstration:** Running `cargo run -- --dir=./src` uses SQLite by default for both materials and cuts, while `cargo run -- --dir=./src --in-memory` uses the original in-memory stores.
+
+### ✅ Task: Refactor Material Timestamps
+
+**Goal:** Improve timestamp tracking for materials by renaming `ingested_at` and adding status change and general update timestamps.
+**Status:** Completed
+
+1. ✅ **Add Timestamps:**
+   - ✅ Renamed `ingested_at` field/column to `created_at`.
+   - ✅ Added `status_updated_at` field/column.
+   - ✅ Added `updated_at` field/column.
+   - ✅ Updated `Material` struct, `Material::new()`, database schema (`src/db.rs`).
+2. ✅ **Implement Update Logic:**
+   - ✅ Updated `InMemoryMaterialRepository::update_material_status` to set `status_updated_at` and `updated_at` to `now` on success.
+   - ✅ Updated `SqliteMaterialRepository::update_material_status` SQL to set `status_updated_at` and `updated_at` to `now` on success.
+   - ✅ Updated `SqliteMaterialRepository::register_material` SQL to insert all three timestamps.
+3. ✅ **Leverage `sqlx` Time Feature:**
+   - ✅ Added `"time"` feature to `sqlx` dependency in `Cargo.toml`.
+   - ✅ Refactored `SqliteMaterialRepository` to use automatic `OffsetDateTime` encoding/decoding via `sqlx`, removing manual parsing/formatting.
+   - ✅ Updated tests in both repositories.
 
 ### Milestone 8: "Basic Swatching Actor Creation"
 

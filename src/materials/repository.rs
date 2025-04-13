@@ -1,45 +1,34 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::Arc;
-use thiserror::Error;
+use time::OffsetDateTime;
 use tokio::sync::RwLock;
 
-use super::types::{Material, MaterialStatus};
-
-/// Errors that can occur during material repository operations
-#[derive(Error, Debug)]
-pub enum RepositoryError {
-    #[error("Material with id {0} not found")]
-    MaterialNotFound(String),
-
-    #[error("Material with id {0} already exists")]
-    MaterialAlreadyExists(String),
-
-    #[error("Invalid state transition from {from} to {to}")]
-    InvalidStateTransition {
-        from: MaterialStatus,
-        to: MaterialStatus,
-    },
-}
+use super::{Material, MaterialRepository, MaterialStatus, RepositoryError, Result};
 
 /// Thread-safe in-memory store for material objects
 #[derive(Debug, Clone)]
-pub struct MaterialRepository {
+pub struct InMemoryMaterialRepository {
     /// The inner storage using a thread-safe hashmap
     materials: Arc<RwLock<HashMap<String, Material>>>,
 }
 
-impl MaterialRepository {
+impl InMemoryMaterialRepository {
     /// Create a new empty material repository
     pub fn new() -> Self {
         Self {
             materials: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+}
 
+#[async_trait]
+impl MaterialRepository for InMemoryMaterialRepository {
     /// Register a new material in the repository
     ///
     /// Returns an error if a material with the same ID already exists
-    pub async fn register_material(&self, material: Material) -> Result<(), RepositoryError> {
+    async fn register_material(&self, material: Material) -> Result<()> {
         let mut materials = self.materials.write().await;
 
         if materials.contains_key(&material.id) {
@@ -51,7 +40,7 @@ impl MaterialRepository {
     }
 
     /// Get a material by its ID
-    pub async fn get_material(&self, id: &str) -> Option<Material> {
+    async fn get_material(&self, id: &str) -> Option<Material> {
         let materials = self.materials.read().await;
         materials.get(id).cloned()
     }
@@ -59,55 +48,54 @@ impl MaterialRepository {
     /// Update the status of a material
     ///
     /// Returns an error if the material is not found or the status transition is invalid
-    pub async fn update_material_status(
+    async fn update_material_status(
         &self,
         id: &str,
-        status: MaterialStatus,
-        error: Option<String>,
-    ) -> Result<(), RepositoryError> {
+        new_status: MaterialStatus,
+        error_message: Option<String>,
+    ) -> Result<()> {
         let mut materials = self.materials.write().await;
 
         let material = materials
             .get_mut(id)
             .ok_or_else(|| RepositoryError::MaterialNotFound(id.to_string()))?;
 
-        // Any state can transition to Error
-        if status == MaterialStatus::Error {
-            material.status = status;
-            if let Some(err_msg) = error {
-                material.error = Some(err_msg);
+        // Validate status transition
+        match (material.status.clone(), new_status.clone()) {
+            // Valid transitions
+            (MaterialStatus::Discovered, MaterialStatus::Cut)
+            | (MaterialStatus::Discovered, MaterialStatus::Error)
+            | (MaterialStatus::Cut, MaterialStatus::Swatched)
+            | (MaterialStatus::Cut, MaterialStatus::Error)
+            | (MaterialStatus::Swatched, MaterialStatus::Error)
+            | (MaterialStatus::Error, MaterialStatus::Discovered) => {
+                let now = OffsetDateTime::now_utc();
+                // Update status
+                material.status = new_status;
+                // Update timestamps
+                material.updated_at = now;
+                material.status_updated_at = now;
+                // Update error message if provided
+                if let Some(msg) = error_message {
+                    material.error = Some(msg);
+                } else {
+                    material.error = None;
+                }
+                Ok(())
             }
-            return Ok(());
+            // Invalid transitions
+            (from, to) => Err(RepositoryError::InvalidStateTransition { from, to }),
         }
-
-        // For now, only allow linear progression
-        match (material.status.clone(), status.clone()) {
-            (MaterialStatus::Discovered, MaterialStatus::Cut) => {}
-            (MaterialStatus::Cut, MaterialStatus::Swatched) => {}
-            _ => {
-                return Err(RepositoryError::InvalidStateTransition {
-                    from: material.status.clone(),
-                    to: status,
-                });
-            }
-        }
-
-        material.status = status;
-        if error.is_some() {
-            material.error = error;
-        }
-
-        Ok(())
     }
 
-    /// List all materials in the repository
-    pub async fn list_materials(&self) -> Vec<Material> {
+    /// List all materials
+    async fn list_materials(&self) -> Vec<Material> {
         let materials = self.materials.read().await;
         materials.values().cloned().collect()
     }
 
-    /// List all materials with a specific status
-    pub async fn list_materials_by_status(&self, status: MaterialStatus) -> Vec<Material> {
+    /// List materials by status
+    async fn list_materials_by_status(&self, status: MaterialStatus) -> Vec<Material> {
         let materials = self.materials.read().await;
         materials
             .values()
@@ -117,7 +105,7 @@ impl MaterialRepository {
     }
 
     /// Count materials by status
-    pub async fn count_by_status(&self) -> HashMap<MaterialStatus, usize> {
+    async fn count_by_status(&self) -> HashMap<MaterialStatus, usize> {
         let materials = self.materials.read().await;
         let mut counts = HashMap::new();
 
@@ -137,7 +125,7 @@ impl MaterialRepository {
     }
 }
 
-impl Default for MaterialRepository {
+impl Default for InMemoryMaterialRepository {
     fn default() -> Self {
         Self::new()
     }
@@ -146,6 +134,7 @@ impl Default for MaterialRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::time::{sleep, Duration};
 
     fn create_test_material(status: MaterialStatus) -> Material {
         let mut material = Material::new("test/path.md".to_string());
@@ -155,7 +144,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_and_get_material() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -166,11 +155,13 @@ mod tests {
         let retrieved = repo.get_material(&id).await.unwrap();
         assert_eq!(retrieved.id, id);
         assert_eq!(retrieved.status, MaterialStatus::Discovered);
+        assert_eq!(retrieved.created_at, retrieved.updated_at);
+        assert_eq!(retrieved.created_at, retrieved.status_updated_at);
     }
 
     #[tokio::test]
     async fn test_register_duplicate_material() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
@@ -195,45 +186,121 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_material_status() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
+        let created_at = material.created_at;
 
         // Register the material
         repo.register_material(material).await.unwrap();
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Update status to Cut
         repo.update_material_status(&id, MaterialStatus::Cut, None)
             .await
             .unwrap();
 
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Cut);
+        // Verify status change and timestamps
+        let updated_after_cut = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_cut.status, MaterialStatus::Cut);
+        assert_eq!(updated_after_cut.created_at, created_at);
+        assert!(updated_after_cut.updated_at > created_at);
+        assert!(updated_after_cut.status_updated_at > created_at);
+        assert_eq!(
+            updated_after_cut.updated_at,
+            updated_after_cut.status_updated_at
+        );
+        let first_update_time = updated_after_cut.updated_at; // Capture time after first update
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
 
         // Update status to Swatched
         repo.update_material_status(&id, MaterialStatus::Swatched, None)
             .await
             .unwrap();
 
-        // Verify status change
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Swatched);
+        // Verify status change and timestamps
+        let updated_after_swatched = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_swatched.status, MaterialStatus::Swatched);
+        assert_eq!(updated_after_swatched.created_at, created_at);
+        assert!(updated_after_swatched.updated_at >= first_update_time);
+        assert!(updated_after_swatched.status_updated_at >= first_update_time);
+        assert_eq!(
+            updated_after_swatched.updated_at,
+            updated_after_swatched.status_updated_at
+        ); // Should be equal after this update
     }
 
     #[tokio::test]
-    async fn test_invalid_status_transition() {
-        let repo = MaterialRepository::new();
+    async fn test_update_material_status_with_error() {
+        let repo = InMemoryMaterialRepository::new();
+        let material = create_test_material(MaterialStatus::Discovered);
+        let id = material.id.clone();
+        let created_at = material.created_at;
+
+        // Register the material
+        repo.register_material(material).await.unwrap();
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
+
+        // Update status to Error with a message
+        let error_message = "Test error message".to_string();
+        repo.update_material_status(&id, MaterialStatus::Error, Some(error_message.clone()))
+            .await
+            .unwrap();
+
+        // Verify status change, error message, and timestamps
+        let updated_after_error = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_error.status, MaterialStatus::Error);
+        assert_eq!(updated_after_error.error, Some(error_message));
+        assert_eq!(updated_after_error.created_at, created_at);
+        assert!(updated_after_error.updated_at > created_at);
+        assert!(updated_after_error.status_updated_at > created_at);
+        assert_eq!(
+            updated_after_error.updated_at,
+            updated_after_error.status_updated_at
+        );
+        let first_update_time = updated_after_error.updated_at; // Capture time after first update
+
+        // Small delay to ensure timestamps will be different
+        sleep(Duration::from_millis(1)).await;
+
+        // Reset to Discovered (simulating retry)
+        repo.update_material_status(&id, MaterialStatus::Discovered, None)
+            .await
+            .unwrap();
+
+        // Verify status change, error message cleared, and timestamps
+        let updated_after_reset = repo.get_material(&id).await.unwrap();
+        assert_eq!(updated_after_reset.status, MaterialStatus::Discovered);
+        assert_eq!(updated_after_reset.error, None);
+        assert_eq!(updated_after_reset.created_at, created_at);
+        assert!(updated_after_reset.updated_at >= first_update_time);
+        assert!(updated_after_reset.status_updated_at >= first_update_time);
+        assert_eq!(
+            updated_after_reset.updated_at,
+            updated_after_reset.status_updated_at
+        ); // Should be equal after this update
+    }
+
+    #[tokio::test]
+    async fn test_invalid_state_transition() {
+        let repo = InMemoryMaterialRepository::new();
         let material = create_test_material(MaterialStatus::Discovered);
         let id = material.id.clone();
 
         // Register the material
         repo.register_material(material).await.unwrap();
 
-        // Try to update from Discovered directly to Swatched (invalid)
+        // Try invalid transition (Discovered -> Swatched)
         let result = repo
             .update_material_status(&id, MaterialStatus::Swatched, None)
             .await;
+
         assert!(result.is_err());
         if let Err(RepositoryError::InvalidStateTransition { from, to }) = result {
             assert_eq!(from, MaterialStatus::Discovered);
@@ -244,29 +311,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_transition_to_error() {
-        let repo = MaterialRepository::new();
-        let material = create_test_material(MaterialStatus::Discovered);
-        let id = material.id.clone();
-
-        // Register the material
-        repo.register_material(material).await.unwrap();
-
-        // Update status to Error
-        let error_msg = "Test error message".to_string();
-        repo.update_material_status(&id, MaterialStatus::Error, Some(error_msg.clone()))
-            .await
-            .unwrap();
-
-        // Verify status change and error message
-        let updated = repo.get_material(&id).await.unwrap();
-        assert_eq!(updated.status, MaterialStatus::Error);
-        assert_eq!(updated.error, Some(error_msg));
-    }
-
-    #[tokio::test]
     async fn test_list_materials() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
 
         // Create and register 3 materials with different statuses
         let material1 = create_test_material(MaterialStatus::Discovered);
@@ -301,7 +347,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_count_by_status() {
-        let repo = MaterialRepository::new();
+        let repo = InMemoryMaterialRepository::new();
 
         // Empty repository should have 0 counts
         let counts = repo.count_by_status().await;

@@ -6,14 +6,12 @@ use crate::materials::MaterialRegistry;
 use actix::prelude::*;
 use actix::SpawnHandle;
 use log::{debug, error, info, warn};
-use std::path::Path;
 use std::sync::Arc;
-use tokio::fs;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
 use super::cutter::TextCutter;
-use super::{Cut, CutsRepository, InMemoryCutsRepository};
+use super::{Cut, CutsRepository};
 
 /// Messages specific to the CuttingActor
 ///
@@ -37,7 +35,7 @@ pub mod messages {
 
         /// Generic cutting error
         #[error("Cutting operation failed: {0}")]
-        OperationFailed(String),
+        OperationFailed(Box<str>),
 
         /// File error
         #[error("File operation failed: {0}")]
@@ -79,7 +77,7 @@ pub struct CuttingActor {
     /// Text cutter with default configuration
     cutter: TextCutter,
     /// Repository for storing cuts
-    cuts_repository: Arc<InMemoryCutsRepository>,
+    cuts_repository: Arc<dyn CutsRepository>,
     /// Sender for the internal work queue
     work_sender: Option<mpsc::Sender<CuttingWorkItem>>,
     /// Handle for the listener task
@@ -99,7 +97,7 @@ impl CuttingActor {
     pub fn new(
         name: &str,
         registry: MaterialRegistry,
-        cuts_repository: Arc<InMemoryCutsRepository>,
+        cuts_repository: Arc<dyn CutsRepository>,
     ) -> Self {
         Self {
             name: name.to_string(),
@@ -202,7 +200,7 @@ impl Actor for CuttingActor {
                         work_item.material_id.clone(),
                         work_item.file_path,
                         &cutter,
-                        &cuts_repository,
+                        cuts_repository.clone(),
                     )
                     .await
                     {
@@ -298,48 +296,45 @@ struct CuttingWorkItem {
     file_path: String,
 }
 
-/// Process a MaterialDiscovered event (called by the processor task)
-///
-/// Reads the file content, cuts it into chunks, and logs sample information.
+/// Worker function to process a discovered material
+/// This is a separate function to make the processing code easier to test
 ///
 /// # Arguments
 ///
-/// * `actor_name` - Name of the actor for logging
-/// * `registry` - Registry to retrieve materials
-/// * `material_id` - ID of the discovered material
-/// * `file_path` - File path of the discovered material
-/// * `cutter` - TextCutter instance to cut the material content
-/// * `cuts_repository` - Repository to store the cuts
-async fn process_discovered_material(
+/// * `actor_name` - Name of the actor, for logging
+/// * `registry` - Registry to retrieve and update materials
+/// * `material_id` - ID of the discovered material to process
+/// * `file_path` - Path to the material file
+/// * `cutter` - Text cutter to use for processing
+/// * `cuts_repository` - Repository for storing cut chunks
+///
+/// # Returns
+///
+/// * `Result<(), CuttingError>` - Success or error
+pub async fn process_discovered_material(
     actor_name: &str,
     registry: &MaterialRegistry,
     material_id: MaterialId,
     file_path: String,
     cutter: &TextCutter,
-    cuts_repository: &InMemoryCutsRepository,
+    cuts_repository: Arc<dyn CutsRepository>,
 ) -> Result<(), messages::CuttingError> {
     info!(
-        "{}: Processing discovered material '{}' at path '{}'",
+        "{}: Processing discovered material: {}",
         actor_name,
-        material_id.as_str(),
-        file_path
+        material_id.as_str()
     );
 
-    let material = match registry.get_material(material_id.as_str()).await {
-        Some(m) => m,
-        None => {
-            error!(
-                "{}: Failed to retrieve material '{}': Not found",
-                actor_name,
-                material_id.as_str()
-            );
-            return Err(messages::CuttingError::MaterialNotFound(material_id));
-        }
-    };
+    // Look up the material from the registry
+    let material = registry
+        .get_material(material_id.as_str())
+        .await
+        .ok_or_else(|| messages::CuttingError::MaterialNotFound(material_id.clone()))?;
 
+    // Skip if the material is not in Discovered status
     if material.status != MaterialStatus::Discovered {
-        warn!(
-            "{}: Skipping processing for material '{}', status is {:?} (expected Discovered)",
+        info!(
+            "{}: Skipping material {} with status {:?} (not Discovered)",
             actor_name,
             material_id.as_str(),
             material.status
@@ -347,32 +342,41 @@ async fn process_discovered_material(
         return Ok(());
     }
 
-    let content = match fs::read_to_string(Path::new(&file_path)).await {
-        Ok(content) => {
-            debug!(
-                "{}: Read {} bytes from file '{}'",
-                actor_name,
-                content.len(),
-                file_path
-            );
-            content
-        }
-        Err(e) => {
-            error!("{}: Failed to read file '{}': {}", actor_name, file_path, e);
+    info!(
+        "{}: Retrieved material '{}' with path: {}",
+        actor_name,
+        material_id.as_str(),
+        material.file_path
+    );
 
+    // Read the content from the file
+    debug!("{}: Reading file content: {}", actor_name, file_path);
+    let content = match tokio::fs::read_to_string(&file_path).await {
+        Ok(content) => content,
+        Err(e) => {
+            let error_msg = format!("Failed to read file: {}", e);
+            error!("{}: {}", actor_name, error_msg);
+
+            // Update material status to Error
             if let Err(update_err) = registry
                 .update_material_status(
                     material_id.as_str(),
                     MaterialStatus::Error,
-                    Some(format!("Failed to read file: {}", e)),
+                    Some(error_msg.clone()),
                 )
                 .await
             {
                 error!(
-                    "{}: Failed to update material status to Error for '{}' after read failure: {}",
+                    "{}: Failed to update material status to Error for '{}': {}",
                     actor_name,
                     material_id.as_str(),
                     update_err
+                );
+            } else {
+                debug!(
+                    "{}: Updated material '{}' status to Error due to file read failure",
+                    actor_name,
+                    material_id.as_str()
                 );
             }
 
@@ -380,120 +384,131 @@ async fn process_discovered_material(
         }
     };
 
-    let chunks = cutter.cut(&content, Some(material_id.clone()))?;
+    // Cut the content into chunks
     debug!(
-        "{}: Cut material '{}' into {} chunks",
+        "{}: Cutting content into chunks for: {}",
         actor_name,
-        material_id.as_str(),
-        chunks.len()
+        material_id.as_str()
     );
+    let chunks = match cutter.cut(&content, Some(material_id.clone())) {
+        Ok(chunks) => chunks,
+        Err(e) => {
+            let error_msg = format!("Failed to cut content: {}", e);
+            error!("{}: {}", actor_name, error_msg);
 
-    if let Some(first_chunk) = chunks.first() {
-        debug!(
-            "{}: First chunk sample ({} chars): '{}...'",
-            actor_name,
-            first_chunk.content.chars().count(),
-            first_chunk.content.chars().take(50).collect::<String>()
-        );
-    }
+            // Update material status to Error
+            if let Err(update_err) = registry
+                .update_material_status(
+                    material_id.as_str(),
+                    MaterialStatus::Error,
+                    Some(error_msg.clone()),
+                )
+                .await
+            {
+                error!(
+                    "{}: Failed to update material status to Error for '{}': {}",
+                    actor_name,
+                    material_id.as_str(),
+                    update_err
+                );
+            } else {
+                debug!(
+                    "{}: Updated material '{}' status to Error due to cutting failure",
+                    actor_name,
+                    material_id.as_str()
+                );
+            }
 
-    // Convert chunks to Cut objects and store them in the repository
+            return Err(messages::CuttingError::CuttingError(e));
+        }
+    };
+
+    debug!("{}: Cut material into {} chunks", actor_name, chunks.len());
+
+    // Convert chunks to Cut objects
     let cuts: Vec<Cut> = chunks
         .iter()
         .map(|chunk| {
             Cut::with_details(
-                material_id.as_str().to_string(),
+                material_id.to_string(),
                 chunk.sequence,
                 chunk.content.clone(),
-                None, // token_count will be implemented later
-                None, // byte_offset_start
-                None, // byte_offset_end
+                Some(cutter.config().get_token_count(&chunk.content)),
+                None, // Byte offsets aren't available from TextCutter currently
+                None,
             )
         })
         .collect();
 
-    // Store cuts in the repository
-    if !cuts.is_empty() {
-        match cuts_repository.save_cuts(&cuts).await {
-            Ok(_) => {
-                info!(
-                    "{}: Successfully saved {} cuts for material '{}'",
-                    actor_name,
-                    cuts.len(),
-                    material_id.as_str()
-                );
-            }
-            Err(e) => {
-                error!(
-                    "{}: Failed to save cuts for material '{}': {}",
-                    actor_name,
-                    material_id.as_str(),
-                    e
-                );
+    // Store the cuts in the repository
+    debug!("{}: Saving {} cuts to repository", actor_name, cuts.len());
+    if let Err(e) = cuts_repository.save_cuts(&cuts).await {
+        let error_msg = format!("Failed to save cuts to repository: {}", e);
+        error!("{}: {}", actor_name, error_msg);
 
-                // Update material status to Error
-                if let Err(update_err) = registry
-                    .update_material_status(
-                        material_id.as_str(),
-                        MaterialStatus::Error,
-                        Some(format!("Failed to save cuts: {}", e)),
-                    )
-                    .await
-                {
-                    error!(
-                        "{}: Failed to update material status to Error for '{}': {}",
-                        actor_name,
-                        material_id.as_str(),
-                        update_err
-                    );
-                }
-
-                return Err(messages::CuttingError::OperationFailed(format!(
-                    "Failed to save cuts: {}",
-                    e
-                )));
-            }
+        // Update material status to Error
+        if let Err(update_err) = registry
+            .update_material_status(
+                material_id.as_str(),
+                MaterialStatus::Error,
+                Some(error_msg.clone()),
+            )
+            .await
+        {
+            error!(
+                "{}: Failed to update material status to Error for '{}': {}",
+                actor_name,
+                material_id.as_str(),
+                update_err
+            );
+        } else {
+            debug!(
+                "{}: Updated material '{}' status to Error due to repository save failure",
+                actor_name,
+                material_id.as_str()
+            );
         }
+
+        return Err(messages::CuttingError::OperationFailed(
+            e.to_string().into_boxed_str(),
+        ));
     }
 
+    // Update the material status to Cut
     debug!(
-        "{}: Updating status to Cut for material '{}'",
+        "{}: Updating material status to Cut: {}",
         actor_name,
         material_id.as_str()
     );
-    if let Err(e) = registry
+    registry
         .update_material_status(material_id.as_str(), MaterialStatus::Cut, None)
         .await
-    {
-        error!(
-            "{}: Failed to update material status to Cut for '{}': {}",
-            actor_name,
-            material_id.as_str(),
-            e
-        );
-    } else {
-        info!(
-            "{}: Successfully processed and marked material '{}' as Cut",
-            actor_name,
-            material_id.as_str()
-        );
-    }
+        .map_err(|e| {
+            error!("{}: Failed to update material status: {}", actor_name, e);
+            messages::CuttingError::OperationFailed(e.to_string().into_boxed_str())
+        })?;
 
+    info!(
+        "{}: Successfully processed material: {}",
+        actor_name,
+        material_id.as_str()
+    );
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cutting::InMemoryCutsRepository;
     use crate::events::EventBus;
-    use crate::materials::types::Material;
-    use crate::materials::MaterialRepository;
+    use crate::materials::InMemoryMaterialRepository;
+    use crate::materials::Material;
+    use crate::materials::MaterialStatus;
+    use std::fs;
     use std::sync::Arc;
     use std::time::Duration;
     use tempfile::tempdir;
-    use tokio::fs;
 
-    // Helper function to initialize test logger
     fn init_test_logger() {
         let _ = env_logger::builder()
             .filter_level(log::LevelFilter::Debug)
@@ -505,136 +520,101 @@ mod tests {
     async fn test_cutting_actor_ping() {
         init_test_logger();
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus);
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
-        let actor = CuttingActor::new("TestCuttingActor", registry, cuts_repository).start();
+        let actor = CuttingActor::new("test-cutter", registry, cuts_repository).start();
 
-        // Send ping and check response
-        let result = actor.send(Ping).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap());
+        let response = actor.send(Ping).await.unwrap();
+        assert!(response, "Ping should return true");
     }
 
     #[actix::test]
     async fn test_cutting_actor_shutdown() {
         init_test_logger();
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus);
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
         let actor = CuttingActor::new("TestCuttingActor", registry, cuts_repository).start();
 
-        // Send shutdown
         let result = actor.send(Shutdown).await;
         assert!(result.is_ok());
 
-        // Give the actor some time to shut down
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Try to ping, should fail because actor is stopped
         let ping_result = actor.send(Ping).await;
         assert!(ping_result.is_err());
     }
 
     #[actix::test]
-    async fn test_cutting_actor_processes_discovered_material() {
+    async fn test_cutting_actor_processes_material() {
         init_test_logger();
 
-        // Create a temporary directory for test files
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let file_path = temp_dir.path().join("test_file.md");
         let file_path_str = file_path.to_string_lossy().to_string();
 
-        // Create a test file with content
         fs::write(
             &file_path,
             "# Test Document\n\nThis is a test document for cutting.",
         )
-        .await
         .expect("Failed to write test file");
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-
-        // Create a cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor
         let cutting_actor =
             CuttingActor::new("TestCuttingActor", registry.clone(), cuts_repository).start();
 
-        // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Register a test material with the file path we created
         let material = Material::new(file_path_str.clone());
         let material_id = material.id.clone();
         registry.register_material(material).await.unwrap();
 
-        // Create and publish a test event directly
         let material = registry.get_material(&material_id).await.unwrap();
         let event = QuiltEvent::material_discovered(&material);
 
-        // Publish the event
         event_bus.publish(event).expect("Failed to publish event");
 
-        // Wait for event processing
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Verify the actor is still alive
         let ping_result = cutting_actor.send(Ping).await;
         assert!(ping_result.is_ok());
         assert!(ping_result.unwrap());
 
-        // Verify the material status was updated to Cut
         let updated_material = registry.get_material(&material_id).await.unwrap();
         assert_eq!(updated_material.status, MaterialStatus::Cut);
 
-        // Clean up
         temp_dir.close().expect("Failed to clean up temp dir");
     }
 
     #[actix::test]
-    async fn test_cutting_actor_saves_cuts_to_repository() {
+    async fn test_cutting_actor_stores_multiple_cuts() {
         init_test_logger();
 
-        // Create a temporary directory for test files
         let temp_dir = tempdir().expect("Failed to create temp dir");
         let file_path = temp_dir.path().join("test_cuts_file.md");
         let file_path_str = file_path.to_string_lossy().to_string();
 
-        // Create a test file with content - large enough to generate multiple cuts
         fs::write(
             &file_path,
-            "# Test Document For Cuts\n\n".repeat(30) + "This is a test document for cutting with enough content to create multiple cuts.",
+            "# Test Document For Cuts\n\n".repeat(30) + "This is a test document for cutting with enough text to create multiple cuts based on token size.",
         )
-        .await
         .expect("Failed to write test file");
 
-        // Create registry with event bus
         let event_bus = Arc::new(EventBus::new());
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let registry = MaterialRegistry::new(repository, event_bus.clone());
-
-        // Create the cuts repository
         let cuts_repository = Arc::new(InMemoryCutsRepository::new());
 
-        // Create and start actor with the cuts repository
         let cutting_actor = CuttingActor::new(
             "TestCuttingActor",
             registry.clone(),
@@ -642,50 +622,39 @@ mod tests {
         )
         .start();
 
-        // Give the actor time to set up
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Register a test material with the file path we created
         let material = Material::new(file_path_str.clone());
         let material_id = material.id.clone();
         registry.register_material(material).await.unwrap();
 
-        // Create and publish a test event directly
         let material = registry.get_material(&material_id).await.unwrap();
         let event = QuiltEvent::material_discovered(&material);
 
-        // Publish the event
         event_bus.publish(event).expect("Failed to publish event");
 
-        // Wait for event processing
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Verify the actor is still alive
         let ping_result = cutting_actor.send(Ping).await;
         assert!(ping_result.is_ok());
         assert!(ping_result.unwrap());
 
-        // Verify the material status was updated to Cut
         let updated_material = registry.get_material(&material_id).await.unwrap();
         assert_eq!(updated_material.status, MaterialStatus::Cut);
 
-        // Verify the cuts were saved in the repository
         let cuts = cuts_repository
             .get_cuts_by_material_id(&material_id)
             .await
             .expect("Failed to get cuts from repository");
 
-        // There should be multiple cuts
         assert!(!cuts.is_empty(), "Expected at least one cut to be saved");
 
-        // Verify cut properties
         for (i, cut) in cuts.iter().enumerate() {
             assert_eq!(cut.material_id, material_id);
             assert_eq!(cut.chunk_index, i);
-            assert!(!cut.content.is_empty(), "Cut content should not be empty");
+            assert!(!cut.content.is_empty());
         }
 
-        // Clean up
         temp_dir.close().expect("Failed to clean up temp dir");
     }
 }

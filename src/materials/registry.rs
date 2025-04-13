@@ -4,8 +4,8 @@ use tracing::{debug, error, info};
 
 use crate::events::types::ProcessingStage;
 use crate::events::{EventBus, EventBusError, QuiltEvent};
-use crate::materials::repository::{MaterialRepository, RepositoryError};
 use crate::materials::types::{Material, MaterialStatus};
+use crate::materials::{MaterialRepository, RepositoryError};
 
 /// Errors that can occur during registry operations
 #[derive(Error, Debug)]
@@ -27,14 +27,14 @@ pub enum RegistryError {
 #[derive(Debug, Clone)]
 pub struct MaterialRegistry {
     /// The underlying repository for persistence
-    repository: MaterialRepository,
+    repository: Arc<dyn MaterialRepository>,
     /// The event bus for publishing events
     event_bus: Arc<EventBus>,
 }
 
 impl MaterialRegistry {
     /// Create a new registry with the given repository and event bus
-    pub fn new(repository: MaterialRepository, event_bus: Arc<EventBus>) -> Self {
+    pub fn new(repository: Arc<dyn MaterialRepository>, event_bus: Arc<EventBus>) -> Self {
         Self {
             repository,
             event_bus,
@@ -137,7 +137,7 @@ impl MaterialRegistry {
     }
 
     /// Get the underlying repository
-    pub fn repository(&self) -> &MaterialRepository {
+    pub fn repository(&self) -> &Arc<dyn MaterialRepository> {
         &self.repository
     }
 
@@ -150,12 +150,13 @@ impl MaterialRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::materials::InMemoryMaterialRepository;
     use std::sync::Arc;
     use tokio::sync::broadcast::Receiver;
 
     // Helper function to create a registry with a subscriber
     async fn setup_registry() -> (MaterialRegistry, Receiver<QuiltEvent>) {
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let receiver = event_bus.subscribe();
         let registry = MaterialRegistry::new(repository, event_bus);

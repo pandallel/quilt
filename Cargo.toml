@@ -27,6 +27,10 @@ env_logger = "0.11.8"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 text-splitter = "0.25.1"
+# Async trait for repository traits
+async-trait = "0.1.88"
+# SQLite database
+sqlx = { version = "0.7.4", features = ["sqlite", "runtime-tokio-rustls", "time"] }
 
 [dev-dependencies]
 tempfile = "3.19.1"

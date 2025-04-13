@@ -6,6 +6,7 @@
 
 pub mod actors;
 pub mod cutting;
+pub mod db;
 pub mod discovery;
 pub mod events;
 pub mod materials;
@@ -19,9 +20,12 @@ pub use discovery::{DirectoryScanner, ScanError, ScanResult, ScanResults};
 pub use events::{EventBus, QuiltEvent};
 
 // Material types and repository
+pub use materials::{InMemoryMaterialRepository, RepositoryError, SqliteMaterialRepository};
 pub use materials::{Material, MaterialFileType, MaterialStatus};
 pub use materials::{MaterialRegistry, RegistryError};
-pub use materials::{MaterialRepository, RepositoryError};
 
 // Cutting and processing types
 pub use cutting::{Cut, CutsRepository, CutsRepositoryError, InMemoryCutsRepository};
+
+// Database functionality
+pub use db::init_memory_db;

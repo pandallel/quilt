@@ -24,6 +24,10 @@ struct Args {
     /// Patterns to exclude from scanning (can be provided multiple times)
     #[arg(short, long)]
     exclude: Vec<String>,
+
+    /// Use in-memory repository instead of SQLite
+    #[arg(long)]
+    in_memory: bool,
 }
 
 #[actix::main]
@@ -47,12 +51,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Starting Quilt with configuration: 
         Directory: {}
         Ignore Hidden: {}
-        Exclude Patterns: {:?}",
-        config.discovery_dir, config.ignore_hidden, config.exclude_patterns
+        Exclude Patterns: {:?}
+        Repository: {}",
+        config.discovery_dir,
+        config.ignore_hidden,
+        config.exclude_patterns,
+        if args.in_memory {
+            "In-Memory"
+        } else {
+            "SQLite"
+        }
     );
 
-    // Run the orchestrator
-    match QuiltOrchestrator::new().run(config).await {
+    // Run the orchestrator with the appropriate repository
+    let result = if args.in_memory {
+        // Use in-memory repository
+        info!("Using in-memory material repository");
+        QuiltOrchestrator::new().run(config).await
+    } else {
+        // Use SQLite repository
+        info!("Using SQLite material repository");
+        match QuiltOrchestrator::with_sqlite().await {
+            Ok(orchestrator) => orchestrator.run(config).await,
+            Err(err) => {
+                error!("Failed to initialize SQLite repository: {}", err);
+                error!("Falling back to in-memory repository");
+                QuiltOrchestrator::new().run(config).await
+            }
+        }
+    };
+
+    // Handle the result
+    match result {
         Ok(_) => {
             info!("Quilt application completed successfully");
         }

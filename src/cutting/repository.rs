@@ -1,62 +1,12 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::Arc;
-use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use super::cut::Cut;
+use async_trait::async_trait;
 
-/// Errors that can occur during cuts repository operations
-#[derive(Error, Debug)]
-pub enum CutsRepositoryError {
-    #[error("Cut with id {0} not found")]
-    CutNotFound(String),
-
-    #[error("Cut with id {0} already exists")]
-    CutAlreadyExists(String),
-
-    #[error("Operation failed: {0}")]
-    OperationFailed(String),
-}
-
-/// Result type for cuts repository operations
-pub type Result<T> = std::result::Result<T, CutsRepositoryError>;
-
-/// Repository trait for managing cuts
-pub trait CutsRepository: Send + Sync + 'static {
-    /// Save a cut to the repository
-    fn save_cut(&self, cut: &Cut) -> impl std::future::Future<Output = Result<()>> + Send;
-
-    /// Save multiple cuts in a batch operation
-    fn save_cuts(&self, cuts: &[Cut]) -> impl std::future::Future<Output = Result<()>> + Send;
-
-    /// Get a cut by its ID
-    fn get_cut_by_id(
-        &self,
-        cut_id: &str,
-    ) -> impl std::future::Future<Output = Result<Option<Cut>>> + Send;
-
-    /// Get all cuts for a specific material
-    fn get_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Cut>>> + Send;
-
-    /// Delete a cut by its ID
-    fn delete_cut(&self, cut_id: &str) -> impl std::future::Future<Output = Result<()>> + Send;
-
-    /// Delete all cuts for a material
-    fn delete_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
-
-    /// Count cuts for a material
-    fn count_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<usize>> + Send;
-}
+use super::{Cut, CutsRepository, CutsRepositoryError, Result};
 
 /// In-memory implementation of the CutsRepository
 #[derive(Debug, Clone)]
@@ -83,177 +33,156 @@ impl Default for InMemoryCutsRepository {
     }
 }
 
+#[async_trait]
 impl CutsRepository for InMemoryCutsRepository {
-    fn save_cut(&self, cut: &Cut) -> impl std::future::Future<Output = Result<()>> + Send {
+    async fn save_cut(&self, cut: &Cut) -> Result<()> {
         let cut = cut.clone();
-        async move {
+        let cut_id = cut.id.clone();
+        let material_id = cut.material_id.clone();
+
+        // Check if the cut already exists
+        let mut cuts = self.cuts_by_id.write().await;
+        if cuts.contains_key(&cut_id) {
+            return Err(CutsRepositoryError::CutAlreadyExists(
+                cut_id.into_boxed_str(),
+            ));
+        }
+
+        // Insert the cut
+        cuts.insert(cut_id.clone(), cut.clone());
+        debug!("Saved cut: {} for material: {}", cut_id, material_id);
+
+        // Update the material index
+        let mut material_index = self.material_cut_index.write().await;
+        material_index
+            .entry(material_id.clone())
+            .or_insert_with(Vec::new)
+            .push(cut_id.clone());
+
+        Ok(())
+    }
+
+    async fn save_cuts(&self, cuts: &[Cut]) -> Result<()> {
+        let cuts = cuts.to_vec();
+        if cuts.is_empty() {
+            return Ok(());
+        }
+
+        let mut cuts_by_id = self.cuts_by_id.write().await;
+        let mut material_index = self.material_cut_index.write().await;
+
+        // Check for duplicates first
+        for cut in &cuts {
+            if cuts_by_id.contains_key(&cut.id) {
+                return Err(CutsRepositoryError::CutAlreadyExists(
+                    cut.id.clone().into_boxed_str(),
+                ));
+            }
+        }
+
+        // Insert all cuts
+        for cut in &cuts {
             let cut_id = cut.id.clone();
             let material_id = cut.material_id.clone();
 
-            // Check if the cut already exists
-            let mut cuts = self.cuts_by_id.write().await;
-            if cuts.contains_key(&cut_id) {
-                return Err(CutsRepositoryError::CutAlreadyExists(cut_id));
-            }
-
-            // Insert the cut
-            cuts.insert(cut_id.clone(), cut.clone());
-            debug!("Saved cut: {} for material: {}", cut_id, material_id);
-
-            // Update the material index
-            let mut material_index = self.material_cut_index.write().await;
+            cuts_by_id.insert(cut_id.clone(), cut.clone());
             material_index
                 .entry(material_id.clone())
                 .or_insert_with(Vec::new)
                 .push(cut_id.clone());
-
-            Ok(())
         }
+
+        info!("Saved {} cuts in batch", cuts.len());
+        Ok(())
     }
 
-    fn save_cuts(&self, cuts: &[Cut]) -> impl std::future::Future<Output = Result<()>> + Send {
-        let cuts = cuts.to_vec();
-        async move {
-            if cuts.is_empty() {
-                return Ok(());
-            }
-
-            let mut cuts_by_id = self.cuts_by_id.write().await;
-            let mut material_index = self.material_cut_index.write().await;
-
-            // Check for duplicates first
-            for cut in &cuts {
-                if cuts_by_id.contains_key(&cut.id) {
-                    return Err(CutsRepositoryError::CutAlreadyExists(cut.id.clone()));
-                }
-            }
-
-            // Insert all cuts
-            for cut in &cuts {
-                let cut_id = cut.id.clone();
-                let material_id = cut.material_id.clone();
-
-                cuts_by_id.insert(cut_id.clone(), cut.clone());
-                material_index
-                    .entry(material_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(cut_id.clone());
-            }
-
-            info!("Saved {} cuts in batch", cuts.len());
-            Ok(())
-        }
-    }
-
-    fn get_cut_by_id(
-        &self,
-        cut_id: &str,
-    ) -> impl std::future::Future<Output = Result<Option<Cut>>> + Send {
+    async fn get_cut_by_id(&self, cut_id: &str) -> Result<Option<Cut>> {
         let cut_id = cut_id.to_string();
-        async move {
-            let cuts = self.cuts_by_id.read().await;
-            Ok(cuts.get(&cut_id).cloned())
-        }
+        let cuts = self.cuts_by_id.read().await;
+        Ok(cuts.get(&cut_id).cloned())
     }
 
-    fn get_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<Vec<Cut>>> + Send {
+    async fn get_cuts_by_material_id(&self, material_id: &str) -> Result<Vec<Cut>> {
         let material_id = material_id.to_string();
-        async move {
-            let material_index = self.material_cut_index.read().await;
-            let cuts_by_id = self.cuts_by_id.read().await;
+        let material_index = self.material_cut_index.read().await;
+        let cuts_by_id = self.cuts_by_id.read().await;
 
-            if let Some(cut_ids) = material_index.get(&material_id) {
-                let mut result = Vec::new();
-                for cut_id in cut_ids {
-                    if let Some(cut) = cuts_by_id.get(cut_id) {
-                        result.push(cut.clone());
-                    }
+        if let Some(cut_ids) = material_index.get(&material_id) {
+            let mut result = Vec::new();
+            for cut_id in cut_ids {
+                if let Some(cut) = cuts_by_id.get(cut_id) {
+                    result.push(cut.clone());
                 }
-                // Sort by chunk_index for consistent ordering
-                result.sort_by_key(|cut| cut.chunk_index);
-                Ok(result)
-            } else {
-                Ok(Vec::new())
             }
+            // Sort by chunk_index for consistent ordering
+            result.sort_by_key(|cut| cut.chunk_index);
+            Ok(result)
+        } else {
+            Ok(Vec::new())
         }
     }
 
-    fn delete_cut(&self, cut_id: &str) -> impl std::future::Future<Output = Result<()>> + Send {
+    async fn delete_cut(&self, cut_id: &str) -> Result<()> {
         let cut_id = cut_id.to_string();
-        async move {
-            let mut cuts_by_id = self.cuts_by_id.write().await;
+        let mut cuts_by_id = self.cuts_by_id.write().await;
 
-            // Get the material_id for this cut before deletion
-            let material_id = if let Some(cut) = cuts_by_id.get(&cut_id) {
-                cut.material_id.clone()
-            } else {
-                return Err(CutsRepositoryError::CutNotFound(cut_id.to_string()));
-            };
+        // Get the material_id for this cut before deletion
+        let material_id = if let Some(cut) = cuts_by_id.get(&cut_id) {
+            cut.material_id.clone()
+        } else {
+            return Err(CutsRepositoryError::CutNotFound(cut_id.into_boxed_str()));
+        };
 
-            // Remove from the primary map
-            cuts_by_id.remove(&cut_id);
+        // Remove from the primary map
+        cuts_by_id.remove(&cut_id);
 
-            // Update the material index
-            let mut material_index = self.material_cut_index.write().await;
-            if let Some(cut_ids) = material_index.get_mut(&material_id) {
-                cut_ids.retain(|id| id != &cut_id);
-                // If this was the last cut for this material, remove the material entry
-                if cut_ids.is_empty() {
-                    material_index.remove(&material_id);
-                }
+        // Update the material index
+        let mut material_index = self.material_cut_index.write().await;
+        if let Some(cut_ids) = material_index.get_mut(&material_id) {
+            cut_ids.retain(|id| id != &cut_id);
+            // If this was the last cut for this material, remove the material entry
+            if cut_ids.is_empty() {
+                material_index.remove(&material_id);
             }
-
-            debug!("Deleted cut: {}", cut_id);
-            Ok(())
         }
+
+        debug!("Deleted cut: {}", cut_id);
+        Ok(())
     }
 
-    fn delete_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<()>> + Send {
+    async fn delete_cuts_by_material_id(&self, material_id: &str) -> Result<()> {
         let material_id = material_id.to_string();
-        async move {
-            let mut material_index = self.material_cut_index.write().await;
+        let mut material_index = self.material_cut_index.write().await;
 
-            // Get the cut IDs for this material
-            let cut_ids = if let Some(ids) = material_index.remove(&material_id) {
-                ids
-            } else {
-                // No cuts found for this material
-                return Ok(());
-            };
+        // Get the cut IDs for this material
+        let cut_ids = if let Some(ids) = material_index.remove(&material_id) {
+            ids
+        } else {
+            // No cuts found for this material
+            return Ok(());
+        };
 
-            // Remove all cuts from the primary map
-            let mut cuts_by_id = self.cuts_by_id.write().await;
-            for cut_id in &cut_ids {
-                cuts_by_id.remove(cut_id);
-            }
-
-            info!(
-                "Deleted {} cuts for material: {}",
-                cut_ids.len(),
-                material_id
-            );
-            Ok(())
+        // Remove all cuts from the primary map
+        let mut cuts_by_id = self.cuts_by_id.write().await;
+        for cut_id in &cut_ids {
+            cuts_by_id.remove(cut_id);
         }
+
+        info!(
+            "Deleted {} cuts for material: {}",
+            cut_ids.len(),
+            material_id
+        );
+        Ok(())
     }
 
-    fn count_cuts_by_material_id(
-        &self,
-        material_id: &str,
-    ) -> impl std::future::Future<Output = Result<usize>> + Send {
+    async fn count_cuts_by_material_id(&self, material_id: &str) -> Result<usize> {
         let material_id = material_id.to_string();
-        async move {
-            let material_index = self.material_cut_index.read().await;
-            if let Some(cut_ids) = material_index.get(&material_id) {
-                Ok(cut_ids.len())
-            } else {
-                Ok(0)
-            }
+        let material_index = self.material_cut_index.read().await;
+        if let Some(cut_ids) = material_index.get(&material_id) {
+            Ok(cut_ids.len())
+        } else {
+            Ok(0)
         }
     }
 }
@@ -298,7 +227,7 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(CutsRepositoryError::CutAlreadyExists(id)) = result {
-            assert_eq!(id, cut.id);
+            assert_eq!(id, cut.id.into_boxed_str());
         } else {
             panic!("Expected CutAlreadyExists error");
         }

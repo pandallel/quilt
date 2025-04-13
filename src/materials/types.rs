@@ -62,8 +62,12 @@ pub struct Material {
     pub file_path: String,
     /// Type of the material file
     pub file_type: MaterialFileType,
-    /// Timestamp when the material was first ingested
-    pub ingested_at: OffsetDateTime,
+    /// Timestamp when the material was first created
+    pub created_at: OffsetDateTime,
+    /// Timestamp when the material was last updated
+    pub updated_at: OffsetDateTime,
+    /// Timestamp when the material's status was last updated
+    pub status_updated_at: OffsetDateTime,
     /// Current status of the material
     pub status: MaterialStatus,
     /// Error message if processing failed
@@ -73,11 +77,14 @@ pub struct Material {
 impl Material {
     /// Create a new Material with the given file path
     pub fn new(file_path: String) -> Self {
+        let now = OffsetDateTime::now_utc();
         Self {
             id: cuid(),
             file_path: file_path.clone(),
             file_type: MaterialFileType::from_path(&file_path),
-            ingested_at: OffsetDateTime::now_utc(),
+            created_at: now,
+            updated_at: now,
+            status_updated_at: now,
             status: MaterialStatus::Discovered,
             error: None,
         }
@@ -96,7 +103,9 @@ mod tests {
         assert_eq!(material.status, MaterialStatus::Discovered);
         assert!(material.error.is_none());
         assert_eq!(material.id.len(), 24);
-        assert!(material.ingested_at <= OffsetDateTime::now_utc());
+        assert!(material.created_at <= OffsetDateTime::now_utc());
+        assert_eq!(material.created_at, material.updated_at);
+        assert_eq!(material.created_at, material.status_updated_at);
     }
 
     #[test]
@@ -160,6 +169,8 @@ mod tests {
         let material2 = Material::new("test/doc2.md".to_string());
 
         // Second material should have a later or equal timestamp
-        assert!(material2.ingested_at >= material1.ingested_at);
+        assert!(material2.created_at >= material1.created_at);
+        assert!(material2.updated_at >= material1.updated_at);
+        assert!(material2.status_updated_at >= material1.status_updated_at);
     }
 }

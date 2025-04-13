@@ -4,6 +4,7 @@ use crate::materials::{MaterialRegistry, RegistryError, RepositoryError};
 use actix::prelude::*;
 use log::{debug, error, info};
 use std::path::Path;
+use std::path::PathBuf;
 
 /// Configuration for directory scanning
 ///
@@ -37,23 +38,23 @@ pub mod messages {
     pub enum DiscoveryError {
         /// Directory not found error
         #[error("Directory not found: {0}")]
-        DirectoryNotFound(String),
+        DirectoryNotFound(Box<str>),
 
         /// Permission error during discovery
         #[error("Permission denied while accessing directory: {0}")]
-        PermissionDenied(String),
+        PermissionDenied(Box<str>),
 
         /// Generic discovery error
         #[error("Discovery operation failed: {0}")]
-        OperationFailed(String),
+        OperationFailed(Box<str>),
 
         /// Scanner error
         #[error("Scanner error: {0}")]
-        ScannerError(String),
+        ScannerError(Box<str>),
 
         /// Repository error
         #[error("Repository error: {0}")]
-        RepositoryError(String),
+        RepositoryError(Box<str>),
     }
 
     /// Command to start discovery using the provided configuration
@@ -139,25 +140,22 @@ impl DiscoveryActor {
 
         if !path.exists() {
             return Err(messages::DiscoveryError::DirectoryNotFound(
-                path.display().to_string(),
+                path.display().to_string().into_boxed_str(),
             ));
         }
 
         if !path.is_dir() {
-            return Err(messages::DiscoveryError::OperationFailed(format!(
-                "Path exists but is not a directory: {}",
-                path.display()
-            )));
+            return Err(messages::DiscoveryError::OperationFailed(
+                format!("Path exists but is not a directory: {}", path.display()).into_boxed_str(),
+            ));
         }
 
         // Basic access check - more sophisticated checks could be added
         match path.read_dir() {
             Ok(_) => Ok(()),
-            Err(e) => Err(messages::DiscoveryError::PermissionDenied(format!(
-                "Cannot read directory {}: {}",
-                path.display(),
-                e
-            ))),
+            Err(e) => Err(messages::DiscoveryError::PermissionDenied(
+                format!("Cannot read directory {}: {}", path.display(), e).into_boxed_str(),
+            )),
         }
     }
 
@@ -203,10 +201,9 @@ impl DiscoveryActor {
                 }
                 Err(err) => {
                     error!("Failed to register material: {}", err);
-                    return Err(messages::DiscoveryError::RepositoryError(format!(
-                        "Failed to register material: {}",
-                        err
-                    )));
+                    return Err(messages::DiscoveryError::RepositoryError(
+                        format!("Failed to register material: {}", err).into_boxed_str(),
+                    ));
                 }
             }
         }
@@ -274,15 +271,17 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 
             // Create scanner
             let scanner = DirectoryScanner::new(&scan_config.directory)
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e)))?
+                .map_err(|e| {
+                    messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str())
+                })?
                 .ignore_hidden(scan_config.ignore_hidden)
                 .exclude(scan_config.exclude_patterns);
 
             // Perform scan
             info!("Starting scan in directory: {}", scan_config.directory);
-            let scan_results = scanner
-                .scan()
-                .map_err(|e| messages::DiscoveryError::ScannerError(format!("{}", e)))?;
+            let mut scan_results = scanner.scan().map_err(|e| {
+                messages::DiscoveryError::ScannerError(format!("{}", e).into_boxed_str())
+            })?;
 
             // Log the basic results
             info!(
@@ -290,6 +289,18 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
                 scan_results.found.len(),
                 scan_results.failed.len()
             );
+
+            // Convert relative paths to absolute paths before registration
+            let base_dir = PathBuf::from(&scan_config.directory);
+            for material in &mut scan_results.found {
+                let absolute_path = base_dir.join(&material.file_path);
+                // Update the file path in the material object
+                material.file_path = absolute_path.to_string_lossy().into_owned();
+                debug!(
+                    "Updated material '{}' path to absolute: {}",
+                    material.id, material.file_path
+                );
+            }
 
             // Create DiscoveryActor with the same registry to use its methods
             let discovery_actor = DiscoveryActor {
@@ -316,7 +327,7 @@ impl Handler<messages::StartDiscovery> for DiscoveryActor {
 mod tests {
     use super::*;
     use crate::events::EventBus;
-    use crate::materials::{MaterialRepository, MaterialStatus};
+    use crate::materials::{InMemoryMaterialRepository, MaterialStatus};
     use std::fs::File;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -333,7 +344,7 @@ mod tests {
         init_test_logger();
 
         // Create a registry with an event bus
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -350,7 +361,7 @@ mod tests {
         init_test_logger();
 
         // Create a registry with an event bus
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -372,7 +383,7 @@ mod tests {
         File::create(&test_file_path).expect("Failed to create test file");
 
         // Create a registry with an event bus
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
 
         // Create a subscriber to keep the event channel open
@@ -415,7 +426,7 @@ mod tests {
         let invalid_path = "/path/to/nonexistent/directory";
 
         // Create a registry with an event bus
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
         let registry = MaterialRegistry::new(repository, event_bus);
 
@@ -460,7 +471,7 @@ mod tests {
         File::create(subdir.join("excluded.md")).expect("Failed to create test file");
 
         // Create a registry with an event bus
-        let repository = MaterialRepository::new();
+        let repository = Arc::new(InMemoryMaterialRepository::new());
         let event_bus = Arc::new(EventBus::new());
 
         // Create a subscriber to keep the event channel open

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::events::{EventBus, QuiltEvent};
-use crate::materials::{Material, MaterialRegistry, MaterialRepository};
+use crate::materials::{InMemoryMaterialRepository, Material, MaterialRegistry};
 
 /// Setup function to create a registry with event bus for testing
 async fn setup_registry() -> (MaterialRegistry, Arc<EventBus>) {
-    let repository = MaterialRepository::new();
+    let repository = Arc::new(InMemoryMaterialRepository::new());
     let event_bus = Arc::new(EventBus::new());
     let registry = MaterialRegistry::new(repository, event_bus.clone());
     (registry, event_bus)
