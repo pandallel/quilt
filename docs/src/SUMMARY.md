@@ -2,6 +2,18 @@
 
 [Introduction](README.md)
 
+# Product
+
+- [Overview](product/overview.md)
+- [User Experience](product/user-experience.md)
+- [User Journeys](product/user-journeys.md)
+- [Success Metrics](product/success-metrics.md)
+
+# Architecture
+
+- [Overview](architecture/overview.md)
+- [Core Technologies](architecture/technologies.md)
+
 # Features
 
 - [Actor Model Architecture](features/actor-model-architecture.md)
@@ -14,6 +26,12 @@
 - [Swatch](features/swatch.md)
 - [Swatch Book](features/swatch-book.md)
 - [Spread](features/spread.md)
+
+# API
+
+- [Overview](api/overview.md)
+- [Events](api/events.md)
+- [Repositories](api/repositories.md)
 
 # Development
 

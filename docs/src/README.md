@@ -2,13 +2,11 @@
 
 Use Quilt to power LLM tools with fast, structured, and evolving context—without relying on cloud infrastructure or leaking your knowledge.
 
----
-
 ## ✨ Core Principles
 
 - **Local-first** – Everything runs on your machine. No cloud, no leaks.
 - **Modular** – Watching, swatching, embedding, and querying are decoupled and swappable.
-- **Quiet** – You don’t interact with Quilt directly—it works behind the scenes to support other systems.
+- **Quiet** – You don't interact with Quilt directly—it works behind the scenes to support other systems.
 - **Crafted** – Inspired by the precision, care, and reuse of quilting.
 
 ---
@@ -21,6 +19,16 @@ Use Quilt to power LLM tools with fast, structured, and evolving context—witho
 | **Swatch**      | A meaningful fragment cut from a Material                                                   |
 | **Swatch Book** | The searchable memory of embedded Swatches                                                  |
 | **Spread**      | A contextual bundle of Swatches and their source Material, assembled in response to a Query |
+
+---
+
+## 🎯 Project Goals
+
+1.  **Powerful Local Context**: Provide rich context to LLM tools without relying on cloud infrastructure.
+2.  **Privacy Preservation**: Keep all user data and processing strictly local.
+3.  **Flexibility**: Create an adaptable system for different use cases and data types.
+4.  **Efficiency**: Process documents incrementally and respond to queries quickly.
+5.  **Quality Implementation**: Deliver a robust, production-ready engine following Rust best practices.
 
 ---
 
