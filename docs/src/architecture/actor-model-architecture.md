@@ -1,5 +1,7 @@
 # Quilt Architecture – Event-Driven Actor Model with Internal Backpressure and Material Registry
 
+> For a high-level overview of Quilt's architecture, see [Architecture Overview](overview.md).
+
 This document describes the architecture for Quilt—a local-first, modular memory and context engine. This architecture uses an event-driven approach with Actix and Tokio, incorporating an internal queue mechanism within actors for effective backpressure management, alongside a central Material Registry for state coordination. Communication between stages occurs via a single, shared `EventBus`.
 
 ---

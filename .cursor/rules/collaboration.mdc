@@ -1,0 +1,91 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Human-Centered Documentation Rules
+
+## Core Philosophy
+
+As an AI assistant, I enhance the human documentation workflow by seamlessly integrating with the project's mdBook documentation. Rather than maintaining separate AI-specific documentation, I use the same knowledge sources as the team, ensuring a single source of truth.
+
+## Documentation Structure
+
+I reference the project's mdBook documentation at `docs/src/` as my primary knowledge source:
+
+- **Introduction (docs/src/README.md)** - Core project overview and principles
+- **Features (docs/src/features/)** - Technical specifications and architecture
+- **Development (docs/src/development/)** - Development workflows and processes
+
+## Documentation Workflow
+
+For each new task, I review these specific files:
+
+1. **docs/src/SUMMARY.md** - To understand the documentation structure
+2. **docs/src/README.md** - For project overview and core principles
+3. **docs/src/development/guide.md** - For development standards
+4. **Task-specific feature documentation** - Based on the work at hand
+
+```mermaid
+flowchart TD
+    Start[Start] --> ReadSummary[Read SUMMARY.md]
+    ReadSummary --> ReadReadme[Read README.md]
+    ReadReadme --> ReadDevGuide[Read development/guide.md]
+    ReadDevGuide --> ReadFeatureDocs[Read Task-Specific Feature Docs]
+    ReadFeatureDocs --> Analyze[Analyze Current Documentation]
+    Analyze --> IdentifyGaps[Identify Documentation Gaps]
+    IdentifyGaps --> CreateImplementationPlan[Create Implementation Plan]
+```
+
+## Implementation Planning & Work State
+
+I store the current work state in:
+
+- **docs/src/development/implementation-plans/** - possible implementation plans
+- **.ai/current-work.md** - stores a reference to the currently active implementation plan
+
+The implementation plan includes:
+1. Task requirements
+2. Technical approach
+3. Files to be modified
+4. Testing strategy
+5. Documentation updates needed
+
+## Update Triggers
+
+I update documentation based on these commands:
+
+- **`UPDATE_DOCS`** - Review all documentation and suggest updates
+- **`REFRESH_CONTEXT`** - Refresh my understanding of the documentation
+- **`SAVE_PLAN`** - Save the current implementation plan to docs/src/development/implementation-plans/
+- **`DOCUMENT_FEATURE`** - Create or update feature documentation
+
+## Documentation Reading Priority
+
+For each task, I read these files in order:
+
+1. **docs/src/SUMMARY.md** - Navigation structure
+2. **docs/src/README.md** - Project overview
+3. **docs/src/development/guide.md** - Development standards  
+4. **docs/src/development/testing_and_linting.md** - Quality standards
+5. **Feature-specific documentation** - Based on the task
+
+## Documentation Updates
+
+When suggesting documentation updates:
+
+1. Identify the specific mdBook file to update
+2. Explain why the update is needed
+3. Show the proposed changes in Markdown format
+4. Only implement after approval
+
+## Knowledge Tracking
+
+When I discover new information that's not documented:
+
+1. Create a branch for documentation updates
+2. Update or create appropriate .md files in docs/src/
+3. Update SUMMARY.md if adding new pages
+4. Suggest a PR with documentation changes
+
+Remember: The docs/src/ directory is the single source of truth

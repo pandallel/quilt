@@ -2,9 +2,18 @@
 
 [Introduction](README.md)
 
+# Product
+
+- [Overview](product/overview.md)
+
+# Architecture
+
+- [Overview](architecture/overview.md)
+- [Core Technologies](architecture/technologies.md)
+- [Actor Model Architecture](architecture/actor-model-architecture.md)
+
 # Features
 
-- [Actor Model Architecture](features/actor-model-architecture.md)
 - [Discovery](features/discovery/discovery.md)
   - [Directory Scanner](features/discovery/directory-scanner.md)
 - [Material Cutting](features/cutting/README.md)
@@ -18,3 +27,4 @@
 # Development
 
 - [Development Guide](development/guide.md)
+- [Implementation Plan](development/implementation-plans/initial-implementation-plan.md)
