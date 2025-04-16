@@ -2,6 +2,8 @@
 
 Use Quilt to power LLM tools with fast, structured, and evolving context—without relying on cloud infrastructure or leaking your knowledge.
 
+> For a more detailed explanation of Quilt's features and implementation, see the [Product Overview](product/overview.md).
+
 ## ✨ Core Principles
 
 - **Local-first** – Everything runs on your machine. No cloud, no leaks.

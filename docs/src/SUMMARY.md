@@ -5,18 +5,15 @@
 # Product
 
 - [Overview](product/overview.md)
-- [User Experience](product/user-experience.md)
-- [User Journeys](product/user-journeys.md)
-- [Success Metrics](product/success-metrics.md)
 
 # Architecture
 
 - [Overview](architecture/overview.md)
 - [Core Technologies](architecture/technologies.md)
+- [Actor Model Architecture](architecture/actor-model-architecture.md)
 
 # Features
 
-- [Actor Model Architecture](features/actor-model-architecture.md)
 - [Discovery](features/discovery/discovery.md)
   - [Directory Scanner](features/discovery/directory-scanner.md)
 - [Material Cutting](features/cutting/README.md)
@@ -27,12 +24,7 @@
 - [Swatch Book](features/swatch-book.md)
 - [Spread](features/spread.md)
 
-# API
-
-- [Overview](api/overview.md)
-- [Events](api/events.md)
-- [Repositories](api/repositories.md)
-
 # Development
 
 - [Development Guide](development/guide.md)
+- [Implementation Plan](development/implementation-plans/initial-implementation-plan.md)
