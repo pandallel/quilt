@@ -20,7 +20,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 
 **Demonstration:** Unit tests for `SqliteSwatchRepository` pass, verifying CRUD operations and embedding serialization/deserialization. `search_similar` is confirmed as unimplemented.
 
-### Milestone: "Integrate Swatch Repository into Actor System"
+### Milestone: "Integrate Swatch Repository into Actor System" [COMPLETED]
 
 **Goal:** Connect the implemented `SqliteSwatchRepository` to the `QuiltOrchestrator` and `SwatchingActor`.
 **Implementation Time:** ~0.5 - 1 day

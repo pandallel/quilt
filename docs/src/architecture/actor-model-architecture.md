@@ -30,7 +30,7 @@ Materials flow through a pipeline of independent processing stages, communicated
     - The `Swatching Actor` system subscribes to the central `EventBus`.
     - Its internal listener filters for `MaterialCut` events.
     - It uses an internal queue to buffer these events.
-    - It processes items from its queue, potentially using concurrent futures for embedding.
+    - It processes items from its queue, potentially using concurrent futures for embedding. It uses a `SwatchRepository` to persist the generated swatches.
     - Upon completion, it updates the `MaterialRegistry`.
     - The `MaterialRegistry` persists the state and publishes a `MaterialSwatched` event onto the central `EventBus`.
 
@@ -176,9 +176,9 @@ flowchart TD
 
 ### Material Repository
 
-- **Role:** Handles persistence of materials and their state.
-- **Responsibilities:** Save and load materials, handle persistence errors, provide atomic storage operations.
-- **Implementation:** A trait that can be implemented for different storage backends (e.g., SQLite, filesystem).
+- **Role:** Handles persistence of materials and their state. Similar repository traits (`CutsRepository`, `SwatchRepository`) handle persistence for Cuts and Swatches respectively.
+- **Responsibilities:** Save and load materials (or cuts/swatches), handle persistence errors, provide atomic storage operations.
+- **Implementation:** A trait that can be implemented for different storage backends (e.g., SQLite, filesystem). Example shown for `MaterialRepository`:
 
   ```rust
   use async_trait::async_trait;
