@@ -9,7 +9,7 @@ use super::swatch::Swatch;
 // Helper function to serialize Vec<f32> to Vec<u8>
 // Uses native endianness for potentially better performance on the same architecture.
 fn f32_vec_to_bytes(vec: &[f32]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(vec.len() * std::mem::size_of::<f32>());
+    let mut bytes = Vec::with_capacity(std::mem::size_of_val(vec));
     for &float in vec {
         bytes.extend_from_slice(&float.to_ne_bytes()); // Using native endianness
     }
@@ -82,7 +82,7 @@ impl SwatchRepository for SqliteSwatchRepository {
         let metadata_json = swatch
             .metadata
             .as_ref()
-            .map(|v| serde_json::to_string(v))
+            .map(serde_json::to_string)
             .transpose()
             .map_err(|e| {
                 SwatchRepositoryError::OperationFailed(
@@ -155,7 +155,7 @@ impl SwatchRepository for SqliteSwatchRepository {
             let metadata_json = swatch
                 .metadata
                 .as_ref()
-                .map(|v| serde_json::to_string(v))
+                .map(serde_json::to_string)
                 .transpose()
                 .map_err(|e| {
                     SwatchRepositoryError::OperationFailed(
@@ -332,7 +332,6 @@ impl SwatchRepository for SqliteSwatchRepository {
                     exec_result.rows_affected(),
                     cut_id
                 );
-                ()
             })
             .map_err(|e| {
                 error!("Failed to delete swatches for cut {}: {}", cut_id, e);
@@ -352,7 +351,6 @@ impl SwatchRepository for SqliteSwatchRepository {
                     exec_result.rows_affected(),
                     material_id
                 );
-                ()
             })
             .map_err(|e| {
                 error!(
@@ -706,16 +704,16 @@ mod tests {
             .expect("Save mat1");
 
         // --- Cut A (Material 1) ---
-        let cutA = Cut::new(material_id1.clone(), 0, "Cut A".to_string());
-        let cut_idA = cutA.id.clone();
-        cuts_repo.save_cut(&cutA).await.expect("Save cutA");
-        let swatchA = create_test_swatch(&cut_idA, &material_id1);
+        let cut_a = Cut::new(material_id1.clone(), 0, "Cut A".to_string());
+        let cut_id_a = cut_a.id.clone();
+        cuts_repo.save_cut(&cut_a).await.expect("Save cutA");
+        let swatch_a = create_test_swatch(&cut_id_a, &material_id1);
 
         // --- Cut B (Material 1) ---
-        let cutB = Cut::new(material_id1.clone(), 1, "Cut B".to_string());
-        let cut_idB = cutB.id.clone();
-        cuts_repo.save_cut(&cutB).await.expect("Save cutB");
-        let swatchB = create_test_swatch(&cut_idB, &material_id1);
+        let cut_b = Cut::new(material_id1.clone(), 1, "Cut B".to_string());
+        let cut_id_b = cut_b.id.clone();
+        cuts_repo.save_cut(&cut_b).await.expect("Save cutB");
+        let swatch_b = create_test_swatch(&cut_id_b, &material_id1);
 
         // --- Material 2 (Different) ---
         let material2 = Material::new("test/mat-different.txt".to_string());
@@ -726,13 +724,13 @@ mod tests {
             .expect("Save mat2");
 
         // --- Cut C (Material 2) ---
-        let cutC = Cut::new(material_id2.clone(), 0, "Cut C".to_string());
-        let cut_idC = cutC.id.clone();
-        cuts_repo.save_cut(&cutC).await.expect("Save cutC");
-        let swatchC = create_test_swatch(&cut_idC, &material_id2);
+        let cut_c = Cut::new(material_id2.clone(), 0, "Cut C".to_string());
+        let cut_id_c = cut_c.id.clone();
+        cuts_repo.save_cut(&cut_c).await.expect("Save cutC");
+        let swatch_c = create_test_swatch(&cut_id_c, &material_id2);
 
         swatch_repo
-            .save_swatches_batch(&[swatchA.clone(), swatchB.clone(), swatchC.clone()])
+            .save_swatches_batch(&[swatch_a.clone(), swatch_b.clone(), swatch_c.clone()])
             .await
             .expect("Batch save failed");
 
@@ -742,9 +740,9 @@ mod tests {
             .expect("Failed to get by material_id");
 
         assert_eq!(results.len(), 2);
-        assert!(results.iter().any(|s| s.id == swatchA.id));
-        assert!(results.iter().any(|s| s.id == swatchB.id));
-        assert!(!results.iter().any(|s| s.id == swatchC.id)); // Ensure swatchC is not included
+        assert!(results.iter().any(|s| s.id == swatch_a.id));
+        assert!(results.iter().any(|s| s.id == swatch_b.id));
+        assert!(!results.iter().any(|s| s.id == swatch_c.id)); // Ensure swatchC is not included
     }
 
     #[tokio::test]
@@ -786,39 +784,39 @@ mod tests {
         let cuts_repo = SqliteCutsRepository::new(pool.clone());
 
         // --- Material X ---
-        let matX = Material::new("test/del-cut-matX.txt".to_string());
-        let matX_id = matX.id.clone();
+        let mat_x = Material::new("test/del-cut-matX.txt".to_string());
+        let mat_x_id = mat_x.id.clone();
         material_repo
-            .register_material(matX)
+            .register_material(mat_x)
             .await
             .expect("Save matX");
 
         // --- Cut 1 (matX - to be deleted) ---
-        let cut1 = Cut::new(matX_id.clone(), 0, "Cut 1".to_string());
+        let cut1 = Cut::new(mat_x_id.clone(), 0, "Cut 1".to_string());
         let cut1_id = cut1.id.clone();
         cuts_repo.save_cut(&cut1).await.expect("Save cut1");
-        let swatch1 = create_test_swatch(&cut1_id, &matX_id);
+        let swatch1 = create_test_swatch(&cut1_id, &mat_x_id);
 
         // --- Cut 2 (matX - different cut, same material - should be deleted too) ---
         // Re-use the same cut ID for deletion test
-        let cut2 = Cut::new(matX_id.clone(), 1, "Cut 2".to_string());
+        let cut2 = Cut::new(mat_x_id.clone(), 1, "Cut 2".to_string());
         let cut2_id = cut2.id.clone();
         cuts_repo.save_cut(&cut2).await.expect("Save cut2");
-        let swatch2 = create_test_swatch(&cut2_id, &matX_id);
+        let swatch2 = create_test_swatch(&cut2_id, &mat_x_id);
 
         // --- Material Y ---
-        let matY = Material::new("test/del-cut-matY.txt".to_string());
-        let matY_id = matY.id.clone();
+        let mat_y = Material::new("test/del-cut-matY.txt".to_string());
+        let mat_y_id = mat_y.id.clone();
         material_repo
-            .register_material(matY)
+            .register_material(mat_y)
             .await
             .expect("Save matY");
 
         // --- Cut 3 (matY - different cut, should remain) ---
-        let cut3 = Cut::new(matY_id.clone(), 0, "Cut 3".to_string());
+        let cut3 = Cut::new(mat_y_id.clone(), 0, "Cut 3".to_string());
         let cut3_id = cut3.id.clone();
         cuts_repo.save_cut(&cut3).await.expect("Save cut3");
-        let swatch3 = create_test_swatch(&cut3_id, &matY_id);
+        let swatch3 = create_test_swatch(&cut3_id, &mat_y_id);
 
         swatch_repo
             .save_swatches_batch(&[swatch1.clone(), swatch2.clone(), swatch3.clone()])
@@ -874,16 +872,16 @@ mod tests {
             .expect("Save mat1");
 
         // --- Cut X (mat1) ---
-        let cutX = Cut::new(mat1_id.clone(), 0, "Cut X".to_string());
-        let cutX_id = cutX.id.clone();
-        cuts_repo.save_cut(&cutX).await.expect("Save cutX");
-        let swatch1 = create_test_swatch(&cutX_id, &mat1_id);
+        let cut_x = Cut::new(mat1_id.clone(), 0, "Cut X".to_string());
+        let cut_x_id = cut_x.id.clone();
+        cuts_repo.save_cut(&cut_x).await.expect("Save cutX");
+        let swatch1 = create_test_swatch(&cut_x_id, &mat1_id);
 
         // --- Cut Y (mat1) ---
-        let cutY = Cut::new(mat1_id.clone(), 1, "Cut Y".to_string());
-        let cutY_id = cutY.id.clone();
-        cuts_repo.save_cut(&cutY).await.expect("Save cutY");
-        let swatch2 = create_test_swatch(&cutY_id, &mat1_id);
+        let cut_y = Cut::new(mat1_id.clone(), 1, "Cut Y".to_string());
+        let cut_y_id = cut_y.id.clone();
+        cuts_repo.save_cut(&cut_y).await.expect("Save cutY");
+        let swatch2 = create_test_swatch(&cut_y_id, &mat1_id);
 
         // --- Material 2 (Different) ---
         let mat2 = Material::new("test/del-mat-other.txt".to_string());
@@ -894,10 +892,10 @@ mod tests {
             .expect("Save mat2");
 
         // --- Cut Z (mat2) ---
-        let cutZ = Cut::new(mat2_id.clone(), 0, "Cut Z".to_string());
-        let cutZ_id = cutZ.id.clone();
-        cuts_repo.save_cut(&cutZ).await.expect("Save cutZ");
-        let swatch3 = create_test_swatch(&cutZ_id, &mat2_id);
+        let cut_z = Cut::new(mat2_id.clone(), 0, "Cut Z".to_string());
+        let cut_z_id = cut_z.id.clone();
+        cuts_repo.save_cut(&cut_z).await.expect("Save cutZ");
+        let swatch3 = create_test_swatch(&cut_z_id, &mat2_id);
 
         swatch_repo
             .save_swatches_batch(&[swatch1.clone(), swatch2.clone(), swatch3.clone()])
