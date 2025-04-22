@@ -11,7 +11,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 2.  **Implement Repository (`src/swatching/sqlite_repository.rs`)**:
     - Create `SqliteSwatchRepository` struct holding a `SqlitePool`.
     - Implement the `SwatchRepository` trait.
-    - Handle `Vec<f32>` <=> `BLOB` serialization/deserialization for the `embedding` column.
+    - Handle `Vec<f32>` <=> `BLOB` serialization/deserialization for the `embedding` column. Converting Vec<f32> ↔ BLOB via bytemuck or bincode is straightforward and zero‑copy if you choose.
     - Implement basic CRUD methods (`save_swatch`, `get_swatch_by_id`, `delete_swatch`, etc.).
     - **Stub out** the `search_similar` method (e.g., return `Err(OperationFailed)` or an empty `Vec`).
 3.  **Unit Tests (`src/swatching/sqlite_repository.rs`)**:
@@ -38,7 +38,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 **Implementation Time:** ~3-4 days
 
 1.  **Inject `CutsRepository`**: Update `SwatchingActor` and `QuiltOrchestrator` to inject the `CutsRepository` dependency into `SwatchingActor`.
-2.  **Implement Embedding Generation**: Choose and integrate an embedding strategy (e.g., `rust-bert`, ONNX). Implement logic in the actor's processor task to generate embeddings (`Vec<f32>`) for `Cut` content.
+2.  **Implement Embedding Generation**: Use `fastembed` and `https://huggingface.co/BAAI/bge-small-en-v1.5`. Implement logic in the actor's processor task to generate embeddings (`Vec<f32>`) for `Cut` content.
 3.  **Implement Swatching Logic**: Modify `SwatchingActor`'s processor task:
     - Retrieve `Cut`s using the injected `CutsRepository`.
     - Generate `Vec<f32>` embeddings for the cuts.
