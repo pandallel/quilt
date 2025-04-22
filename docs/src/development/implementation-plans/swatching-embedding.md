@@ -2,7 +2,7 @@
 
 This workstream focuses on the logic within the Swatching Actor to generate embeddings for text cuts and create Swatch objects.
 
-### Milestone: "Implement SQLite Swatch Repository (Persistence Only)"
+### Milestone: "Implement SQLite Swatch Repository (Persistence Only)" [COMPLETED]
 
 **Goal:** Implement the basic SQLite persistence layer for swatches, storing embeddings as `BLOB`s. **Vector search will be handled in a later milestone.**
 **Implementation Time:** ~1-2 days

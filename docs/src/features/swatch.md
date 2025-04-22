@@ -52,3 +52,16 @@ Swatches are used to:
 - Retrieve original Materials for addition to the Spread
 - Enable precise information retrieval
 - Maintain relationships between content pieces
+
+## Persistence
+
+Once created, Swatches (along with their generated embeddings) are persisted for later retrieval. This is handled by components implementing the `SwatchRepository` trait.
+
+The current primary implementation uses an SQLite database (`SqliteSwatchRepository`) to store Swatch data, including:
+
+- Core metadata (ID, source material ID, source cut ID)
+- Embedding model details (name, version)
+- The embedding vector itself (stored as a `BLOB`)
+- Optional user-defined metadata (as JSON)
+
+This allows for efficient querying and retrieval of swatches, forming the basis of the Swatch Book.
