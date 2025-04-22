@@ -51,12 +51,6 @@ pub trait SwatchRepository: Send + Sync + Debug + 'static {
     /// Delete all swatches for a material
     async fn delete_swatches_by_material_id(&self, material_id: &str) -> Result<()>;
 
-    /// Count swatches for a cut
-    async fn count_swatches_by_cut_id(&self, cut_id: &str) -> Result<usize>;
-
-    /// Count swatches for a material
-    async fn count_swatches_by_material_id(&self, material_id: &str) -> Result<usize>;
-
     /// Perform a similarity search to find the most similar swatches to an embedding
     ///
     /// * `embedding` - The query embedding to compare against
@@ -67,20 +61,6 @@ pub trait SwatchRepository: Send + Sync + Debug + 'static {
     async fn search_similar(
         &self,
         embedding: &[f32],
-        limit: usize,
-        min_score: Option<f32>,
-    ) -> Result<Vec<(Swatch, f32)>>;
-
-    /// Perform a search to find the most similar swatches to a given swatch
-    ///
-    /// * `swatch_id` - The ID of the swatch to use as the query
-    /// * `limit` - Maximum number of results to return
-    /// * `min_score` - Optional minimum similarity score (0.0 to 1.0)
-    ///
-    /// Returns a vector of (Swatch, score) pairs, sorted by decreasing similarity score
-    async fn search_similar_to_swatch(
-        &self,
-        swatch_id: &str,
         limit: usize,
         min_score: Option<f32>,
     ) -> Result<Vec<(Swatch, f32)>>;

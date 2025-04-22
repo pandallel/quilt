@@ -42,4 +42,4 @@ Thumbs.db
 *.log
 
 # AI files
-/.ai/
+.cursor/rules/current_implementation_plan.mdc

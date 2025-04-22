@@ -60,11 +60,13 @@ graph TB
 
 ## Key Technical Components
 
-1. **Material Repository** - Thread-safe data store for materials and their processing state
-2. **Discovery Worker** - Monitors input sources for new/updated materials
-3. **Cutting Worker** - Processes materials by cutting them into swatches
-4. **Labeling Worker** - Executes embedding operations on swatches
-5. **Vector-based Storage** - Persists embedded swatches for semantic retrieval
+1. **Material Registry** - Central coordinator holding material state and publishing events.
+2. **Repository Traits (`MaterialRepository`, `CutsRepository`, `SwatchRepository`)** - Define interfaces for data persistence (material status, cut content, swatch data & embeddings).
+3. **Concrete Repositories (`SqliteMaterialRepository`, `SqliteCutsRepository`, `SqliteSwatchRepository`)** - Current implementations of the repository traits using SQLite for persistence. Swatches and their embeddings are stored here.
+4. **Discovery Actor** - Monitors input sources for new/updated materials.
+5. **Cutting Actor** - Processes materials by cutting them into swatches (structured text fragments).
+6. **Swatching Actor** - Generates vector embeddings for swatches using a local model and triggers persistence via `SwatchRepository`.
+7. **Event Bus** - Facilitates communication between actors via published events.
 
 ## Material Processing Flow
 
@@ -75,23 +77,30 @@ sequenceDiagram
     participant SA as Swatching Actor
     participant Reg as Material Registry
     participant EB as Event Bus
-    participant Repo as Material Repository
+    participant MatRepo as Material Repository
+    participant CutRepo as Cuts Repository
+    participant SwatchRepo as Swatch Repository
 
     DA->>Reg: Register material
-    Reg->>Repo: Persist material
+    Reg->>MatRepo: Persist material
     Reg->>EB: Publish MaterialDiscovered
     EB-->>CA: Subscribe to MaterialDiscovered
+    CA->>CutRepo: Save Cuts
     CA->>Reg: Update status to Cut
-    Reg->>Repo: Persist updated state
+    Reg->>MatRepo: Persist updated state
     Reg->>EB: Publish MaterialCut
     EB-->>SA: Subscribe to MaterialCut
+    SA->>SwatchRepo: Save Swatches (with embeddings)
     SA->>Reg: Update status to Swatched
-    Reg->>Repo: Persist updated state
+    Reg->>MatRepo: Persist updated state
     Reg->>EB: Publish MaterialSwatched
 
     alt Error occurs
         CA->>Reg: Update status to Error
-        Reg->>Repo: Persist error state
+        Reg->>MatRepo: Persist error state
+        Reg->>EB: Publish ErrorEvent
+        SA->>Reg: Update status to Error
+        Reg->>MatRepo: Persist error state
         Reg->>EB: Publish ErrorEvent
     end
 ```

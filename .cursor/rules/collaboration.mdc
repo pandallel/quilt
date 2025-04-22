@@ -7,85 +7,135 @@ alwaysApply: true
 
 ## Core Philosophy
 
-As an AI assistant, I enhance the human documentation workflow by seamlessly integrating with the project's mdBook documentation. Rather than maintaining separate AI-specific documentation, I use the same knowledge sources as the team, ensuring a single source of truth.
+We prioritize human-readable, example-driven documentation by leveraging:
+
+- **mdBook** for structured documentation (`docs/src/`).
+- **Standard Rust Tests** (`cargo test`) for validating behavior.
+- **Examples** (if present in `examples/`) to showcase usage.
+
+All documentation is written in Markdown under `docs/src/`, ensuring a single source of truth.
+
+---
+
+## **MUST READ FIRST**: Initial Context Acquisition
+
+**At the absolute start of processing any new user request or beginning a new task/milestone, you MUST read the following core documentation files in order. This step is mandatory and precedes any planning or analysis.** This ensures you operate with the fundamental project context.
+
+**Mandatory Initial Reading List:**
+1.  `docs/src/SUMMARY.md` (Understand Documentation Structure)
+2.  `docs/src/README.md` (Project Overview & Principles)
+3.  `docs/src/development/guide.md` (Development Standards)
+4.  `docs/src/development/testing_and_linting.md` (Quality & Linting)
+5.  The current implementation plan (look in `docs/src/development/implementation-plans/`)
+
+**Do not proceed to planning, analysis, or execution until this initial reading is complete.**
+
+---
 
 ## Documentation Structure
 
-I reference the project's mdBook documentation at `docs/src/` as my primary knowledge source:
+```
+docs/
+├── src/
+│   ├── SUMMARY.md               # Table of contents for mdBook
+│   ├── README.md                # Project overview & principles
+│   ├── features/                # Feature documentation (Markdown)
+│   │   └── *.md
+│   ├── architecture/            # Architecture documentation (Markdown)
+│   │   └── *.md
+│   ├── reference/               # API reference & core docs (if applicable)
+│   └── development/
+│       ├── guide.md             # Development standards
+│       ├── testing_and_linting.md # Quality & Lint rules
+│       └── implementation-plans/
+│           └── *.md             # Drafted implementation plans
+├── book/                      # mdBook build output (ignore)
+└── examples/                  # Code examples (if applicable)
+    └── *.rs
+```
 
-- **Introduction (docs/src/README.md)** - Core project overview and principles
-- **Features (docs/src/features/)** - Technical specifications and architecture
-- **Development (docs/src/development/)** - Development workflows and processes
+---
 
 ## Documentation Workflow
 
-For each new task, I review these specific files:
+For each new task:
 
-1. **docs/src/SUMMARY.md** - To understand the documentation structure
-2. **docs/src/README.md** - For project overview and core principles
-3. **docs/src/development/guide.md** - For development standards
-4. **Task-specific feature documentation** - Based on the work at hand
+1. **Read**
+   - `docs/src/SUMMARY.md`
+   - `docs/src/README.md`
+   - `docs/src/development/guide.md`
+   - `docs/src/development/testing_and_linting.md`
+   - Task-specific documentation in `docs/src/` (e.g., `features/`, `architecture/`)
+   - Relevant examples in `examples/` (if applicable)
 
-```mermaid
-flowchart TD
-    Start[Start] --> ReadSummary[Read SUMMARY.md]
-    ReadSummary --> ReadReadme[Read README.md]
-    ReadReadme --> ReadDevGuide[Read development/guide.md]
-    ReadDevGuide --> ReadFeatureDocs[Read Task-Specific Feature Docs]
-    ReadFeatureDocs --> Analyze[Analyze Current Documentation]
-    Analyze --> IdentifyGaps[Identify Documentation Gaps]
-    IdentifyGaps --> CreateImplementationPlan[Create Implementation Plan]
-```
+2. **Experiment**
+   - Run relevant Rust tests (`cargo test`) to understand current behavior.
+   - Execute example code (if applicable).
 
-## Implementation Planning & Work State
+3. **Analyze**
+   - Compare expected behavior (from docs/requirements) against test results and implementation.
+   - Identify gaps or outdated content in documentation.
 
-I store the current work state in:
+4. **Plan**
+   - Draft an implementation plan in
+     `docs/src/development/implementation-plans/<task-name>.md`
 
-- **docs/src/development/implementation-plans/** - possible implementation plans
-- **.ai/current-work.md** - stores a reference to the currently active implementation plan
+5. **Document**
+   - Update or add Markdown in `docs/src/`.
+   - Update or add Rust tests (`#[test]`, integration tests).
+   - Update or create examples in `examples/` (if applicable).
+   - Amend `docs/src/SUMMARY.md` if structure changes.
 
-The implementation plan includes:
-1. Task requirements
-2. Technical approach
-3. Files to be modified
-4. Testing strategy
-5. Documentation updates needed
+---
+
+## Standard Workflow (After Initial Read)
+
+Once the initial context is established by reading the mandatory files:
+
+1.  **Read Task-Specific Docs (If Applicable):**
+    *   Relevant `docs/src/**/*.md`
+    *   Relevant `examples/*.rs`
+    *   Existing `docs/src/development/implementation-plans/<task-name>.md`
+2.  **Experiment:** Run relevant `cargo test`, execute examples.
+3.  **Analyze:** Compare requirements, docs, tests, and implementation. Identify gaps.
+4.  **Plan (PLAN Mode):** Draft or update the implementation plan in `docs/src/development/implementation-plans/`.
+5.  **Document & Implement (ACT Mode):** Update code, tests, examples, and documentation (`docs/src/`, `SUMMARY.md`).
+
+---
 
 ## Update Triggers
 
-I update documentation based on these commands:
+- **`update docs`** — Review recent implementations and update the documentation to match.
+- **`new plan`** — Scaffold a new implementation plan template.
 
-- **`UPDATE_DOCS`** - Review all documentation and suggest updates
-- **`REFRESH_CONTEXT`** - Refresh my understanding of the documentation
-- **`SAVE_PLAN`** - Save the current implementation plan to docs/src/development/implementation-plans/
-- **`DOCUMENT_FEATURE`** - Create or update feature documentation
+---
 
-## Documentation Reading Priority
+## File Reading Priority
 
-For each task, I read these files in order:
+1. `docs/src/SUMMARY.md`
+2. `docs/src/README.md`
+3. `docs/src/development/guide.md`
+4. `docs/src/development/testing_and_linting.md`
+5. Task-specific documentation in `docs/src/` (e.g., features, architecture)
+6. `examples/` (if applicable)
+7. `docs/src/reference/` (if applicable)
 
-1. **docs/src/SUMMARY.md** - Navigation structure
-2. **docs/src/README.md** - Project overview
-3. **docs/src/development/guide.md** - Development standards  
-4. **docs/src/development/testing_and_linting.md** - Quality standards
-5. **Feature-specific documentation** - Based on the task
+---
 
-## Documentation Updates
+## Making Documentation Updates
 
-When suggesting documentation updates:
+1. Identify the Markdown file(s) in `docs/src/` to update.
+2. Note why the update is needed.
+3. Show proposed changes in Markdown format.
+4. Update `docs/src/SUMMARY.md` if pages are added/removed.
+5. Commit changes after review.
 
-1. Identify the specific mdBook file to update
-2. Explain why the update is needed
-3. Show the proposed changes in Markdown format
-4. Only implement after approval
+---
 
 ## Knowledge Tracking
 
-When I discover new information that's not documented:
-
-1. Create a branch for documentation updates
-2. Update or create appropriate .md files in docs/src/
-3. Update SUMMARY.md if adding new pages
-4. Suggest a PR with documentation changes
-
-Remember: The docs/src/ directory is the single source of truth
+1. Create a dedicated branch for docs updates.
+2. Edit or add files in `docs/src/` and potentially `examples/`.
+3. Run `cargo test` to verify changes don't break tests.
+4. Build the docs (`cd docs && mdbook build`) to check for errors.
+5. Open a PR with updated docs, tests, and examples.
