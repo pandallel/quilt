@@ -2,17 +2,22 @@
 
 This workstream focuses on implementing vector similarity search capabilities using the generated embeddings.
 
-### Milestone 12: "Implement Basic Semantic Search"
+### Milestone: "Implement Vector Search with `sqlite-vec`"
 
-**Goal:** Implement basic vector similarity search using the stored swatches and embeddings.
+**Goal:** Integrate `sqlite-vec` and implement vector similarity search functionality on the stored swatch embeddings.
 **Implementation Time:** ~2-3 days
 
-1. Integrate Vector Search Extension (1 day)
-   - Integrate `sqlite-vec` or a similar vector search extension with the SQLite setup (`src/db.rs`).
-   - Update the `swatches` table schema and `SqliteSwatchRepository` (from M10) to store and index the embedding vectors correctly for search.
-2. Implement Search Logic (1-2 days)
-   - Add a function or method (e.g., in `SqliteSwatchRepository` or a new query service) to perform vector similarity search.
-   - Implement a basic query interface (e.g., a new command-line argument or internal function) that takes query text, generates its embedding, and performs the search.
-   - Add tests for the vector search functionality.
+1.  **Dependencies & DB Setup (`Cargo.toml`, `src/db.rs`)**:
+    - Add `sqlite-vec` crate dependency.
+    - Update `init_memory_db` function:
+      - Load/enable the `sqlite-vec` extension.
+      - Create the `vss_swatches` virtual table using `vss0` indexing the `embedding` column from the `swatches` table (use appropriate dimensions).
+2.  **Update Repository (`src/swatching/sqlite_repository.rs`)**:
+    - Modify `save_swatch`/`save_swatches_batch` to also insert the embedding into the `vss_swatches` virtual table.
+    - Modify `delete_swatch`/`delete_swatches_by_cut_id`/`delete_swatches_by_material_id` to also remove corresponding entries from `vss_swatches`.
+    - Implement the `search_similar` method using `vss_search` on the `vss_swatches` virtual table.
+3.  **Unit Tests (`src/swatching/sqlite_repository.rs`)**:
+    - Add/update unit tests specifically verifying the `search_similar` functionality and interactions with the virtual table.
+4.  **(Optional) Basic Query Interface**: Implement a basic way to test search (e.g., a simple command-line flag or internal function) that takes query text, generates its embedding (using logic from "Swatching Actor Logic" milestone), and performs the search via the repository.
 
-**Demonstration:** Running the application with a search query performs semantic search and returns relevant swatch IDs/content based on vector similarity.
+**Demonstration:** Unit tests for `SqliteSwatchRepository` pass, verifying vector search functionality. Optionally, a basic query interface allows for manual search testing.
