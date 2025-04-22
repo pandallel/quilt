@@ -72,6 +72,7 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
             created_at TEXT NOT NULL,
             dimensions INTEGER NOT NULL,
             metadata TEXT, -- Storing metadata as JSON string or similar
+            similarity_threshold REAL, -- Optional similarity threshold
             FOREIGN KEY (cut_id) REFERENCES cuts (id) ON DELETE CASCADE,
             FOREIGN KEY (material_id) REFERENCES materials (id) ON DELETE CASCADE
         )

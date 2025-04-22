@@ -69,6 +69,7 @@ impl SqliteSwatchRepository {
             created_at: row.try_get("created_at")?, // Assuming Swatch uses OffsetDateTime from time crate
             dimensions: row.try_get::<i64, _>("dimensions")? as usize, // SQLite stores as i64
             metadata,
+            similarity_threshold: row.try_get::<Option<f32>, _>("similarity_threshold")?,
         })
     }
 }
@@ -89,9 +90,9 @@ impl SwatchRepository for SqliteSwatchRepository {
             r#"
             INSERT INTO swatches (
                 id, cut_id, material_id, embedding, model_name, model_version, 
-                created_at, dimensions, metadata
+                created_at, dimensions, metadata, similarity_threshold
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 cut_id = excluded.cut_id,
                 material_id = excluded.material_id,
@@ -100,7 +101,8 @@ impl SwatchRepository for SqliteSwatchRepository {
                 model_version = excluded.model_version,
                 created_at = excluded.created_at, -- Consider if this should be updated
                 dimensions = excluded.dimensions,
-                metadata = excluded.metadata
+                metadata = excluded.metadata,
+                similarity_threshold = excluded.similarity_threshold
             "#,
         )
         .bind(&swatch.id)
@@ -112,6 +114,7 @@ impl SwatchRepository for SqliteSwatchRepository {
         .bind(swatch.created_at) // Assuming OffsetDateTime
         .bind(swatch.dimensions as i64) // Store usize as i64
         .bind(metadata_json)
+        .bind(swatch.similarity_threshold) // Bind Option<f32>
         .execute(&self.pool)
         .await;
 
@@ -149,9 +152,9 @@ impl SwatchRepository for SqliteSwatchRepository {
                  r#"
                 INSERT INTO swatches (
                     id, cut_id, material_id, embedding, model_name, model_version, 
-                    created_at, dimensions, metadata
+                    created_at, dimensions, metadata, similarity_threshold
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     cut_id = excluded.cut_id,
                     material_id = excluded.material_id,
@@ -160,7 +163,8 @@ impl SwatchRepository for SqliteSwatchRepository {
                     model_version = excluded.model_version,
                     created_at = excluded.created_at,
                     dimensions = excluded.dimensions,
-                    metadata = excluded.metadata
+                    metadata = excluded.metadata,
+                    similarity_threshold = excluded.similarity_threshold
                 "#,
             )
             .bind(&swatch.id)
@@ -172,6 +176,7 @@ impl SwatchRepository for SqliteSwatchRepository {
             .bind(swatch.created_at)
             .bind(swatch.dimensions as i64)
             .bind(metadata_json)
+            .bind(swatch.similarity_threshold) // Bind Option<f32>
             .execute(&mut *tx) // Execute within the transaction
             .await
             .map_err(|e| {
@@ -335,5 +340,488 @@ impl SwatchRepository for SqliteSwatchRepository {
         Err(SwatchRepositoryError::OperationFailed(
             "Vector search not implemented for SQLite repository".into(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::init_memory_db;
+    use crate::materials::{Material, MaterialRepository, SqliteMaterialRepository};
+    use crate::cutting::{Cut, CutsRepository, SqliteCutsRepository};
+    use serde_json::json;
+    use time::Duration;
+
+    // Helper to create a test pool
+    async fn setup() -> SqlitePool {
+        init_memory_db().await.expect("Failed to init test DB")
+    }
+
+    // Helper to create a unique swatch with default threshold
+    // Note: This no longer saves dependencies; tests must do that.
+    fn create_test_swatch(cut_id: &str, material_id: &str) -> Swatch {
+        let mut s = Swatch::new(
+            cut_id.to_string(),
+            material_id.to_string(),
+            vec![0.1, 0.2, 0.3],
+            "test-model".to_string(),
+            "v1.0".to_string(),
+        );
+        s.similarity_threshold = Some(0.85); // Add a default threshold for tests
+        s
+    }
+
+    // Helper to create a swatch with metadata and threshold
+    // Note: This no longer saves dependencies; tests must do that.
+    fn create_test_swatch_with_metadata(cut_id: &str, material_id: &str) -> Swatch {
+        let mut swatch = create_test_swatch(cut_id, material_id);
+        swatch.metadata = Some(json!({ "key": "value", "number": 123 }));
+        swatch.similarity_threshold = Some(0.9); // Can override default if needed
+        swatch
+    }
+
+    // Helper to insert prerequisite Material and Cut
+    async fn insert_test_dependencies(
+        pool: &SqlitePool,
+        material_path_suffix: &str,
+        cut_index: usize,
+    ) -> (SqliteMaterialRepository, SqliteCutsRepository, String, String) {
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        let material = Material::new(format!("test/mat-{}.txt", material_path_suffix));
+        let material_id = material.id.clone();
+        material_repo
+            .register_material(material)
+            .await
+            .expect("Failed to save test material");
+
+        let cut = Cut::new(
+            material_id.clone(),
+            cut_index,
+            format!("Test cut content {}", cut_index),
+        );
+        let cut_id = cut.id.clone();
+        cuts_repo
+            .save_cut(&cut)
+            .await
+            .expect("Failed to save test cut");
+
+        (material_repo, cuts_repo, material_id, cut_id)
+    }
+
+    #[tokio::test]
+    async fn test_save_and_get_swatch() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let (_material_repo, _cuts_repo, material_id, cut_id) = 
+            insert_test_dependencies(&pool, "save-get", 0).await;
+        
+        let swatch = create_test_swatch(&cut_id, &material_id);
+
+        swatch_repo.save_swatch(&swatch).await.expect("Failed to save");
+
+        let retrieved_swatch = swatch_repo
+            .get_swatch_by_id(&swatch.id)
+            .await
+            .expect("Failed to get")
+            .expect("Swatch not found");
+
+        // Compare fields individually
+        assert_eq!(retrieved_swatch.id, swatch.id);
+        assert_eq!(retrieved_swatch.cut_id, cut_id);
+        assert_eq!(retrieved_swatch.material_id, material_id);
+        assert_eq!(retrieved_swatch.embedding, swatch.embedding);
+        assert_eq!(retrieved_swatch.model_name, swatch.model_name);
+        assert_eq!(retrieved_swatch.model_version, swatch.model_version);
+        assert_eq!(retrieved_swatch.dimensions, swatch.dimensions);
+        assert!(retrieved_swatch.metadata.is_none()); // Metadata is none in base helper
+        assert_eq!(retrieved_swatch.similarity_threshold, Some(0.85)); // Check threshold
+        // Allow a small tolerance for timestamp comparison
+        assert!((retrieved_swatch.created_at - swatch.created_at).abs() < Duration::seconds(1));
+    }
+
+    #[tokio::test]
+    async fn test_save_and_get_swatch_with_metadata() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let (_material_repo, _cuts_repo, material_id, cut_id) = 
+            insert_test_dependencies(&pool, "save-get-meta", 0).await;
+
+        let swatch = create_test_swatch_with_metadata(&cut_id, &material_id);
+
+        swatch_repo.save_swatch(&swatch).await.expect("Failed to save");
+
+        let retrieved_swatch = swatch_repo
+            .get_swatch_by_id(&swatch.id)
+            .await
+            .expect("Failed to get")
+            .expect("Swatch not found");
+
+        assert_eq!(retrieved_swatch.id, swatch.id);
+        assert_eq!(retrieved_swatch.cut_id, cut_id);
+        assert_eq!(retrieved_swatch.material_id, material_id);
+        assert_eq!(retrieved_swatch.metadata, swatch.metadata);
+        assert_eq!(retrieved_swatch.similarity_threshold, Some(0.9)); // Check threshold
+    }
+
+
+    #[tokio::test]
+    async fn test_get_swatch_not_found() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        // No dependencies inserted for this test
+        let non_existent_id = cuid2::cuid(); // Generate a valid CUID
+
+        let result = swatch_repo.get_swatch_by_id(&non_existent_id).await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_save_swatch_upsert() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+         let (_material_repo, _cuts_repo, material_id, cut_id) = 
+            insert_test_dependencies(&pool, "upsert", 0).await;
+
+        let mut swatch = create_test_swatch(&cut_id, &material_id);
+        swatch.similarity_threshold = Some(0.7); // Initial threshold
+
+        // Initial save
+        swatch_repo.save_swatch(&swatch).await.expect("Initial save failed");
+
+        // Modify and save again (upsert)
+        swatch.model_version = "v1.1".to_string();
+        swatch.embedding = vec![0.4, 0.5];
+        swatch.dimensions = swatch.embedding.len();
+        swatch.similarity_threshold = Some(0.75); // Update threshold
+
+        swatch_repo.save_swatch(&swatch).await.expect("Upsert save failed");
+
+        let retrieved_swatch = swatch_repo
+            .get_swatch_by_id(&swatch.id)
+            .await
+            .expect("Failed to get after upsert")
+            .expect("Swatch not found after upsert");
+
+        assert_eq!(retrieved_swatch.id, swatch.id);
+        assert_eq!(retrieved_swatch.model_version, "v1.1");
+        assert_eq!(retrieved_swatch.embedding, vec![0.4, 0.5]);
+        assert_eq!(retrieved_swatch.dimensions, 2);
+        assert_eq!(retrieved_swatch.similarity_threshold, Some(0.75)); // Check updated threshold
+    }
+
+    #[tokio::test]
+    async fn test_save_batch_and_get() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        // --- Swatch 1 dependencies ---
+        let material1 = Material::new("test/mat-batch1.txt".to_string());
+        let material_id1 = material1.id.clone();
+        material_repo.register_material(material1).await.expect("Save mat1");
+        let cut1 = Cut::new(material_id1.clone(), 0, "Cut 1".to_string());
+        let cut_id1 = cut1.id.clone();
+        cuts_repo.save_cut(&cut1).await.expect("Save cut1");
+        let swatch1 = create_test_swatch(&cut_id1, &material_id1);
+
+        // --- Swatch 2 dependencies ---
+        let material2 = Material::new("test/mat-batch2.txt".to_string());
+        let material_id2 = material2.id.clone();
+        material_repo.register_material(material2).await.expect("Save mat2");
+        let cut2 = Cut::new(material_id2.clone(), 0, "Cut 2".to_string());
+        let cut_id2 = cut2.id.clone();
+        cuts_repo.save_cut(&cut2).await.expect("Save cut2");
+        let swatch2 = create_test_swatch_with_metadata(&cut_id2, &material_id2);
+
+        let swatches = vec![swatch1.clone(), swatch2.clone()];
+
+        swatch_repo.save_swatches_batch(&swatches)
+            .await
+            .expect("Batch save failed");
+
+        let retrieved1 = swatch_repo
+            .get_swatch_by_id(&swatch1.id)
+            .await
+            .expect("Failed to get swatch1")
+            .expect("Swatch1 not found");
+        let retrieved2 = swatch_repo
+            .get_swatch_by_id(&swatch2.id)
+            .await
+            .expect("Failed to get swatch2")
+            .expect("Swatch2 not found");
+
+        assert_eq!(retrieved1.id, swatch1.id);
+        assert_eq!(retrieved2.id, swatch2.id);
+        assert_eq!(retrieved2.metadata, swatch2.metadata);
+        assert_eq!(retrieved2.similarity_threshold, swatch2.similarity_threshold);
+    }
+
+    #[tokio::test]
+    async fn test_get_swatches_by_cut_id() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        // --- Shared Material ---
+        let material_shared = Material::new("test/mat-get-by-cut.txt".to_string());
+        let material_id_shared = material_shared.id.clone();
+        material_repo.register_material(material_shared).await.expect("Save mat-shared");
+
+        // --- Cut 1 (Shared) ---
+        let cut1 = Cut::new(material_id_shared.clone(), 0, "Cut 1".to_string());
+        let cut_id1 = cut1.id.clone();
+        cuts_repo.save_cut(&cut1).await.expect("Save cut1");
+        let swatch1 = create_test_swatch(&cut_id1, &material_id_shared);
+
+        // --- Cut 2 (Shared) ---
+        let cut2 = Cut::new(material_id_shared.clone(), 1, "Cut 2".to_string());
+        let cut_id2 = cut2.id.clone();
+        cuts_repo.save_cut(&cut2).await.expect("Save cut2");
+        let swatch2 = create_test_swatch(&cut_id2, &material_id_shared);
+
+         // Test getting by Cut ID 3
+        let material_other = Material::new("test/mat-other.txt".to_string());
+        let material_id_other = material_other.id.clone();
+        material_repo.register_material(material_other).await.expect("Save mat-other");
+        let cut3 = Cut::new(material_id_other.clone(), 0, "Cut 3".to_string());
+        let cut_id3 = cut3.id.clone();
+        cuts_repo.save_cut(&cut3).await.expect("Save cut3");
+        let swatch3 = create_test_swatch(&cut_id3, &material_id_other);
+
+
+        swatch_repo.save_swatches_batch(&[swatch1.clone(), swatch2.clone(), swatch3.clone()])
+            .await
+            .expect("Batch save failed");
+
+        // Test getting by Cut ID 1
+        let results1 = swatch_repo
+            .get_swatches_by_cut_id(&cut_id1)
+            .await
+            .expect("Failed to get by cut_id1");
+        assert_eq!(results1.len(), 1);
+        assert_eq!(results1[0].id, swatch1.id);
+
+        // Test getting by Cut ID 2
+        let results2 = swatch_repo
+            .get_swatches_by_cut_id(&cut_id2)
+            .await
+            .expect("Failed to get by cut_id2");
+        assert_eq!(results2.len(), 1);
+        assert_eq!(results2[0].id, swatch2.id);
+
+         // Test getting by Cut ID 3
+        let results3 = swatch_repo
+            .get_swatches_by_cut_id(&cut_id3)
+            .await
+            .expect("Failed to get by cut_id3");
+        assert_eq!(results3.len(), 1);
+        assert_eq!(results3[0].id, swatch3.id);
+    }
+
+     #[tokio::test]
+    async fn test_get_swatches_by_material_id() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        // --- Material 1 (Shared) ---
+        let material1 = Material::new("test/mat-shared.txt".to_string());
+        let material_id1 = material1.id.clone();
+        material_repo.register_material(material1).await.expect("Save mat1");
+
+        // --- Cut A (Material 1) ---
+        let cutA = Cut::new(material_id1.clone(), 0, "Cut A".to_string());
+        let cut_idA = cutA.id.clone();
+        cuts_repo.save_cut(&cutA).await.expect("Save cutA");
+        let swatchA = create_test_swatch(&cut_idA, &material_id1);
+
+        // --- Cut B (Material 1) ---
+        let cutB = Cut::new(material_id1.clone(), 1, "Cut B".to_string());
+        let cut_idB = cutB.id.clone();
+        cuts_repo.save_cut(&cutB).await.expect("Save cutB");
+        let swatchB = create_test_swatch(&cut_idB, &material_id1);
+
+        // --- Material 2 (Different) ---
+        let material2 = Material::new("test/mat-different.txt".to_string());
+        let material_id2 = material2.id.clone();
+        material_repo.register_material(material2).await.expect("Save mat2");
+
+        // --- Cut C (Material 2) ---
+        let cutC = Cut::new(material_id2.clone(), 0, "Cut C".to_string());
+        let cut_idC = cutC.id.clone();
+        cuts_repo.save_cut(&cutC).await.expect("Save cutC");
+        let swatchC = create_test_swatch(&cut_idC, &material_id2);
+
+        swatch_repo.save_swatches_batch(&[swatchA.clone(), swatchB.clone(), swatchC.clone()])
+            .await
+            .expect("Batch save failed");
+
+        let results = swatch_repo
+            .get_swatches_by_material_id(&material_id1)
+            .await
+            .expect("Failed to get by material_id");
+
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|s| s.id == swatchA.id));
+        assert!(results.iter().any(|s| s.id == swatchB.id));
+        assert!(!results.iter().any(|s| s.id == swatchC.id)); // Ensure swatchC is not included
+    }
+
+    #[tokio::test]
+    async fn test_delete_swatch() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let (_material_repo, _cuts_repo, material_id, cut_id) = 
+            insert_test_dependencies(&pool, "del-sw", 0).await;
+
+        let swatch = create_test_swatch(&cut_id, &material_id);
+
+        swatch_repo.save_swatch(&swatch).await.expect("Save failed");
+
+        // Delete
+        let result = swatch_repo.delete_swatch(&swatch.id).await;
+        assert!(result.is_ok(), "Delete failed: {:?}", result.err());
+
+        // Verify deleted
+        let retrieved = swatch_repo.get_swatch_by_id(&swatch.id).await.expect("Get after delete failed");
+        assert!(retrieved.is_none(), "Swatch was not deleted");
+
+        // Test deleting non-existent
+        let result = swatch_repo.delete_swatch(&swatch.id).await; // Delete again
+        assert!(result.is_err());
+        assert!(matches!(result.err().unwrap(), SwatchRepositoryError::SwatchNotFound(_)));
+    }
+
+     #[tokio::test]
+    async fn test_delete_swatches_by_cut_id() {
+        let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        // --- Material X ---
+        let matX = Material::new("test/del-cut-matX.txt".to_string());
+        let matX_id = matX.id.clone();
+        material_repo.register_material(matX).await.expect("Save matX");
+
+        // --- Cut 1 (matX - to be deleted) ---
+        let cut1 = Cut::new(matX_id.clone(), 0, "Cut 1".to_string());
+        let cut1_id = cut1.id.clone();
+        cuts_repo.save_cut(&cut1).await.expect("Save cut1");
+        let swatch1 = create_test_swatch(&cut1_id, &matX_id);
+
+        // --- Cut 2 (matX - different cut, same material - should be deleted too) ---
+        // Re-use the same cut ID for deletion test
+        let cut2 = Cut::new(matX_id.clone(), 1, "Cut 2".to_string()); 
+        let cut2_id = cut2.id.clone(); 
+        cuts_repo.save_cut(&cut2).await.expect("Save cut2");
+        let swatch2 = create_test_swatch(&cut2_id, &matX_id);
+        
+
+        // --- Material Y ---
+        let matY = Material::new("test/del-cut-matY.txt".to_string());
+        let matY_id = matY.id.clone();
+        material_repo.register_material(matY).await.expect("Save matY");
+
+        // --- Cut 3 (matY - different cut, should remain) ---
+        let cut3 = Cut::new(matY_id.clone(), 0, "Cut 3".to_string());
+        let cut3_id = cut3.id.clone();
+        cuts_repo.save_cut(&cut3).await.expect("Save cut3");
+        let swatch3 = create_test_swatch(&cut3_id, &matY_id);
+
+        swatch_repo.save_swatches_batch(&[swatch1.clone(), swatch2.clone(), swatch3.clone()])
+            .await
+            .expect("Batch save failed");
+
+        // Delete by cut_id (only deletes swatches associated with cut1_id)
+        let result = swatch_repo.delete_swatches_by_cut_id(&cut1_id).await;
+        assert!(result.is_ok(), "Delete by cut_id failed: {:?}", result.err());
+
+        // Verify deleted
+        let retrieved1 = swatch_repo.get_swatch_by_id(&swatch1.id).await.expect("Get s1 failed");
+        let retrieved2 = swatch_repo.get_swatch_by_id(&swatch2.id).await.expect("Get s2 failed");
+        let retrieved3 = swatch_repo.get_swatch_by_id(&swatch3.id).await.expect("Get s3 failed");
+
+        assert!(retrieved1.is_none(), "Swatch1 not deleted by cut_id");
+        assert!(retrieved2.is_some(), "Swatch2 (different cut_id) was incorrectly deleted");
+        assert!(retrieved3.is_some(), "Swatch3 (different cut_id) was incorrectly deleted");
+    }
+
+     #[tokio::test]
+    async fn test_delete_swatches_by_material_id() {
+         let pool = setup().await;
+        let swatch_repo = SqliteSwatchRepository::new(pool.clone());
+        let material_repo = SqliteMaterialRepository::new(pool.clone());
+        let cuts_repo = SqliteCutsRepository::new(pool.clone());
+
+        // --- Material 1 (To be deleted) ---
+        let mat1 = Material::new("test/del-mat-1.txt".to_string());
+        let mat1_id = mat1.id.clone();
+        material_repo.register_material(mat1).await.expect("Save mat1");
+
+        // --- Cut X (mat1) ---
+        let cutX = Cut::new(mat1_id.clone(), 0, "Cut X".to_string());
+        let cutX_id = cutX.id.clone();
+        cuts_repo.save_cut(&cutX).await.expect("Save cutX");
+        let swatch1 = create_test_swatch(&cutX_id, &mat1_id);
+
+        // --- Cut Y (mat1) ---
+        let cutY = Cut::new(mat1_id.clone(), 1, "Cut Y".to_string());
+        let cutY_id = cutY.id.clone();
+        cuts_repo.save_cut(&cutY).await.expect("Save cutY");
+        let swatch2 = create_test_swatch(&cutY_id, &mat1_id);
+
+        // --- Material 2 (Different) ---
+        let mat2 = Material::new("test/del-mat-other.txt".to_string());
+        let mat2_id = mat2.id.clone();
+        material_repo.register_material(mat2).await.expect("Save mat2");
+
+        // --- Cut Z (mat2) ---
+        let cutZ = Cut::new(mat2_id.clone(), 0, "Cut Z".to_string());
+        let cutZ_id = cutZ.id.clone();
+        cuts_repo.save_cut(&cutZ).await.expect("Save cutZ");
+        let swatch3 = create_test_swatch(&cutZ_id, &mat2_id);
+
+        swatch_repo.save_swatches_batch(&[swatch1.clone(), swatch2.clone(), swatch3.clone()])
+            .await
+            .expect("Batch save failed");
+
+        // Delete by material_id (mat1_id)
+        let result = swatch_repo.delete_swatches_by_material_id(&mat1_id).await;
+         assert!(result.is_ok(), "Delete by material_id failed: {:?}", result.err());
+
+        // Verify deleted
+        let retrieved1 = swatch_repo.get_swatch_by_id(&swatch1.id).await.expect("Get s1 failed");
+        let retrieved2 = swatch_repo.get_swatch_by_id(&swatch2.id).await.expect("Get s2 failed");
+        let retrieved3 = swatch_repo.get_swatch_by_id(&swatch3.id).await.expect("Get s3 failed");
+
+        assert!(retrieved1.is_none(), "Swatch1 not deleted by material_id");
+        assert!(retrieved2.is_none(), "Swatch2 not deleted by material_id");
+        assert!(retrieved3.is_some(), "Swatch3 (different material_id) was incorrectly deleted");
+    }
+
+    #[tokio::test]
+    async fn test_search_similar_stubbed() {
+        let pool = setup().await;
+        let repo = SqliteSwatchRepository::new(pool.clone());
+        // No dependencies needed as it should error out anyway
+        let dummy_embedding = vec![0.0; 3]; 
+
+        let result = repo.search_similar(&dummy_embedding, 10, None).await;
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            SwatchRepositoryError::OperationFailed(msg) => {
+                assert!(msg.to_string().contains("not implemented for SQLite"));
+            }
+            _ => panic!("Expected OperationFailed error"),
+        }
     }
 }
