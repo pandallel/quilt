@@ -5,14 +5,14 @@
 
 mod actor;
 mod repository;
-mod swatch;
 pub mod sqlite_repository;
+mod swatch;
 
 pub use actor::messages::{OperationComplete, SwatchingError};
 pub use actor::SwatchingActor;
 pub use repository::{Result, SwatchRepository, SwatchRepositoryError};
-pub use swatch::Swatch;
 pub use sqlite_repository::SqliteSwatchRepository;
+pub use swatch::Swatch;
 
 #[cfg(test)]
 mod tests {

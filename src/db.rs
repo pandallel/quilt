@@ -76,7 +76,7 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
             FOREIGN KEY (cut_id) REFERENCES cuts (id) ON DELETE CASCADE,
             FOREIGN KEY (material_id) REFERENCES materials (id) ON DELETE CASCADE
         )
-        "#
+        "#,
     )
     .execute(&pool)
     .await?;
