@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
 # Human-Centered Documentation Rules
 
 ## Core Philosophy
@@ -60,7 +65,7 @@ For each new task:
    - `docs/src/README.md`
    - `docs/src/development/guide.md`
    - `docs/src/development/testing_and_linting.md`
-   - Task-specific documentation in `docs/src/` (e.g., features, architecture)
+   - Task-specific documentation in `docs/src/` (e.g., `features/`, `architecture/`)
    - Relevant examples in `examples/` (if applicable)
 
 2. **Experiment**
@@ -134,8 +139,3 @@ Once the initial context is established by reading the mandatory files:
 3. Run `cargo test` to verify changes don't break tests.
 4. Build the docs (`cd docs && mdbook build`) to check for errors.
 5. Open a PR with updated docs, tests, and examples.
-2. Edit or add files in `docs/src/` and `docs/playgrounds/`.  
-3. Run Cucumber and Playground to verify.  
-4. Open a PR with updated docs and specs.
-
----
