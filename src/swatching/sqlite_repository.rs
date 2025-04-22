@@ -103,7 +103,6 @@ impl SwatchRepository for SqliteSwatchRepository {
                 embedding = excluded.embedding,
                 model_name = excluded.model_name,
                 model_version = excluded.model_version,
-                created_at = excluded.created_at, -- Consider if this should be updated
                 dimensions = excluded.dimensions,
                 metadata = excluded.metadata,
                 similarity_threshold = excluded.similarity_threshold
@@ -176,7 +175,6 @@ impl SwatchRepository for SqliteSwatchRepository {
                     embedding = excluded.embedding,
                     model_name = excluded.model_name,
                     model_version = excluded.model_version,
-                    created_at = excluded.created_at,
                     dimensions = excluded.dimensions,
                     metadata = excluded.metadata,
                     similarity_threshold = excluded.similarity_threshold
