@@ -59,6 +59,27 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
     .execute(&pool)
     .await?;
 
+    // Create swatches table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS swatches (
+            id TEXT PRIMARY KEY,
+            cut_id TEXT NOT NULL,
+            material_id TEXT NOT NULL,
+            embedding BLOB NOT NULL,
+            model_name TEXT NOT NULL,
+            model_version TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            dimensions INTEGER NOT NULL,
+            metadata TEXT, -- Storing metadata as JSON string or similar
+            FOREIGN KEY (cut_id) REFERENCES cuts (id) ON DELETE CASCADE,
+            FOREIGN KEY (material_id) REFERENCES materials (id) ON DELETE CASCADE
+        )
+        "#
+    )
+    .execute(&pool)
+    .await?;
+
     info!("SQLite in-memory database initialized with tables");
 
     Ok(pool)
