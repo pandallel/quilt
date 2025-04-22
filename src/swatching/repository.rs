@@ -5,6 +5,9 @@ use async_trait::async_trait;
 
 use super::swatch::Swatch;
 
+#[cfg(test)]
+use mockall::automock;
+
 /// Errors that can occur during swatch repository operations
 #[derive(Error, Debug)]
 pub enum SwatchRepositoryError {
@@ -25,6 +28,7 @@ pub enum SwatchRepositoryError {
 pub type Result<T> = std::result::Result<T, SwatchRepositoryError>;
 
 /// Repository trait for managing swatches
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait SwatchRepository: Send + Sync + Debug + 'static {
     /// Save a swatch to the repository

@@ -38,5 +38,4 @@ serde_json = "1.0"
 [dev-dependencies]
 tempfile = "3.19.1"
 futures = "0.3.31"
-
-# We'll add more dependencies as we implement features 
+mockall = "0.12"

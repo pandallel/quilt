@@ -13,16 +13,14 @@ use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
-use crate::cutting::{CutsRepository, CuttingActor, InMemoryCutsRepository, SqliteCutsRepository};
+use crate::cutting::{CutsRepository, CuttingActor, SqliteCutsRepository};
 use crate::db::init_memory_db;
 use crate::discovery::actor::messages::{DiscoverySuccess, StartDiscovery};
 use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
-use crate::materials::{
-    InMemoryMaterialRepository, MaterialRegistry, MaterialRepository, SqliteMaterialRepository,
-};
-use crate::swatching::SwatchingActor;
+use crate::materials::{MaterialRegistry, MaterialRepository, SqliteMaterialRepository};
+use crate::swatching::{SqliteSwatchRepository, SwatchRepository, SwatchingActor};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -65,42 +63,24 @@ pub struct QuiltOrchestrator {
     registry: MaterialRegistry,
     event_bus: Arc<EventBus>,
     cuts_repository: Arc<dyn CutsRepository>,
+    swatch_repository: Arc<dyn SwatchRepository>,
 }
 
 impl QuiltOrchestrator {
-    /// Create a new QuiltOrchestrator with default configuration
-    pub fn new() -> Self {
+    /// Create a new QuiltOrchestrator with default configuration (in-memory SQLite)
+    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let event_bus = Arc::new(EventBus::new());
 
-        // Initialize repositories
-        let cuts_repository: Arc<dyn CutsRepository> = Arc::new(InMemoryCutsRepository::new());
-
-        // Create the registry with InMemoryMaterialRepository as fallback
-        // If SQLite initialization fails, we'll fall back to the in-memory repository
-        let repository: Arc<dyn MaterialRepository> = Arc::new(InMemoryMaterialRepository::new());
-        let registry = MaterialRegistry::new(repository, event_bus.clone());
-
-        Self {
-            discovery: None,
-            cutting: None,
-            swatching: None,
-            registry,
-            event_bus,
-            cuts_repository,
-        }
-    }
-
-    /// Create a new QuiltOrchestrator with SQLite repositories
-    pub async fn with_sqlite() -> Result<Self, Box<dyn std::error::Error>> {
-        let event_bus = Arc::new(EventBus::new());
-
-        // Initialize SQLite
+        // Initialize SQLite in-memory database
         let pool = init_memory_db().await?;
 
-        // Create repositories
+        // Initialize repositories (all SQLite-backed, in-memory)
         let material_repository: Arc<dyn MaterialRepository> =
             Arc::new(SqliteMaterialRepository::new(pool.clone()));
-        let cuts_repository: Arc<dyn CutsRepository> = Arc::new(SqliteCutsRepository::new(pool));
+        let cuts_repository: Arc<dyn CutsRepository> =
+            Arc::new(SqliteCutsRepository::new(pool.clone()));
+        let swatch_repository: Arc<dyn SwatchRepository> =
+            Arc::new(SqliteSwatchRepository::new(pool.clone()));
 
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
@@ -112,6 +92,7 @@ impl QuiltOrchestrator {
             registry,
             event_bus,
             cuts_repository,
+            swatch_repository,
         })
     }
 
@@ -201,7 +182,11 @@ impl QuiltOrchestrator {
         self.cutting = Some(cutting_addr);
 
         // Initialize swatching actor
-        let swatching_actor = SwatchingActor::new("main-swatching", self.event_bus.clone());
+        let swatching_actor = SwatchingActor::new(
+            "main-swatching",
+            self.event_bus.clone(),
+            self.swatch_repository.clone(),
+        );
         let swatching_addr = swatching_actor.start();
         debug!("Initialized swatching actor");
         self.swatching = Some(swatching_addr);
@@ -335,11 +320,5 @@ impl QuiltOrchestrator {
 
         // Optionally stop the entire actor system
         // System::current().stop();
-    }
-}
-
-impl Default for QuiltOrchestrator {
-    fn default() -> Self {
-        Self::new()
     }
 }

@@ -63,23 +63,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     );
 
-    // Run the orchestrator with the appropriate repository
-    let result = if args.in_memory {
-        // Use in-memory repository
-        info!("Using in-memory material repository");
-        QuiltOrchestrator::new().run(config).await
-    } else {
-        // Use SQLite repository
-        info!("Using SQLite material repository");
-        match QuiltOrchestrator::with_sqlite().await {
-            Ok(orchestrator) => orchestrator.run(config).await,
-            Err(err) => {
-                error!("Failed to initialize SQLite repository: {}", err);
-                error!("Falling back to in-memory repository");
-                QuiltOrchestrator::new().run(config).await
-            }
+    // Initialize orchestrator
+    // Since new() now always uses in-memory SQLite, the `--in-memory` flag is currently redundant.
+    // We initialize unconditionally here.
+    info!("Initializing Quilt Orchestrator (using in-memory SQLite)...");
+    let orchestrator = match QuiltOrchestrator::new().await {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Failed to initialize Quilt Orchestrator: {}", e);
+            return Ok(()); // Exit gracefully on initialization error
         }
     };
+
+    // Run the orchestrator
+    info!("Running Quilt Orchestrator...");
+    let result = orchestrator.run(config).await;
 
     // Handle the result
     match result {

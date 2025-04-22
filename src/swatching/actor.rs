@@ -4,8 +4,11 @@ use crate::events::QuiltEvent;
 use actix::prelude::*;
 use actix::SpawnHandle;
 use log::{debug, error, info, warn};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+
+use super::repository::SwatchRepository;
 
 /// Messages specific to the SwatchingActor
 ///
@@ -62,7 +65,9 @@ pub struct SwatchingActor {
     /// Name of this actor instance for logging
     name: String,
     /// Event bus to subscribe to events
-    event_bus: std::sync::Arc<crate::events::EventBus>,
+    event_bus: Arc<crate::events::EventBus>,
+    /// Swatch repository for persistence
+    swatch_repository: Arc<dyn SwatchRepository>,
     /// Sender for the internal work queue
     work_sender: Option<mpsc::Sender<SwatchingWorkItem>>,
     /// Handle for the listener task
@@ -72,16 +77,22 @@ pub struct SwatchingActor {
 }
 
 impl SwatchingActor {
-    /// Create a new SwatchingActor with the given name and event bus
+    /// Create a new SwatchingActor with the given name, event bus, and repository
     ///
     /// # Arguments
     ///
     /// * `name` - Name for this actor instance, used in logging
     /// * `event_bus` - Event bus to subscribe to events
-    pub fn new(name: &str, event_bus: std::sync::Arc<crate::events::EventBus>) -> Self {
+    /// * `swatch_repository` - Repository for swatch persistence
+    pub fn new(
+        name: &str,
+        event_bus: Arc<crate::events::EventBus>,
+        swatch_repository: Arc<dyn SwatchRepository>,
+    ) -> Self {
         Self {
             name: name.to_string(),
             event_bus,
+            swatch_repository,
             work_sender: None,
             listener_handle: None,
             processor_handle: None,
@@ -102,6 +113,9 @@ impl Actor for SwatchingActor {
 
         let bus_receiver = self.event_bus.subscribe();
         let actor_name = self.name.clone();
+
+        // Clone repository for the processor task
+        let swatch_repo_clone = self.swatch_repository.clone();
 
         let listener_actor_name = actor_name.clone();
         let listener_handle = ctx.spawn(
@@ -158,16 +172,43 @@ impl Actor for SwatchingActor {
                 info!("{}: Processor task started", processor_actor_name);
                 let mut work_receiver = work_receiver;
                 let actor_name = processor_actor_name;
+                // Use the cloned repository
+                let swatch_repository = swatch_repo_clone;
 
                 while let Some(work_item) = work_receiver.recv().await {
+                    let material_id_str = work_item.material_id.as_str();
                     debug!(
                         "{}: Processor received work item for: {}",
-                        actor_name,
-                        work_item.material_id.as_str()
+                        actor_name, material_id_str
                     );
 
-                    // Currently just logging receipt of the work item
-                    // Swatching processing logic will be implemented in Milestone 9
+                    // --- Temporary Read/Log to resolve dead_code --- //
+                    debug!(
+                        "{}: Checking for existing swatches for material {}",
+                        actor_name, material_id_str
+                    );
+                    let check_result = swatch_repository
+                        .get_swatches_by_material_id(material_id_str)
+                        .await;
+                    match check_result {
+                        Ok(swatches) => {
+                            debug!(
+                                "{}: Found {} existing swatches for material {}",
+                                actor_name,
+                                swatches.len(),
+                                material_id_str
+                            );
+                        }
+                        Err(e) => {
+                            warn!(
+                                "{}: Failed to check swatches for material {}: {}",
+                                actor_name, material_id_str, e
+                            );
+                        }
+                    }
+                    // --- End Temporary Read/Log --- //
+
+                    // Original logging (can be kept or removed)
                     info!(
                         "{}: Received material to process for swatching: {}",
                         actor_name,
@@ -219,7 +260,11 @@ struct SwatchingWorkItem {
 mod tests {
     use super::*;
     use crate::events::EventBus;
+    use crate::swatching::repository::MockSwatchRepository;
+    use crate::swatching::SwatchRepositoryError;
     use std::sync::Arc;
+    use std::time::Duration;
+    use time::OffsetDateTime;
 
     fn init_test_logger() {
         let _ = env_logger::builder()
@@ -232,7 +277,9 @@ mod tests {
     async fn test_swatching_actor_ping() {
         init_test_logger();
         let event_bus = Arc::new(EventBus::new());
-        let actor = SwatchingActor::new("test-swatching", event_bus).start();
+        let mock_repo = MockSwatchRepository::new();
+        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
+        let actor = SwatchingActor::new("test-swatching", event_bus, repo).start();
 
         let result = actor.send(Ping).await;
         assert!(result.is_ok());
@@ -243,16 +290,72 @@ mod tests {
     async fn test_swatching_actor_shutdown() {
         init_test_logger();
         let event_bus = Arc::new(EventBus::new());
-        let actor = SwatchingActor::new("test-swatching", event_bus).start();
+        let mock_repo = MockSwatchRepository::new();
+        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
+        let actor = SwatchingActor::new("test-swatching", event_bus, repo).start();
 
         let result = actor.send(Shutdown).await;
         assert!(result.is_ok());
 
-        // Wait a short period for the actor to shut down
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-        // Actor should no longer respond
         let ping_result = actor.send(Ping).await;
         assert!(ping_result.is_err());
+    }
+
+    #[actix::test]
+    async fn test_swatching_actor_processes_item() {
+        init_test_logger();
+        let event_bus = Arc::new(EventBus::new());
+        let test_material_id = MaterialId::from("test_mat_id");
+        let id_for_closure = test_material_id.clone();
+
+        let mut mock_repo = MockSwatchRepository::new();
+        mock_repo
+            .expect_get_swatches_by_material_id()
+            .withf(move |id| id == id_for_closure.as_str())
+            .times(1)
+            .returning(|_| Ok(Vec::new()));
+
+        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
+        let _actor = SwatchingActor::new("test-processor", event_bus.clone(), repo).start();
+
+        let cut_event = QuiltEvent::MaterialCut(crate::events::types::MaterialCutEvent {
+            material_id: test_material_id.clone(),
+            timestamp: OffsetDateTime::now_utc(),
+        });
+        let _ = event_bus.publish(cut_event);
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    #[actix::test]
+    async fn test_swatching_actor_handles_repo_error() {
+        init_test_logger();
+        let event_bus = Arc::new(EventBus::new());
+        let test_material_id = MaterialId::from("test_mat_id_err");
+        let id_for_closure = test_material_id.clone();
+
+        let mut mock_repo = MockSwatchRepository::new();
+        mock_repo
+            .expect_get_swatches_by_material_id()
+            .withf(move |id| id == id_for_closure.as_str())
+            .times(1)
+            .returning(|id| {
+                Err(SwatchRepositoryError::OperationFailed(
+                    format!("Test error checking swatches for {}", id).into(),
+                ))
+            });
+
+        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
+        let _actor = SwatchingActor::new("test-error", event_bus.clone(), repo).start();
+
+        let cut_event = QuiltEvent::MaterialCut(crate::events::types::MaterialCutEvent {
+            material_id: test_material_id.clone(),
+            timestamp: OffsetDateTime::now_utc(),
+        });
+        let _ = event_bus.publish(cut_event);
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }
