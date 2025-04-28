@@ -32,19 +32,103 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 
 **Demonstration:** Application compiles and runs. `QuiltOrchestrator` successfully injects the `SqliteSwatchRepository` instance into `SwatchingActor`. Tests for `SwatchingActor` pass.
 
-### Milestone: "Implement Swatching Actor Logic & Event"
+# Milestone: Implement Swatching Actor Logic & Event
 
-**Goal:** Connect the `SwatchingActor` to retrieve cuts, generate **actual embeddings**, create swatches, store them via the repository, update registry status, and publish the `MaterialSwatched` event.
-**Implementation Time:** ~3-4 days
+**Goal:** Connect the `SwatchingActor` to retrieve cuts, generate **actual embeddings**, create swatches, store them via the repository, update registry status, and publish the `MaterialSwatched` event.  
+**Implementation Time:** ~3–4 days
 
-1.  **Inject `CutsRepository`**: Update `SwatchingActor` and `QuiltOrchestrator` to inject the `CutsRepository` dependency into `SwatchingActor`.
-2.  **Implement Embedding Generation**: Use `fastembed` and `https://huggingface.co/BAAI/bge-small-en-v1.5`. Implement logic in the actor's processor task to generate embeddings (`Vec<f32>`) for `Cut` content.
-3.  **Implement Swatching Logic**: Modify `SwatchingActor`'s processor task:
-    - Retrieve `Cut`s using the injected `CutsRepository`.
-    - Generate `Vec<f32>` embeddings for the cuts.
-    - Create `Swatch` instances with the generated embeddings.
-    - Save `Swatch` instances using the injected `SwatchRepository`.
-    - Call `MaterialRegistry` to update material status to `Swatched` (or `Error`).
-4.  **Implement `MaterialSwatched` Event**: Define the event variant in `QuiltEvent`. Update `MaterialRegistry` to publish the event. Add/update integration tests covering the full actor flow.
+---
+
+## Component Roles & Responsibilities
+
+| Component             | Responsibility                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| **CutsRepository**    | Data access: fetch raw `Cut` objects from storage.                                                     |
+| **EmbeddingService**  | (New) Encapsulate embedding logic: given text, return `Vec<f32>` via `fastembed` + HuggingFace model.  |
+| **SwatchRepository**  | Data access: persist created `Swatch` objects to storage.                                              |
+| **SwatchingActor**    | Orchestrator for a single “swatch” job: coordinates fetching, embedding, swatch creation, persistence. |
+| **MaterialRegistry**  | Update material status (Swatched / Error) and publish `MaterialSwatched` event.                        |
+| **QuiltOrchestrator** | Top-level actor supervisor: injects dependencies and routes material IDs to `SwatchingActor`.          |
+
+---
+
+## Implementation Plan
+
+### 1. Define & Wire Dependencies (Day 1)
+
+1. Add `EmbeddingService` interface
+   ```rust
+   pub trait EmbeddingService {
+     fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
+   }
+   ```
+2. Implement `HfEmbeddingService` calling `fastembed` + HF model URL.
+3. Refactor DI in `QuiltOrchestrator` to instantiate and pass:
+   - `CutsRepository`
+   - `EmbeddingService`
+   - `SwatchRepository`
+   - `MaterialRegistry`
+
+### 2. Fetch & Embed Cuts (Day 2)
+
+1. In `SwatchingActor.process(material_id)`:
+   - `let cuts = cuts_repo.get_by_material(material_id)?;`
+   - For each `cut`:
+     ```rust
+     let embedding = embedding_service.embed(&cut.content)?;
+     ```
+
+### 3. Create & Persist Swatches (Day 2–3)
+
+1. Map each `Cut` → `Swatch`:
+   ```rust
+   struct Swatch {
+     cut_id: Uuid,
+     embedding: Vec<f32>,
+     created_at: DateTime<Utc>,
+   }
+   ```
+2. Save via `swatch_repo.save(&swatch)?;`
+
+### 4. Update Registry & Publish Event (Day 3)
+
+1. On success:
+   ```rust
+   material_registry.mark_swatched(material_id)?;
+   ```
+2. On failure:
+   ```rust
+   material_registry.mark_error(material_id, error_info)?;
+   ```
+3. New event variant in `QuiltEvent`:
+   ```rust
+   enum QuiltEvent {
+     MaterialSwatched { material_id: Uuid, timestamp: DateTime<Utc> },
+     // …
+   }
+   ```
+
+### 5. Integration & Test Coverage (Day 4)
+
+1. **Unit tests**
+   - Mock `EmbeddingService`, `CutsRepository`, `SwatchRepository`.
+   - Test happy path & embedding failures.
+2. **Integration tests**
+   - In-memory DB: run actor end-to-end, assert cuts retrieved, swatches persisted, event emitted.
+3. **Error scenarios**
+   - Invalid cut data
+   - Embedding API failure
+   - Repository write failure
+
+---
+
+## Rough Timeline
+
+| Day | Focus                                              |
+| --- | -------------------------------------------------- |
+| 1   | Define `EmbeddingService`, wire DI in orchestrator |
+| 2   | Fetch cuts, generate embeddings                    |
+| 3   | Create/persist swatches, update registry & event   |
+| 4   | Write unit + integration tests; polish & review    |
 
 **Demonstration:** Running `main` shows "Created X swatches with embeddings..." logs. Material status updates to `Swatched`. `MaterialSwatched` events are published. Integration tests verify embedding creation and storage in the database.
