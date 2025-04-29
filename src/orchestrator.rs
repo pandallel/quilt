@@ -5,13 +5,13 @@
 
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
+use anyhow::Result;
 use log::{debug, error, info, warn};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
-use anyhow::Result;
 
 use crate::actors::{ActorError, Ping, Shutdown};
 use crate::cutting::{CutsRepository, CuttingActor, SqliteCutsRepository};
@@ -87,9 +87,7 @@ impl QuiltOrchestrator {
             Arc::new(SqliteSwatchRepository::new(pool.clone()));
 
         // Initialize embedding service
-        let embedding_service: Arc<dyn EmbeddingService> = Arc::new(
-            HfEmbeddingService::new()?
-        );
+        let embedding_service: Arc<dyn EmbeddingService> = Arc::new(HfEmbeddingService::new()?);
 
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
@@ -107,14 +105,18 @@ impl QuiltOrchestrator {
     }
 
     /// Run the orchestrator with the given configuration
-    pub async fn run(mut self, config: OrchestratorConfig) -> std::result::Result<(), OrchestratorError> {
+    pub async fn run(
+        mut self,
+        config: OrchestratorConfig,
+    ) -> std::result::Result<(), OrchestratorError> {
         info!("Actor system starting...");
 
         // Set up event monitoring
         self.setup_event_monitoring();
 
         // Initialize actors
-        self.initialize_actors()?;
+        self.initialize_actors()
+            .map_err(|e| OrchestratorError::Other(e.into()))?;
 
         // Start discovery process with timeout
         let success = self
