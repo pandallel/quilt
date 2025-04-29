@@ -46,7 +46,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 | **CutsRepository**    | Data access: fetch raw `Cut` objects from storage.                                                     |
 | **EmbeddingService**  | (New) Encapsulate embedding logic: given text, return `Vec<f32>` via `fastembed` + HuggingFace model.  |
 | **SwatchRepository**  | Data access: persist created `Swatch` objects to storage.                                              |
-| **SwatchingActor**    | Orchestrator for a single “swatch” job: coordinates fetching, embedding, swatch creation, persistence. |
+| **SwatchingActor**    | Orchestrator for a single "swatch" job: coordinates fetching, embedding, swatch creation, persistence. |
 | **MaterialRegistry**  | Update material status (Swatched / Error) and publish `MaterialSwatched` event.                        |
 | **QuiltOrchestrator** | Top-level actor supervisor: injects dependencies and routes material IDs to `SwatchingActor`.          |
 
@@ -111,14 +111,21 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 ### 5. Integration & Test Coverage (Day 4)
 
 1. **Unit tests**
-   - Mock `EmbeddingService`, `CutsRepository`, `SwatchRepository`.
+
+   - Mock `EmbeddingService`, `CutsRepository`, `SwatchRepository` using mockall.
    - Test happy path & embedding failures.
+   - Tests should be quiet by default (avoid println statements) and rely on assertions.
+   - Use descriptive test names and assertion messages for better failure reporting.
+   - For tests requiring special case handling (e.g., model loading failures), use `eprintln!` for warnings.
+
 2. **Integration tests**
+
    - In-memory DB: run actor end-to-end, assert cuts retrieved, swatches persisted, event emitted.
-3. **Error scenarios**
-   - Invalid cut data
-   - Embedding API failure
-   - Repository write failure
+   - Test all expected failure modes and verify proper error propagation.
+
+3. **Test robustness**
+   - Ensure tests handle edge cases: empty text, very long text, special characters.
+   - Include tests for retry mechanisms and concurrent operations.
 
 ---
 
