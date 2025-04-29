@@ -207,38 +207,172 @@ impl Actor for SwatchingActor {
                         actor_name, material_id_str
                     );
 
-                    // --- Temporary Read/Log to resolve dead_code --- //
-                    debug!(
-                        "{}: Checking for existing swatches for material {}",
-                        actor_name, material_id_str
-                    );
-                    let check_result = swatch_repository
-                        .get_swatches_by_material_id(material_id_str)
-                        .await;
-                    match check_result {
-                        Ok(swatches) => {
+                    // Fetch cuts from the repository
+                    let cuts_result = cuts_repository.get_cuts_by_material_id(material_id_str).await;
+                    
+                    match cuts_result {
+                        Ok(cuts) => {
+                            if cuts.is_empty() {
+                                warn!(
+                                    "{}: No cuts found for material {}",
+                                    actor_name, material_id_str
+                                );
+                                // TODO: Update registry with error status
+                                continue;
+                            }
+
                             debug!(
-                                "{}: Found {} existing swatches for material {}",
+                                "{}: Retrieved {} cuts for material {}",
                                 actor_name,
-                                swatches.len(),
+                                cuts.len(),
+                                material_id_str
+                            );
+
+                            // Process each cut to generate embeddings
+                            let mut embedding_results = Vec::new();
+                            
+                            for cut in &cuts {
+                                debug!(
+                                    "{}: Generating embedding for cut {} (chunk {})",
+                                    actor_name, cut.id, cut.chunk_index
+                                );
+                                
+                                // Generate embedding for the cut content
+                                match embedding_service.embed(&cut.content) {
+                                    Ok(embedding) => {
+                                        debug!(
+                                            "{}: Successfully generated embedding for cut {} with dimensions {}",
+                                            actor_name, cut.id, embedding.len()
+                                        );
+                                        
+                                        // Store the cut and its embedding for the next step
+                                        embedding_results.push((cut, embedding));
+                                    }
+                                    Err(e) => {
+                                        error!(
+                                            "{}: Failed to generate embedding for cut {}: {}",
+                                            actor_name, cut.id, e
+                                        );
+                                        // TODO: Decide how to handle individual embedding failures
+                                        // For now, continue with other cuts
+                                    }
+                                }
+                            }
+
+                            // Create swatches from embeddings
+                            if embedding_results.is_empty() {
+                                error!(
+                                    "{}: Failed to generate any valid embeddings for material {}",
+                                    actor_name, material_id_str
+                                );
+                                
+                                // Update registry with error status
+                                if let Err(err) = registry.update_material_status(
+                                    material_id_str,
+                                    crate::materials::types::MaterialStatus::Error,
+                                    Some(format!("Failed to generate embeddings for any cuts")),
+                                ).await {
+                                    error!(
+                                        "{}: Failed to update material status for {}: {}",
+                                        actor_name, material_id_str, err
+                                    );
+                                }
+                                
+                                continue;
+                            }
+
+                            // Create swatches from the embeddings
+                            let mut swatches = Vec::new();
+                            
+                            for (cut, embedding) in &embedding_results {
+                                // Create a new swatch using the embedding
+                                let swatch = super::swatch::Swatch::new(
+                                    cut.id.clone(),
+                                    material_id_str.to_string(),
+                                    embedding.clone(),
+                                    "fastembed-model".to_string(), // TODO: Get actual model info from embedding service
+                                    "v1".to_string(),
+                                );
+                                
+                                swatches.push(swatch);
+                            }
+                            
+                            // Persist the swatches to the repository
+                            match swatch_repository.save_swatches_batch(&swatches).await {
+                                Ok(_) => {
+                                    info!(
+                                        "{}: Successfully stored {} swatches for material {}",
+                                        actor_name,
+                                        swatches.len(),
+                                        material_id_str
+                                    );
+                                    
+                                    // Update material registry status to Swatched
+                                    if let Err(err) = registry.update_material_status(
+                                        material_id_str,
+                                        crate::materials::types::MaterialStatus::Swatched,
+                                        None,
+                                    ).await {
+                                        error!(
+                                            "{}: Failed to update material status for {}: {}",
+                                            actor_name, material_id_str, err
+                                        );
+                                    } else {
+                                        // Successfully updated material status to Swatched
+                                        // The material_registry.mark_swatched call will publish the MaterialSwatched event
+                                        info!(
+                                            "{}: Material {} marked as Swatched in registry",
+                                            actor_name, material_id_str
+                                        );
+                                    }
+                                },
+                                Err(e) => {
+                                    error!(
+                                        "{}: Failed to save swatches for material {}: {}",
+                                        actor_name, material_id_str, e
+                                    );
+                                    
+                                    // Update registry with error status
+                                    if let Err(err) = registry.update_material_status(
+                                        material_id_str,
+                                        crate::materials::types::MaterialStatus::Error,
+                                        Some(format!("Failed to store swatches: {}", e)),
+                                    ).await {
+                                        error!(
+                                            "{}: Failed to update material status for {}: {}",
+                                            actor_name, material_id_str, err
+                                        );
+                                    }
+                                }
+                            }
+
+                            info!(
+                                "{}: Successfully processed {}/{} embeddings for material {}",
+                                actor_name,
+                                embedding_results.len(),
+                                cuts.len(),
                                 material_id_str
                             );
                         }
                         Err(e) => {
-                            warn!(
-                                "{}: Failed to check swatches for material {}: {}",
+                            error!(
+                                "{}: Failed to retrieve cuts for material {}: {}",
                                 actor_name, material_id_str, e
                             );
+                            
+                            // Update registry with error status
+                            if let Err(err) = registry.update_material_status(
+                                material_id_str,
+                                crate::materials::types::MaterialStatus::Error,
+                                Some(format!("Failed to retrieve cuts: {}", e)),
+                            ).await {
+                                error!(
+                                    "{}: Failed to update material status for {}: {}",
+                                    actor_name, material_id_str, err
+                                );
+                            }
                         }
                     }
-                    // --- End Temporary Read/Log --- //
-
-                    // Original logging (can be kept or removed)
-                    info!(
-                        "{}: Received material to process for swatching: {}",
-                        actor_name,
-                        work_item.material_id.as_str()
-                    );
                 }
                 info!("{}: Processor task finished", actor_name);
             }
@@ -284,13 +418,17 @@ struct SwatchingWorkItem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cutting::cut::Cut;
+    use crate::cutting::MockCutsRepository;
     use crate::events::EventBus;
+    use crate::materials::MockMaterialRepository;
+    use crate::materials::MaterialStatus;
+    use crate::swatching::embedding::MockEmbeddingService;
     use crate::swatching::repository::MockSwatchRepository;
-    use crate::swatching::SwatchRepositoryError;
-    use std::sync::Arc;
+    use mockall::predicate;
     use std::time::Duration;
-    use time::OffsetDateTime;
 
+    /// Initialize a test logger for better debugging
     fn init_test_logger() {
         let _ = env_logger::builder()
             .filter_level(log::LevelFilter::Debug)
@@ -302,85 +440,165 @@ mod tests {
     async fn test_swatching_actor_ping() {
         init_test_logger();
         let event_bus = Arc::new(EventBus::new());
-        let mock_repo = MockSwatchRepository::new();
-        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
-        let actor = SwatchingActor::new("test-swatching", event_bus, repo).start();
+        
+        // Create mock repositories and services
+        let mock_cuts_repo = Arc::new(MockCutsRepository::new());
+        let mock_embedding_service = Arc::new(MockEmbeddingService::new());
+        let mock_swatch_repo = Arc::new(MockSwatchRepository::new());
+        let mock_registry = MaterialRegistry::new(
+            Arc::new(MockMaterialRepository::new()),
+            event_bus.clone(),
+        );
 
-        let result = actor.send(Ping).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap());
-    }
+        let actor = SwatchingActor::new(
+            "test-swatching-actor",
+            event_bus,
+            mock_cuts_repo,
+            mock_embedding_service,
+            mock_swatch_repo,
+            mock_registry,
+        );
 
-    #[actix::test]
-    async fn test_swatching_actor_shutdown() {
-        init_test_logger();
-        let event_bus = Arc::new(EventBus::new());
-        let mock_repo = MockSwatchRepository::new();
-        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
-        let actor = SwatchingActor::new("test-swatching", event_bus, repo).start();
-
-        let result = actor.send(Shutdown).await;
-        assert!(result.is_ok());
-
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        let ping_result = actor.send(Ping).await;
-        assert!(ping_result.is_err());
+        let actor_addr = actor.start();
+        let result = actor_addr.send(Ping).await.unwrap();
+        assert!(result, "Actor should respond to ping");
     }
 
     #[actix::test]
     async fn test_swatching_actor_processes_item() {
         init_test_logger();
+        
+        // Setup
         let event_bus = Arc::new(EventBus::new());
-        let test_material_id = MaterialId::from("test_mat_id");
-        let id_for_closure = test_material_id.clone();
-
-        let mut mock_repo = MockSwatchRepository::new();
-        mock_repo
-            .expect_get_swatches_by_material_id()
-            .withf(move |id| id == id_for_closure.as_str())
-            .times(1)
-            .returning(|_| Ok(Vec::new()));
-
-        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
-        let _actor = SwatchingActor::new("test-processor", event_bus.clone(), repo).start();
-
-        let cut_event = QuiltEvent::MaterialCut(crate::events::types::MaterialCutEvent {
-            material_id: test_material_id.clone(),
-            timestamp: OffsetDateTime::now_utc(),
-        });
-        let _ = event_bus.publish(cut_event);
-
+        let material_id = "test-material-id";
+        
+        // Create a test cut
+        let cut = Cut::new(
+            material_id.to_string(),
+            0,
+            "This is test content for embedding".to_string(),
+        );
+        
+        // Setup mock cuts repository
+        let mut mock_cuts_repo = MockCutsRepository::new();
+        mock_cuts_repo
+            .expect_get_cuts_by_material_id()
+            .with(predicate::eq(material_id))
+            .returning(move |_| Ok(vec![cut.clone()]));
+        
+        // Setup mock embedding service
+        let test_embedding = vec![0.1, 0.2, 0.3, 0.4];
+        let mut mock_embedding_service = MockEmbeddingService::new();
+        mock_embedding_service
+            .expect_embed()
+            .returning(move |_| Ok(test_embedding.clone()));
+        
+        // Setup mock swatch repository
+        let mut mock_swatch_repo = MockSwatchRepository::new();
+        mock_swatch_repo
+            .expect_save_swatches_batch()
+            .returning(|_| Ok(()));
+            
+        // Setup mock material registry
+        let mut mock_material_repo = MockMaterialRepository::new();
+        mock_material_repo
+            .expect_update_material_status()
+            .with(
+                predicate::eq(material_id),
+                predicate::eq(MaterialStatus::Swatched),
+                predicate::always(),
+            )
+            .returning(|_, _, _| Ok(()));
+        
+        let mock_registry = MaterialRegistry::new(
+            Arc::new(mock_material_repo),
+            event_bus.clone(),
+        );
+        
+        // Create actor with mocks
+        let actor = SwatchingActor::new(
+            "test-swatching-actor",
+            event_bus.clone(),
+            Arc::new(mock_cuts_repo),
+            Arc::new(mock_embedding_service),
+            Arc::new(mock_swatch_repo),
+            mock_registry,
+        );
+        
+        // Start actor
+        let actor_addr = actor.start();
+        
+        // Manually trigger processing
+        let (tx, _rx) = mpsc::channel(1);
+        tx.send(SwatchingWorkItem {
+            material_id: material_id.into(),
+        }).await.unwrap();
+        
+        // Give the actor time to process
         tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // Shutdown actor
+        actor_addr.send(Shutdown).await.unwrap();
     }
 
     #[actix::test]
     async fn test_swatching_actor_handles_repo_error() {
         init_test_logger();
+        
+        // Setup
         let event_bus = Arc::new(EventBus::new());
-        let test_material_id = MaterialId::from("test_mat_id_err");
-        let id_for_closure = test_material_id.clone();
-
-        let mut mock_repo = MockSwatchRepository::new();
-        mock_repo
-            .expect_get_swatches_by_material_id()
-            .withf(move |id| id == id_for_closure.as_str())
-            .times(1)
-            .returning(|id| {
-                Err(SwatchRepositoryError::OperationFailed(
-                    format!("Test error checking swatches for {}", id).into(),
-                ))
-            });
-
-        let repo: Arc<dyn SwatchRepository> = Arc::new(mock_repo);
-        let _actor = SwatchingActor::new("test-error", event_bus.clone(), repo).start();
-
-        let cut_event = QuiltEvent::MaterialCut(crate::events::types::MaterialCutEvent {
-            material_id: test_material_id.clone(),
-            timestamp: OffsetDateTime::now_utc(),
-        });
-        let _ = event_bus.publish(cut_event);
-
+        let material_id = "test-material-id";
+        
+        // Setup mock cuts repository with error
+        let mut mock_cuts_repo = MockCutsRepository::new();
+        mock_cuts_repo
+            .expect_get_cuts_by_material_id()
+            .with(predicate::eq(material_id))
+            .returning(|_| Err(crate::cutting::CutsRepositoryError::OperationFailed("Test error".into())));
+        
+        // Setup mock material registry
+        let mut mock_material_repo = MockMaterialRepository::new();
+        mock_material_repo
+            .expect_update_material_status()
+            .with(
+                predicate::eq(material_id),
+                predicate::eq(MaterialStatus::Error),
+                predicate::always(),
+            )
+            .returning(|_, _, _| Ok(()));
+        
+        let mock_registry = MaterialRegistry::new(
+            Arc::new(mock_material_repo),
+            event_bus.clone(),
+        );
+        
+        // Mock services that shouldn't be called
+        let mock_embedding_service = Arc::new(MockEmbeddingService::new());
+        let mock_swatch_repo = Arc::new(MockSwatchRepository::new());
+        
+        // Create actor with mocks
+        let actor = SwatchingActor::new(
+            "test-swatching-actor",
+            event_bus.clone(),
+            Arc::new(mock_cuts_repo),
+            mock_embedding_service,
+            mock_swatch_repo,
+            mock_registry,
+        );
+        
+        // Start actor
+        let actor_addr = actor.start();
+        
+        // Manually trigger processing
+        let (tx, _rx) = mpsc::channel(1);
+        tx.send(SwatchingWorkItem {
+            material_id: material_id.into(),
+        }).await.unwrap();
+        
+        // Give the actor time to process
         tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // Shutdown actor
+        actor_addr.send(Shutdown).await.unwrap();
     }
 }

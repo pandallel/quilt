@@ -22,6 +22,9 @@ pub use sqlite_repository::SqliteCutsRepository;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+use mockall::automock;
+
 /// Errors that can occur during cuts repository operations
 #[derive(Error, Debug)]
 pub enum CutsRepositoryError {
@@ -39,6 +42,7 @@ pub enum CutsRepositoryError {
 pub type Result<T> = std::result::Result<T, CutsRepositoryError>;
 
 /// Repository trait for managing cuts
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait CutsRepository: Send + Sync + Debug + 'static {
     /// Save a cut to the repository

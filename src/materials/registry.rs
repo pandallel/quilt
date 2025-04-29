@@ -110,6 +110,14 @@ impl MaterialRegistry {
                     .map_err(RegistryError::EventBus)?;
                 debug!("Published MaterialCut event for material: {}", id);
             }
+            MaterialStatus::Swatched => {
+                // Material has been swatched, publish a MaterialSwatched event
+                let event = QuiltEvent::material_swatched(id);
+                self.event_bus
+                    .publish(event)
+                    .map_err(RegistryError::EventBus)?;
+                debug!("Published MaterialSwatched event for material: {}", id);
+            }
             MaterialStatus::Error => {
                 // Material has encountered an error, publish a ProcessingError event
                 if let Some(error_message) = error {

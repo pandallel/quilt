@@ -74,6 +74,15 @@ pub struct MaterialCutEvent {
     pub timestamp: OffsetDateTime,
 }
 
+/// Material event when swatches have been created
+#[derive(Debug, Clone)]
+pub struct MaterialSwatchedEvent {
+    /// ID of the material
+    pub material_id: MaterialId,
+    /// Timestamp when the event occurred
+    pub timestamp: OffsetDateTime,
+}
+
 /// Error event during material processing
 #[derive(Debug, Clone)]
 pub struct MaterialProcessingErrorEvent {
@@ -94,6 +103,8 @@ pub enum QuiltEvent {
     MaterialDiscovered(MaterialDiscoveredEvent),
     /// Material has been cut into chunks
     MaterialCut(MaterialCutEvent),
+    /// Material has been swatched (embeddings created)
+    MaterialSwatched(MaterialSwatchedEvent),
     /// System event for shutdown or health check
     System(SystemEvent),
     /// Processing error occurred
@@ -123,6 +134,14 @@ impl QuiltEvent {
     /// Create a MaterialCut event
     pub fn material_cut(material_id: &str) -> Self {
         Self::MaterialCut(MaterialCutEvent {
+            material_id: MaterialId::new(material_id.to_string()),
+            timestamp: OffsetDateTime::now_utc(),
+        })
+    }
+
+    /// Create a MaterialSwatched event
+    pub fn material_swatched(material_id: &str) -> Self {
+        Self::MaterialSwatched(MaterialSwatchedEvent {
             material_id: MaterialId::new(material_id.to_string()),
             timestamp: OffsetDateTime::now_utc(),
         })
@@ -188,6 +207,11 @@ impl fmt::Display for QuiltEvent {
             Self::MaterialCut(evt) => write!(
                 f,
                 "MaterialCut {{ material_id: {} }}",
+                evt.material_id.as_str()
+            ),
+            Self::MaterialSwatched(evt) => write!(
+                f,
+                "MaterialSwatched {{ material_id: {} }}",
                 evt.material_id.as_str()
             ),
             Self::System(SystemEvent::Shutdown) => write!(f, "System.Shutdown"),
@@ -288,6 +312,21 @@ mod tests {
 
         let display = format!("{}", cut_event);
         assert!(display.contains("MaterialCut"));
+        assert!(display.contains("test-material"));
+    }
+
+    #[test]
+    fn test_material_swatched_event() {
+        let swatched_event = QuiltEvent::material_swatched("test-material");
+
+        if let QuiltEvent::MaterialSwatched(ref evt) = swatched_event {
+            assert_eq!(evt.material_id.as_str(), "test-material");
+        } else {
+            panic!("Expected MaterialSwatched event");
+        }
+
+        let display = format!("{}", swatched_event);
+        assert!(display.contains("MaterialSwatched"));
         assert!(display.contains("test-material"));
     }
 }
