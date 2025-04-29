@@ -32,6 +32,12 @@ pub trait EmbeddingService: Send + Sync {
     /// A `Result` containing either the vector embedding (`Vec<f32>`) on success,
     /// or an `EmbeddingError` on failure.
     fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
+
+    /// Returns the name of the embedding model used by the service.
+    fn model_name(&self) -> &str;
+
+    /// Returns the version or identifier of the embedding model used by the service.
+    fn model_version(&self) -> &str;
 }
 
 #[cfg(test)]

@@ -9,11 +9,14 @@ use crate::swatching::embedding::{EmbeddingError, EmbeddingService};
 
 /// Default model to use for embeddings
 const DEFAULT_MODEL: EmbeddingModel = EmbeddingModel::BGESmallENV15;
+const DEFAULT_MODEL_VERSION: &str = "v1.5"; // Specify version for default model
 
 /// HuggingFace-based embedding service using the fastembed library.
 pub struct HfEmbeddingService {
     /// The text embedding model instance
     embedder: Arc<TextEmbedding>,
+    /// The model enum used for initialization
+    model_enum: EmbeddingModel,
 }
 
 impl HfEmbeddingService {
@@ -36,7 +39,8 @@ impl HfEmbeddingService {
     ///
     /// A Result containing the new HfEmbeddingService or an EmbeddingError if model loading fails.
     pub fn with_model(model: EmbeddingModel) -> Result<Self, EmbeddingError> {
-        let options = InitOptions::new(model);
+        // Clone model here to avoid move error later
+        let options = InitOptions::new(model.clone());
 
         // Try up to 3 times to initialize the model, with a delay between attempts
         // to handle potential file lock issues
@@ -46,6 +50,7 @@ impl HfEmbeddingService {
                 Ok(embedder) => {
                     return Ok(Self {
                         embedder: Arc::new(embedder),
+                        model_enum: model, // Use the original (now unmoved) model
                     });
                 }
                 Err(err) => {
@@ -88,6 +93,20 @@ impl EmbeddingService for HfEmbeddingService {
         })?;
 
         Ok(embedding)
+    }
+
+    fn model_name(&self) -> &str {
+        // Use the associated function to get model info and correct field name
+        match TextEmbedding::get_model_info(&self.model_enum) {
+            Ok(info) => info.model_code.as_str(), // Use as_str() for String
+            Err(_) => "unknown-model",            // Fallback if getting info fails
+        }
+    }
+
+    fn model_version(&self) -> &str {
+        // fastembed ModelInfo v4 doesn't have an explicit version string.
+        // TODO: Enhance this if specific model version tracking is needed.
+        DEFAULT_MODEL_VERSION // Using the constant defined for the default
     }
 }
 
