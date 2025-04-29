@@ -11,6 +11,7 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
+use anyhow::Result;
 
 use crate::actors::{ActorError, Ping, Shutdown};
 use crate::cutting::{CutsRepository, CuttingActor, SqliteCutsRepository};
@@ -71,7 +72,7 @@ pub struct QuiltOrchestrator {
 
 impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration (in-memory SQLite)
-    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new() -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
         // Initialize SQLite in-memory database
@@ -87,7 +88,7 @@ impl QuiltOrchestrator {
 
         // Initialize embedding service
         let embedding_service: Arc<dyn EmbeddingService> = Arc::new(
-            HfEmbeddingService::new().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?,
+            HfEmbeddingService::new()?
         );
 
         // Create the registry
@@ -106,7 +107,7 @@ impl QuiltOrchestrator {
     }
 
     /// Run the orchestrator with the given configuration
-    pub async fn run(mut self, config: OrchestratorConfig) -> Result<(), OrchestratorError> {
+    pub async fn run(mut self, config: OrchestratorConfig) -> std::result::Result<(), OrchestratorError> {
         info!("Actor system starting...");
 
         // Set up event monitoring
@@ -167,7 +168,7 @@ impl QuiltOrchestrator {
     }
 
     /// Initialize all actors in the system
-    fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn initialize_actors(&mut self) -> Result<()> {
         // Create the discovery actor with registry
         let discovery_actor = DiscoveryActor::new("main-discovery", self.registry.clone());
         self.discovery = Some(discovery_actor.start());
@@ -177,7 +178,7 @@ impl QuiltOrchestrator {
             debug!("Initialized discovery actor, verifying it's running...");
             // Don't wait for verification here - we'll check before using it
         } else {
-            return Err("Failed to start discovery actor".into());
+            anyhow::bail!("Failed to start discovery actor");
         }
 
         // Initialize cutting actor with cuts repository
