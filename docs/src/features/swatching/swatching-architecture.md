@@ -167,15 +167,42 @@ Materials progress through the following states during swatching:
 
 ## Implementation Status
 
-The SwatchingActor is implemented with:
+The SwatchingActor has been fully implemented with:
 
-- ✅ Event subscription
-- ✅ Asynchronous processing
-- ✅ Embedding generation
-- ✅ Swatch storage
-- ✅ Error handling
-- ✅ Repository integration
-- 🔄 Similarity search (basic implementation, optimization pending)
+- ✅ Event subscription and processing
+- ✅ Asynchronous processing with Tokio and Actix
+- ✅ Embedding generation via HuggingFace models
+- ✅ Swatch creation and storage
+- ✅ Repository integration with SQLite
+- ✅ Error handling and recovery
+- ✅ Status management and event publishing
+- ✅ Comprehensive testing suite
+
+### Testing Approach
+
+The testing strategy for the SwatchingActor includes:
+
+1. **Unit Tests**
+
+   - Mock-based tests using Mockall for CutsRepository, MaterialRepository, and EmbeddingService
+   - Tests for happy path scenarios with successful embeddings
+   - Tests for error conditions and recovery mechanisms
+   - Tests verifying correct event flow and status updates
+
+2. **Integration Tests**
+
+   - End-to-end tests with in-memory repositories
+   - Tests covering the full material lifecycle
+   - Tests for edge cases such as empty content and very long text
+   - Tests for concurrent processing scenarios
+
+3. **Embedding Tests**
+   - Tests for actual embedding generation using HuggingFace models
+   - Tests for consistency of embedding dimensions
+   - Tests for semantic similarity between related content
+   - Tests for error handling in model loading and processing
+
+All tests are automated and integrated into the continuous integration pipeline.
 
 ## Future Enhancements
 

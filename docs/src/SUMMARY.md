@@ -30,4 +30,6 @@
 # Development
 
 - [Development Guide](development/guide.md)
+- [Testing with Mockall](development/testing_with_mockall.md)
+- [Testing and Linting](development/testing_and_linting.md)
 - [Implementation Plan](development/implementation-plans/initial-implementation-plan.md)

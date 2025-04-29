@@ -32,7 +32,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 
 **Demonstration:** Application compiles and runs. `QuiltOrchestrator` successfully injects the `SqliteSwatchRepository` instance into `SwatchingActor`. Tests for `SwatchingActor` pass.
 
-# Milestone: Implement Swatching Actor Logic & Event
+### Milestone: "Implement Swatching Actor Logic & Event" [COMPLETED]
 
 **Goal:** Connect the `SwatchingActor` to retrieve cuts, generate **actual embeddings**, create swatches, store them via the repository, update registry status, and publish the `MaterialSwatched` event.  
 **Implementation Time:** ~3–4 days
@@ -54,7 +54,7 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 
 ## Implementation Plan
 
-### 1. Define & Wire Dependencies (Day 1)
+### 1. Define & Wire Dependencies (Day 1) [COMPLETED]
 
 1. ~~Add `EmbeddingService` interface~~ [DONE]
    ```rust
@@ -69,18 +69,18 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
    - `SwatchRepository`
    - `MaterialRegistry`
 
-### 2. Fetch & Embed Cuts (Day 2) [NEXT STEP]
+### 2. Fetch & Embed Cuts (Day 2) [COMPLETED]
 
-1. In `SwatchingActor.process(material_id)`:
-   - `let cuts = cuts_repo.get_by_material(material_id)?;`
-   - For each `cut`:
+1. ~~In `SwatchingActor.process(material_id)`:~~ [DONE]
+   - ~~`let cuts = cuts_repo.get_by_material(material_id)?;`~~
+   - ~~For each `cut`:~~
      ```rust
      let embedding = embedding_service.embed(&cut.content)?;
      ```
 
-### 3. Create & Persist Swatches (Day 2–3)
+### 3. Create & Persist Swatches (Day 2–3) [COMPLETED]
 
-1. Map each `Cut` → `Swatch`:
+1. ~~Map each `Cut` → `Swatch`:~~ [DONE]
    ```rust
    struct Swatch {
      cut_id: Uuid,
@@ -88,19 +88,19 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
      created_at: DateTime<Utc>,
    }
    ```
-2. Save via `swatch_repo.save(&swatch)?;`
+2. ~~Save via `swatch_repo.save(&swatch)?;`~~ [DONE]
 
-### 4. Update Registry & Publish Event (Day 3)
+### 4. Update Registry & Publish Event (Day 3) [COMPLETED]
 
-1. On success:
+1. ~~On success:~~ [DONE]
    ```rust
    material_registry.mark_swatched(material_id)?;
    ```
-2. On failure:
+2. ~~On failure:~~ [DONE]
    ```rust
    material_registry.mark_error(material_id, error_info)?;
    ```
-3. New event variant in `QuiltEvent`:
+3. ~~New event variant in `QuiltEvent`:~~ [DONE]
    ```rust
    enum QuiltEvent {
      MaterialSwatched { material_id: Uuid, timestamp: DateTime<Utc> },
@@ -108,34 +108,46 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
    }
    ```
 
-### 5. Integration & Test Coverage (Day 4)
+### 5. Integration & Test Coverage (Day 4) [COMPLETED]
 
-1. **Unit tests**
+1. **Unit tests** [DONE]
 
-   - Mock `EmbeddingService`, `CutsRepository`, `SwatchRepository` using mockall.
-   - Test happy path & embedding failures.
-   - Tests should be quiet by default (avoid println statements) and rely on assertions.
-   - Use descriptive test names and assertion messages for better failure reporting.
-   - For tests requiring special case handling (e.g., model loading failures), use `eprintln!` for warnings.
+   - ~~Mock `EmbeddingService`, `CutsRepository`, `SwatchRepository` using mockall.~~
+   - ~~Test happy path & embedding failures.~~
+   - ~~Tests should be quiet by default (avoid println statements) and rely on assertions.~~
+   - ~~Use descriptive test names and assertion messages for better failure reporting.~~
+   - ~~For tests requiring special case handling (e.g., model loading failures), use `eprintln!` for warnings.~~
 
-2. **Integration tests**
+2. **Integration tests** [DONE]
 
-   - In-memory DB: run actor end-to-end, assert cuts retrieved, swatches persisted, event emitted.
-   - Test all expected failure modes and verify proper error propagation.
+   - ~~In-memory DB: run actor end-to-end, assert cuts retrieved, swatches persisted, event emitted.~~
+   - ~~Test all expected failure modes and verify proper error propagation.~~
 
-3. **Test robustness**
-   - Ensure tests handle edge cases: empty text, very long text, special characters.
-   - Include tests for retry mechanisms and concurrent operations.
+3. **Test robustness** [DONE]
+   - ~~Ensure tests handle edge cases: empty text, very long text, special characters.~~
+   - ~~Include tests for retry mechanisms and concurrent operations.~~
 
 ---
 
-## Rough Timeline
+## Completion Status
 
-| Day | Focus                                              |
-| --- | -------------------------------------------------- |
-| 1   | Define `EmbeddingService`, wire DI in orchestrator |
-| 2   | Fetch cuts, generate embeddings                    |
-| 3   | Create/persist swatches, update registry & event   |
-| 4   | Write unit + integration tests; polish & review    |
+The SwatchingActor implementation has been completed, including:
+
+1. **Event-driven processing**: The actor listens for MaterialCut events and processes them asynchronously.
+2. **Embedding generation**: The actor uses the EmbeddingService to generate vector embeddings for cut content.
+3. **Swatch creation and storage**: The actor creates Swatch objects and persists them via the SwatchRepository.
+4. **Status management**: The actor updates material status in the registry (Swatched or Error).
+5. **Event publishing**: The actor publishes MaterialSwatched events upon successful processing.
+6. **Error handling**: The actor properly handles errors during processing and updates material status accordingly.
+7. **Testing**: Comprehensive unit and integration tests verify the functionality of all components.
+
+All components are properly integrated with the dependency injection system and tests are passing.
+
+## Next Steps
+
+1. **Vector search optimization**: Implement efficient approximate nearest-neighbor search algorithms.
+2. **Advanced embedding strategies**: Support for different embedding models and strategies.
+3. **Metrics and monitoring**: Add tracking of embedding quality, processing time, and error rates.
+4. **Performance tuning**: Optimize batch processing, caching, and parallel embedding generation.
 
 **Demonstration:** Running `main` shows "Created X swatches with embeddings..." logs. Material status updates to `Swatched`. `MaterialSwatched` events are published. Integration tests verify embedding creation and storage in the database.
