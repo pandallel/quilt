@@ -446,6 +446,7 @@ mod tests {
     use crate::swatching::swatch::Swatch;
     use futures::future;
     use mockall::{predicate, Sequence};
+    use std::collections::HashMap;
     use std::sync::Arc;
     use std::time::Duration;
     use time::OffsetDateTime;
@@ -586,6 +587,9 @@ mod tests {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
+        mock_material_repo
+            .expect_count_by_status()
+            .returning(HashMap::new);
 
         let registry = MaterialRegistry::new(Arc::new(mock_material_repo), event_bus.clone());
 
@@ -643,6 +647,9 @@ mod tests {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
+        mock_material_repo
+            .expect_count_by_status()
+            .returning(HashMap::new);
 
         let registry = MaterialRegistry::new(Arc::new(mock_material_repo), event_bus.clone());
 
@@ -701,6 +708,9 @@ mod tests {
             })
             .times(1)
             .returning(|_, _, _| Ok(()));
+        mock_material_repo
+            .expect_count_by_status()
+            .returning(HashMap::new);
 
         let registry = MaterialRegistry::new(Arc::new(mock_material_repo), event_bus.clone());
 
@@ -784,6 +794,9 @@ mod tests {
             })
             .times(1)
             .returning(|_, _, _| Ok(()));
+        mock_material_repo
+            .expect_count_by_status()
+            .returning(HashMap::new);
 
         let registry = MaterialRegistry::new(Arc::new(mock_material_repo), event_bus.clone());
 
@@ -904,6 +917,9 @@ mod tests {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
+        mock_material_repo
+            .expect_count_by_status()
+            .returning(HashMap::new);
 
         let registry = MaterialRegistry::new(Arc::new(mock_material_repo), event_bus.clone());
 

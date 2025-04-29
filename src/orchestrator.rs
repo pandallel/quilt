@@ -129,9 +129,7 @@ impl QuiltOrchestrator {
 
         // Check success
         if success.success {
-            info!(
-                "Discovery complete. System running, press Ctrl+C to exit..."
-            );
+            info!("Discovery complete. System running, press Ctrl+C to exit...");
         } else {
             error!(
                 "Discovery failed after {:?}. Shutting down.",
