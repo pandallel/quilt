@@ -20,11 +20,16 @@
   - [Cutting Behaviors](features/cutting/cutting-behaviors.md)
   - [Cutting Architecture](features/cutting/cutting-architecture.md)
   - [Error Handling](features/cutting/cut-errors.md)
-- [Swatch](features/swatch.md)
+- [Material Swatching](features/swatching/README.md)
+  - [Swatching Behaviors](features/swatching/swatching-behaviors.md)
+  - [Swatching Architecture](features/swatching/swatching-architecture.md)
+  - [Error Handling](features/swatching/swatching-errors.md)
 - [Swatch Book](features/swatch-book.md)
 - [Spread](features/spread.md)
 
 # Development
 
 - [Development Guide](development/guide.md)
-- [Implementation Plan](development/implementation-plans/initial-implementation-plan.md)
+- [Testing with Mockall](development/testing_with_mockall.md)
+- [Testing and Linting](development/testing_and_linting.md)
+- [Implementation Plan](development/implementation-plans/swatching-embedding.md)

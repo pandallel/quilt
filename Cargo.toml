@@ -34,6 +34,10 @@ sqlx = { version = "0.7.4", features = ["sqlite", "runtime-tokio-rustls", "time"
 # JSON serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# Error handling
+anyhow = "1.0"
+# Embedding model
+fastembed = "4.8.0"
 
 [dev-dependencies]
 tempfile = "3.19.1"

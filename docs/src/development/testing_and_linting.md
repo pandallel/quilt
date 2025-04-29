@@ -46,6 +46,32 @@ mod tests {
 }
 ```
 
+### Test Output
+
+Tests should be quiet by default and rely on Rust's built-in test framework for reporting. Follow these guidelines:
+
+- **Avoid `println!` statements** in tests, as they add noise to test output and make it harder to spot actual failures.
+- Use descriptive test names and assertion messages instead of printing progress messages.
+- For conditional test execution (e.g., skipping tests when prerequisites aren't met), use `eprintln!` instead of `println!` to output warnings.
+- If debugging test behavior, use `cargo test -- --nocapture` to see output, but remove debug prints before committing.
+
+Example of proper error output in tests:
+
+```rust
+#[test]
+fn test_configuration_parsing() {
+    let config = match parse_config("test.cfg") {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("Skipping test due to missing test file: {}", e);
+            return;
+        }
+    };
+
+    assert_eq!(config.value, expected_value, "Config should parse 'value' field correctly");
+}
+```
+
 ## Linting and Formatting
 
 ### Rustfmt

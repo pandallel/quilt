@@ -110,6 +110,14 @@ impl MaterialRegistry {
                     .map_err(RegistryError::EventBus)?;
                 debug!("Published MaterialCut event for material: {}", id);
             }
+            MaterialStatus::Swatched => {
+                // Material has been swatched, publish a MaterialSwatched event
+                let event = QuiltEvent::material_swatched(id);
+                self.event_bus
+                    .publish(event)
+                    .map_err(RegistryError::EventBus)?;
+                debug!("Published MaterialSwatched event for material: {}", id);
+            }
             MaterialStatus::Error => {
                 // Material has encountered an error, publish a ProcessingError event
                 if let Some(error_message) = error {
@@ -131,6 +139,27 @@ impl MaterialRegistry {
             _ => {
                 // No events to publish for other status changes
             }
+        }
+
+        // Log progress after status update and event publishing
+        let status_counts = self.repository.count_by_status().await;
+        let total_count = status_counts.values().sum::<usize>();
+        let swatched_count = status_counts
+            .get(&MaterialStatus::Swatched)
+            .copied()
+            .unwrap_or(0);
+        let error_count = status_counts
+            .get(&MaterialStatus::Error)
+            .copied()
+            .unwrap_or(0);
+        let processed_count = swatched_count + error_count;
+
+        if total_count > 0 {
+            let percentage = (processed_count as f32 / total_count as f32) * 100.0;
+            info!(
+                "Progress: {} / {} materials processed ({:.1}%), Swatched: {}, Error: {}",
+                processed_count, total_count, percentage, swatched_count, error_count
+            );
         }
 
         Ok(())

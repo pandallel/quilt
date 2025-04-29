@@ -17,6 +17,9 @@ pub use registry::*;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+use mockall::automock;
+
 pub use repository::InMemoryMaterialRepository;
 pub use sqlite_repository::SqliteMaterialRepository;
 pub use types::{Material, MaterialFileType, MaterialStatus};
@@ -41,6 +44,7 @@ pub enum RepositoryError {
 pub type Result<T> = std::result::Result<T, RepositoryError>;
 
 /// Repository trait for managing materials
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait MaterialRepository: Send + Sync + Debug + 'static {
     /// Register a new material in the repository

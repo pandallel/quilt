@@ -5,11 +5,11 @@
 
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
-use log::{debug, error, info, warn};
+use anyhow::Result;
+use log::{debug, error, info};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
@@ -20,7 +20,9 @@ use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
 use crate::materials::{MaterialRegistry, MaterialRepository, SqliteMaterialRepository};
-use crate::swatching::{SqliteSwatchRepository, SwatchRepository, SwatchingActor};
+use crate::swatching::{
+    EmbeddingService, HfEmbeddingService, SqliteSwatchRepository, SwatchRepository, SwatchingActor,
+};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -64,11 +66,12 @@ pub struct QuiltOrchestrator {
     event_bus: Arc<EventBus>,
     cuts_repository: Arc<dyn CutsRepository>,
     swatch_repository: Arc<dyn SwatchRepository>,
+    embedding_service: Arc<dyn EmbeddingService>,
 }
 
 impl QuiltOrchestrator {
     /// Create a new QuiltOrchestrator with default configuration (in-memory SQLite)
-    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new() -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
         // Initialize SQLite in-memory database
@@ -82,6 +85,9 @@ impl QuiltOrchestrator {
         let swatch_repository: Arc<dyn SwatchRepository> =
             Arc::new(SqliteSwatchRepository::new(pool.clone()));
 
+        // Initialize embedding service
+        let embedding_service: Arc<dyn EmbeddingService> = Arc::new(HfEmbeddingService::new()?);
+
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
 
@@ -93,18 +99,23 @@ impl QuiltOrchestrator {
             event_bus,
             cuts_repository,
             swatch_repository,
+            embedding_service,
         })
     }
 
     /// Run the orchestrator with the given configuration
-    pub async fn run(mut self, config: OrchestratorConfig) -> Result<(), OrchestratorError> {
+    pub async fn run(
+        mut self,
+        config: OrchestratorConfig,
+    ) -> std::result::Result<(), OrchestratorError> {
         info!("Actor system starting...");
 
         // Set up event monitoring
         self.setup_event_monitoring();
 
         // Initialize actors
-        self.initialize_actors()?;
+        self.initialize_actors()
+            .map_err(|e| OrchestratorError::Other(e.into()))?;
 
         // Start discovery process with timeout
         let success = self
@@ -118,22 +129,19 @@ impl QuiltOrchestrator {
 
         // Check success
         if success.success {
-            info!("Discovery process completed successfully");
+            info!("Discovery complete. System running, press Ctrl+C to exit...");
         } else {
-            error!("Discovery process failed");
+            error!(
+                "Discovery failed after {:?}. Shutting down.",
+                config.actor_timeout
+            );
+            // Proceed to shutdown even if discovery failed
         }
 
-        // Run application logic
-        let (tx, rx) = oneshot::channel::<()>();
-        self.run_application_logic(tx).await;
-
-        // Wait for completion with timeout
+        // Wait indefinitely for Ctrl+C signal
         tokio::select! {
-            _ = rx => {
-                info!("Work completed, initiating shutdown");
-            }
-            _ = tokio::time::sleep(config.actor_timeout) => {
-                warn!("Operation timed out after {:?}, forcing shutdown", config.actor_timeout);
+            _ = tokio::signal::ctrl_c() => {
+                info!("Ctrl+C received, initiating shutdown...");
             }
         }
 
@@ -158,7 +166,7 @@ impl QuiltOrchestrator {
     }
 
     /// Initialize all actors in the system
-    fn initialize_actors(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn initialize_actors(&mut self) -> Result<()> {
         // Create the discovery actor with registry
         let discovery_actor = DiscoveryActor::new("main-discovery", self.registry.clone());
         self.discovery = Some(discovery_actor.start());
@@ -168,7 +176,7 @@ impl QuiltOrchestrator {
             debug!("Initialized discovery actor, verifying it's running...");
             // Don't wait for verification here - we'll check before using it
         } else {
-            return Err("Failed to start discovery actor".into());
+            anyhow::bail!("Failed to start discovery actor");
         }
 
         // Initialize cutting actor with cuts repository
@@ -181,11 +189,14 @@ impl QuiltOrchestrator {
         debug!("Initialized cutting actor");
         self.cutting = Some(cutting_addr);
 
-        // Initialize swatching actor
+        // Initialize swatching actor with all dependencies
         let swatching_actor = SwatchingActor::new(
             "main-swatching",
             self.event_bus.clone(),
+            self.cuts_repository.clone(),
+            self.embedding_service.clone(),
             self.swatch_repository.clone(),
+            self.registry.clone(),
         );
         let swatching_addr = swatching_actor.start();
         debug!("Initialized swatching actor");
@@ -263,18 +274,6 @@ impl QuiltOrchestrator {
             }
             Err(_) => Err(OrchestratorError::Timeout(timeout_duration)),
         }
-    }
-
-    /// Run application logic
-    async fn run_application_logic(&self, tx: oneshot::Sender<()>) {
-        // Example of scheduled shutdown after some work
-        tokio::spawn(async move {
-            // Simulate some work
-            tokio::time::sleep(Duration::from_secs(1)).await;
-
-            // Signal we're done
-            let _ = tx.send(());
-        });
     }
 
     /// Shutdown all actors in the system with a timeout
