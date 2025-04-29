@@ -20,7 +20,9 @@ use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
 use crate::materials::{MaterialRegistry, MaterialRepository, SqliteMaterialRepository};
-use crate::swatching::{EmbeddingService, HfEmbeddingService, SqliteSwatchRepository, SwatchRepository, SwatchingActor};
+use crate::swatching::{
+    EmbeddingService, HfEmbeddingService, SqliteSwatchRepository, SwatchRepository, SwatchingActor,
+};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -82,10 +84,11 @@ impl QuiltOrchestrator {
             Arc::new(SqliteCutsRepository::new(pool.clone()));
         let swatch_repository: Arc<dyn SwatchRepository> =
             Arc::new(SqliteSwatchRepository::new(pool.clone()));
-            
+
         // Initialize embedding service
-        let embedding_service: Arc<dyn EmbeddingService> = 
-            Arc::new(HfEmbeddingService::new().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?);
+        let embedding_service: Arc<dyn EmbeddingService> = Arc::new(
+            HfEmbeddingService::new().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?,
+        );
 
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
