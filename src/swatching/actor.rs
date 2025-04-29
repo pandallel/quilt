@@ -1,6 +1,8 @@
 use crate::actors::{Ping, Shutdown};
+use crate::cutting::CutsRepository;
 use crate::events::types::MaterialId;
 use crate::events::QuiltEvent;
+use crate::materials::MaterialRegistry;
 use actix::prelude::*;
 use actix::SpawnHandle;
 use log::{debug, error, info, warn};
@@ -8,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
+use super::embedding::EmbeddingService;
 use super::repository::SwatchRepository;
 
 /// Messages specific to the SwatchingActor
@@ -68,6 +71,12 @@ pub struct SwatchingActor {
     event_bus: Arc<crate::events::EventBus>,
     /// Swatch repository for persistence
     swatch_repository: Arc<dyn SwatchRepository>,
+    /// Cuts repository for retrieving cut content
+    cuts_repository: Arc<dyn CutsRepository>,
+    /// Embedding service for generating embeddings
+    embedding_service: Arc<dyn EmbeddingService>,
+    /// Material registry for updating status
+    registry: MaterialRegistry,
     /// Sender for the internal work queue
     work_sender: Option<mpsc::Sender<SwatchingWorkItem>>,
     /// Handle for the listener task
@@ -77,22 +86,31 @@ pub struct SwatchingActor {
 }
 
 impl SwatchingActor {
-    /// Create a new SwatchingActor with the given name, event bus, and repository
+    /// Create a new SwatchingActor with the given name, event bus, and repositories
     ///
     /// # Arguments
     ///
     /// * `name` - Name for this actor instance, used in logging
     /// * `event_bus` - Event bus to subscribe to events
+    /// * `cuts_repository` - Repository for retrieving cuts
+    /// * `embedding_service` - Service for generating embeddings
     /// * `swatch_repository` - Repository for swatch persistence
+    /// * `registry` - Material registry for updating status
     pub fn new(
         name: &str,
         event_bus: Arc<crate::events::EventBus>,
+        cuts_repository: Arc<dyn CutsRepository>,
+        embedding_service: Arc<dyn EmbeddingService>,
         swatch_repository: Arc<dyn SwatchRepository>,
+        registry: MaterialRegistry,
     ) -> Self {
         Self {
             name: name.to_string(),
             event_bus,
+            cuts_repository,
+            embedding_service,
             swatch_repository,
+            registry,
             work_sender: None,
             listener_handle: None,
             processor_handle: None,
@@ -114,8 +132,11 @@ impl Actor for SwatchingActor {
         let bus_receiver = self.event_bus.subscribe();
         let actor_name = self.name.clone();
 
-        // Clone repository for the processor task
+        // Clone repositories and services for the processor task
         let swatch_repo_clone = self.swatch_repository.clone();
+        let cuts_repo_clone = self.cuts_repository.clone();
+        let embedding_service_clone = self.embedding_service.clone();
+        let registry_clone = self.registry.clone();
 
         let listener_actor_name = actor_name.clone();
         let listener_handle = ctx.spawn(
@@ -172,8 +193,12 @@ impl Actor for SwatchingActor {
                 info!("{}: Processor task started", processor_actor_name);
                 let mut work_receiver = work_receiver;
                 let actor_name = processor_actor_name;
-                // Use the cloned repository
+                
+                // Use the cloned dependencies
                 let swatch_repository = swatch_repo_clone;
+                let cuts_repository = cuts_repo_clone;
+                let embedding_service = embedding_service_clone;
+                let registry = registry_clone;
 
                 while let Some(work_item) = work_receiver.recv().await {
                     let material_id_str = work_item.material_id.as_str();

@@ -56,20 +56,20 @@ This workstream focuses on the logic within the Swatching Actor to generate embe
 
 ### 1. Define & Wire Dependencies (Day 1)
 
-1. Add `EmbeddingService` interface
+1. ~~Add `EmbeddingService` interface~~ [DONE]
    ```rust
    pub trait EmbeddingService {
      fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
    }
    ```
-2. Implement `HfEmbeddingService` calling `fastembed` + HF model URL.
-3. Refactor DI in `QuiltOrchestrator` to instantiate and pass:
+2. ~~Implement `HfEmbeddingService` calling `fastembed` + HF model URL.~~ [DONE]
+3. ~~Refactor DI in `QuiltOrchestrator` to instantiate and pass:~~ [DONE]
    - `CutsRepository`
    - `EmbeddingService`
    - `SwatchRepository`
    - `MaterialRegistry`
 
-### 2. Fetch & Embed Cuts (Day 2)
+### 2. Fetch & Embed Cuts (Day 2) [NEXT STEP]
 
 1. In `SwatchingActor.process(material_id)`:
    - `let cuts = cuts_repo.get_by_material(material_id)?;`

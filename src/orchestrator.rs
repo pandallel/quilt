@@ -20,7 +20,7 @@ use crate::discovery::actor::DiscoveryConfig;
 use crate::discovery::DiscoveryActor;
 use crate::events::EventBus;
 use crate::materials::{MaterialRegistry, MaterialRepository, SqliteMaterialRepository};
-use crate::swatching::{SqliteSwatchRepository, SwatchRepository, SwatchingActor};
+use crate::swatching::{EmbeddingService, HfEmbeddingService, SqliteSwatchRepository, SwatchRepository, SwatchingActor};
 
 /// Configuration for the Quilt orchestrator
 pub struct OrchestratorConfig {
@@ -64,6 +64,7 @@ pub struct QuiltOrchestrator {
     event_bus: Arc<EventBus>,
     cuts_repository: Arc<dyn CutsRepository>,
     swatch_repository: Arc<dyn SwatchRepository>,
+    embedding_service: Arc<dyn EmbeddingService>,
 }
 
 impl QuiltOrchestrator {
@@ -81,6 +82,10 @@ impl QuiltOrchestrator {
             Arc::new(SqliteCutsRepository::new(pool.clone()));
         let swatch_repository: Arc<dyn SwatchRepository> =
             Arc::new(SqliteSwatchRepository::new(pool.clone()));
+            
+        // Initialize embedding service
+        let embedding_service: Arc<dyn EmbeddingService> = 
+            Arc::new(HfEmbeddingService::new().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?);
 
         // Create the registry
         let registry = MaterialRegistry::new(material_repository, event_bus.clone());
@@ -93,6 +98,7 @@ impl QuiltOrchestrator {
             event_bus,
             cuts_repository,
             swatch_repository,
+            embedding_service,
         })
     }
 
@@ -181,11 +187,14 @@ impl QuiltOrchestrator {
         debug!("Initialized cutting actor");
         self.cutting = Some(cutting_addr);
 
-        // Initialize swatching actor
+        // Initialize swatching actor with all dependencies
         let swatching_actor = SwatchingActor::new(
             "main-swatching",
             self.event_bus.clone(),
+            self.cuts_repository.clone(),
+            self.embedding_service.clone(),
             self.swatch_repository.clone(),
+            self.registry.clone(),
         );
         let swatching_addr = swatching_actor.start();
         debug!("Initialized swatching actor");
