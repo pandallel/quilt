@@ -18,6 +18,11 @@ Future milestones will focus on more advanced features:
    - Enhanced caching strategies
    - Load balancing and monitoring
    - Performance optimization based on usage patterns (tuning queue sizes, buffer capacities)
+   - **Address Swatching Bottlenecks:**
+     - **Parallelize Embedding Generation:** Explore parallelizing CPU-intensive embedding computation within the `EmbeddingService` (e.g., using `rayon`) or by spawning multiple embedding tasks.
+     - **Implement Batch Swatch Saving:** Modify `SwatchRepository` and `SwatchingActor` to save generated swatches in batches, reducing database transaction overhead.
+   - **Optimize Progress Reporting:** Reduce database load by making progress count queries in `MaterialRegistry` less frequent (e.g., timer-based, every N updates, or dedicated reporting task).
+   - **Database Optimization:** Evaluate alternative databases (e.g., PostgreSQL) for improved concurrent write performance if SQLite becomes a bottleneck under heavy load.
 
 3. **Cutting Enhancements**
 
