@@ -6,11 +6,10 @@
 use actix::dev::ToEnvelope;
 use actix::prelude::*;
 use anyhow::Result;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::oneshot;
 use tokio::time::timeout;
 
 use crate::actors::{ActorError, Ping, Shutdown};
@@ -130,22 +129,21 @@ impl QuiltOrchestrator {
 
         // Check success
         if success.success {
-            info!("Discovery process completed successfully");
+            info!(
+                "Discovery complete. System running, press Ctrl+C to exit..."
+            );
         } else {
-            error!("Discovery process failed");
+            error!(
+                "Discovery failed after {:?}. Shutting down.",
+                config.actor_timeout
+            );
+            // Proceed to shutdown even if discovery failed
         }
 
-        // Run application logic
-        let (tx, rx) = oneshot::channel::<()>();
-        self.run_application_logic(tx).await;
-
-        // Wait for completion with timeout
+        // Wait indefinitely for Ctrl+C signal
         tokio::select! {
-            _ = rx => {
-                info!("Work completed, initiating shutdown");
-            }
-            _ = tokio::time::sleep(config.actor_timeout) => {
-                warn!("Operation timed out after {:?}, forcing shutdown", config.actor_timeout);
+            _ = tokio::signal::ctrl_c() => {
+                info!("Ctrl+C received, initiating shutdown...");
             }
         }
 
@@ -278,18 +276,6 @@ impl QuiltOrchestrator {
             }
             Err(_) => Err(OrchestratorError::Timeout(timeout_duration)),
         }
-    }
-
-    /// Run application logic
-    async fn run_application_logic(&self, tx: oneshot::Sender<()>) {
-        // Example of scheduled shutdown after some work
-        tokio::spawn(async move {
-            // Simulate some work
-            tokio::time::sleep(Duration::from_secs(1)).await;
-
-            // Signal we're done
-            let _ = tx.send(());
-        });
     }
 
     /// Shutdown all actors in the system with a timeout
