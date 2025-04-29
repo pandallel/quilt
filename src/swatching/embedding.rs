@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 use thiserror::Error;
@@ -13,15 +14,20 @@ pub enum EmbeddingError {
     #[error("Model loading failed: {0}")]
     ModelLoadFailed(String),
 
+    /// Error when a blocking task panics
+    #[error("Embedding task failed: {0}")]
+    TaskFailed(String),
+
     /// Catch-all for other errors
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
 /// A trait for services that generate vector embeddings from text.
+#[async_trait]
 #[cfg_attr(test, automock)]
 pub trait EmbeddingService: Send + Sync {
-    /// Generates an embedding for the given text.
+    /// Generates an embedding for the given text asynchronously.
     ///
     /// # Arguments
     ///
@@ -31,7 +37,7 @@ pub trait EmbeddingService: Send + Sync {
     ///
     /// A `Result` containing either the vector embedding (`Vec<f32>`) on success,
     /// or an `EmbeddingError` on failure.
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
+    async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
 
     /// Returns the name of the embedding model used by the service.
     fn model_name(&self) -> &str;

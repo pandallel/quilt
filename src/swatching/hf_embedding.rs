@@ -3,7 +3,9 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::Context;
+use async_trait::async_trait;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use tokio::task;
 
 use crate::swatching::embedding::{EmbeddingError, EmbeddingService};
 
@@ -72,20 +74,32 @@ impl HfEmbeddingService {
     }
 }
 
+#[async_trait]
 impl EmbeddingService for HfEmbeddingService {
-    fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
-        if text.trim().is_empty() {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        let trimmed_text = text.trim();
+        if trimmed_text.is_empty() {
             return Err(EmbeddingError::GenerationFailed(
                 "Cannot embed empty text".to_string(),
             ));
         }
 
-        let documents = vec![text.to_string()];
-        let embeddings = self
-            .embedder
-            .embed(documents, None)
-            .context("Failed to generate embedding")
-            .map_err(|e| EmbeddingError::GenerationFailed(e.to_string()))?;
+        let embedder_clone = self.embedder.clone();
+        let text_clone = trimmed_text.to_string(); // Clone text to move into the closure
+
+        // Spawn the potentially blocking embed operation on a blocking thread
+        let result = task::spawn_blocking(move || {
+            let documents = vec![text_clone];
+            embedder_clone
+                .embed(documents, None)
+                .context("Fastembed failed to generate embedding") // Add context here
+        })
+        .await;
+
+        // Handle potential errors from spawn_blocking (JoinError) and the inner result
+        let embeddings_result = result.map_err(|e| EmbeddingError::TaskFailed(e.to_string()))?;
+
+        let embeddings = embeddings_result.context("Failed to generate embedding")?;
 
         // We only embedded one text, so we can safely extract the first embedding
         let embedding = embeddings.into_iter().next().ok_or_else(|| {
@@ -114,8 +128,8 @@ impl EmbeddingService for HfEmbeddingService {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_empty_text_returns_error() {
+    #[tokio::test]
+    async fn test_empty_text_returns_error() {
         // Test with different empty strings
         let services = match HfEmbeddingService::new() {
             Ok(service) => service,
@@ -127,8 +141,8 @@ mod tests {
         };
 
         // Test with empty string
-        let result = services.embed("");
-        assert!(result.is_err());
+        let result = services.embed("").await;
+        assert!(result.is_err(), "Embedding empty string should fail");
         if let Err(EmbeddingError::GenerationFailed(msg)) = result {
             assert_eq!(msg, "Cannot embed empty text");
         } else {
@@ -136,8 +150,8 @@ mod tests {
         }
 
         // Test with whitespace-only string
-        let result = services.embed("   \t\n");
-        assert!(result.is_err());
+        let result = services.embed("   \t\n").await;
+        assert!(result.is_err(), "Embedding whitespace string should fail");
         if let Err(EmbeddingError::GenerationFailed(msg)) = result {
             assert_eq!(msg, "Cannot embed empty text");
         } else {
@@ -145,8 +159,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_successful_embedding() {
+    #[tokio::test]
+    async fn test_successful_embedding() {
         // Skip test if model can't be loaded
         let service = match HfEmbeddingService::new() {
             Ok(service) => service,
@@ -158,9 +172,9 @@ mod tests {
 
         // Test with simple text
         let text = "This is a sample text for embedding.";
-        let result = service.embed(text);
+        let result = service.embed(text).await;
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Embedding should succeed for valid text");
 
         // Check that embedding is non-empty and has expected dimensions
         let embedding = result.unwrap();
@@ -178,8 +192,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_consistency() {
+    #[tokio::test]
+    async fn test_consistency() {
         // Skip test if model can't be loaded
         let service = match HfEmbeddingService::new() {
             Ok(service) => service,
@@ -191,15 +205,15 @@ mod tests {
 
         // Generate embeddings for the same text twice
         let text = "The quick brown fox jumps over the lazy dog.";
-        let embedding1 = service.embed(text).unwrap();
-        let embedding2 = service.embed(text).unwrap();
+        let embedding1 = service.embed(text).await.unwrap();
+        let embedding2 = service.embed(text).await.unwrap();
 
         // Embeddings for the same text should be identical
         assert_eq!(embedding1, embedding2);
 
         // Generate embeddings for different text
         let text2 = "A completely different sentence for comparison.";
-        let embedding3 = service.embed(text2).unwrap();
+        let embedding3 = service.embed(text2).await.unwrap();
 
         // Embeddings for different text should be different
         assert_ne!(embedding1, embedding3);
@@ -212,8 +226,8 @@ mod tests {
         dot_product
     }
 
-    #[test]
-    fn test_semantic_similarity() {
+    #[tokio::test]
+    async fn test_semantic_similarity() {
         // Skip test if model can't be loaded
         let service = match HfEmbeddingService::new() {
             Ok(service) => service,
@@ -228,9 +242,9 @@ mod tests {
         let text2 = "Pasta is my favorite food for the evening meal.";
         let text3 = "Quantum physics explores the fundamental nature of reality.";
 
-        let emb1 = service.embed(text1).unwrap();
-        let emb2 = service.embed(text2).unwrap();
-        let emb3 = service.embed(text3).unwrap();
+        let emb1 = service.embed(text1).await.unwrap();
+        let emb2 = service.embed(text2).await.unwrap();
+        let emb3 = service.embed(text3).await.unwrap();
 
         let sim_similar = cosine_similarity(&emb1, &emb2);
         let sim_different = cosine_similarity(&emb1, &emb3);

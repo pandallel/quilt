@@ -253,7 +253,7 @@ impl Actor for SwatchingActor {
                                 );
 
                                 // Generate embedding for the cut content
-                                match embedding_service.embed(&cut.content) {
+                                match embedding_service.embed(&cut.content).await {
                                     Ok(embedding) => {
                                         debug!(
                                             "{}: Successfully generated embedding for cut {} with dimensions {}",
@@ -444,6 +444,7 @@ mod tests {
     use crate::swatching::embedding::{EmbeddingError, MockEmbeddingService};
     use crate::swatching::repository::MockSwatchRepository;
     use crate::swatching::swatch::Swatch;
+    use futures::future;
     use mockall::{predicate, Sequence};
     use std::sync::Arc;
     use std::time::Duration;
@@ -557,7 +558,7 @@ mod tests {
             .expect_embed()
             .withf(move |text: &str| text == cut_content_clone)
             .times(1)
-            .returning(move |_| Ok(test_embedding_clone.clone()));
+            .returning(move |_| Box::pin(future::ready(Ok(test_embedding_clone.clone()))));
         mock_swatch_repo
             .expect_save_swatches_batch()
             .withf(move |swatches: &[Swatch]| {
@@ -758,7 +759,11 @@ mod tests {
         mock_embedding_service
             .expect_embed()
             .times(2)
-            .returning(|_| Err(EmbeddingError::GenerationFailed("Mock embed error".into())));
+            .returning(|_| {
+                Box::pin(future::ready(Err(EmbeddingError::GenerationFailed(
+                    "Mock embed error".into(),
+                ))))
+            });
 
         let mat_id_clone = material_id.to_string();
         mock_material_repo
@@ -850,19 +855,23 @@ mod tests {
             .withf(move |text: &str| text == cut1_content_clone)
             .times(1)
             .in_sequence(&mut seq)
-            .returning(move |_| Ok(embed_ok1_clone.clone()));
+            .returning(move |_| Box::pin(future::ready(Ok(embed_ok1_clone.clone()))));
         mock_embedding_service
             .expect_embed()
             .withf(move |text: &str| text == cut2_content_clone)
             .times(1)
             .in_sequence(&mut seq)
-            .returning(|_| Err(EmbeddingError::GenerationFailed("Fail 2".into())));
+            .returning(|_| {
+                Box::pin(future::ready(Err(EmbeddingError::GenerationFailed(
+                    "Fail 2".into(),
+                ))))
+            });
         mock_embedding_service
             .expect_embed()
             .withf(move |text: &str| text == cut3_content_clone)
             .times(1)
             .in_sequence(&mut seq)
-            .returning(move |_| Ok(embed_ok3_clone.clone()));
+            .returning(move |_| Box::pin(future::ready(Ok(embed_ok3_clone.clone()))));
         mock_swatch_repo
             .expect_save_swatches_batch()
             .withf(move |swatches: &[Swatch]| {
