@@ -43,3 +43,5 @@ Thumbs.db
 
 # AI files
 .cursor/rules/current_implementation_plan.mdc
+
+.fastembed_cache/
