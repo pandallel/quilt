@@ -110,6 +110,43 @@ impl SqliteSwatchRepository {
             }
         }
     }
+
+    /// Execute a query in a transaction.
+    ///
+    /// This is a convenience wrapper around execute_in_transaction for single query operations.
+    /// It handles standard error mapping for SQLite errors.
+    ///
+    /// # Arguments
+    /// * `f` - A function that takes a transaction and returns a SQLx query result
+    ///
+    /// # Returns
+    /// * The result of the query execution mapped to our Result type
+    async fn execute_query_in_transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = std::result::Result<T, sqlx::Error>> + 'a>> + 'static,
+    {
+        self.execute_in_transaction(|tx| Box::pin(async move {
+            match f(tx).await {
+                Ok(value) => Ok(value),
+                Err(e) => {
+                    let err_msg = format!("Query execution failed: {}", e);
+                    error!("{}", err_msg);
+                    
+                    // Map database errors to specific repository errors
+                    match &e {
+                        sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
+                            return Err(SwatchRepositoryError::SwatchAlreadyExists(
+                                "Duplicate ID detected".into(),
+                            ));
+                        }
+                        _ => {}
+                    }
+                    
+                    Err(SwatchRepositoryError::OperationFailed(err_msg.into()))
+                }
+            }
+        })).await
+    }
 }
 
 #[async_trait]
@@ -1062,5 +1099,55 @@ mod tests {
             .unwrap();
         
         assert!(result.is_none(), "Transaction should have been rolled back");
+    }
+
+    #[tokio::test]
+    async fn test_query_transaction_helper() {
+        let pool = setup().await;
+        let repo = SqliteSwatchRepository::new(pool.clone());
+        
+        // Create a test table
+        sqlx::query("CREATE TABLE test_query_tx (id TEXT PRIMARY KEY, value TEXT)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        
+        // Test successful query execution
+        let result: Result<sqlx::sqlite::SqliteQueryResult> = repo.execute_query_in_transaction(|tx| Box::pin(async move {
+            sqlx::query("INSERT INTO test_query_tx (id, value) VALUES (?, ?)")
+                .bind("test-query-1")
+                .bind("value-1")
+                .execute(&mut **tx)
+                .await
+        })).await;
+        
+        assert!(result.is_ok(), "Query execution should succeed");
+        
+        // Verify data was committed
+        let row = sqlx::query("SELECT value FROM test_query_tx WHERE id = ?")
+            .bind("test-query-1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        
+        let value: String = row.try_get("value").unwrap();
+        assert_eq!(value, "value-1");
+        
+        // Test unique constraint violation mapping
+        let result: Result<sqlx::sqlite::SqliteQueryResult> = repo.execute_query_in_transaction(|tx| Box::pin(async move {
+            // Try to insert with the same primary key
+            sqlx::query("INSERT INTO test_query_tx (id, value) VALUES (?, ?)")
+                .bind("test-query-1") // Same ID, which will violate the primary key constraint
+                .bind("different-value")
+                .execute(&mut **tx)
+                .await
+        })).await;
+        
+        match result {
+            Err(SwatchRepositoryError::SwatchAlreadyExists(_)) => {
+                // This is the expected error for a unique constraint violation
+            },
+            _ => panic!("Expected a SwatchAlreadyExists error, got: {:?}", result),
+        }
     }
 }
