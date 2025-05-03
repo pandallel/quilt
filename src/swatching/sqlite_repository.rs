@@ -344,79 +344,65 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn save_swatches_batch(&self, swatches: &[Swatch]) -> Result<()> {
         debug!("Saving batch of {} swatches", swatches.len());
-        // Use a transaction for atomicity
-        let mut tx = self.pool.begin().await.map_err(|e| {
-            SwatchRepositoryError::OperationFailed(
-                format!("Failed to begin transaction: {}", e).into(),
-            )
-        })?;
+        
+        // Using execute_query_in_transaction for this batch operation because:
+        // 1. We need atomic transaction guarantees for the batch
+        // 2. It provides consistent error handling and transaction management
+        // 3. Batch operations should be committed or rolled back as a unit
+        
+        // Clone the swatches for use in the closure
+        let swatches_for_closure = swatches.to_vec();
+        
+        self.execute_query_in_transaction(move |tx| {
+            Box::pin(async move {
+                for swatch in &swatches_for_closure {
+                    let embedding_bytes = f32_vec_to_bytes(&swatch.embedding);
+                    let metadata_json = swatch
+                        .metadata
+                        .as_ref()
+                        .map(serde_json::to_string)
+                        .transpose()
+                        .map_err(|e| {
+                            sqlx::Error::Decode(
+                                format!("Failed to serialize metadata for {}: {}", swatch.id, e).into(),
+                            )
+                        })?;
 
-        for swatch in swatches {
-            let embedding_bytes = f32_vec_to_bytes(&swatch.embedding);
-            let metadata_json = swatch
-                .metadata
-                .as_ref()
-                .map(serde_json::to_string)
-                .transpose()
-                .map_err(|e| {
-                    SwatchRepositoryError::OperationFailed(
-                        format!("Failed to serialize metadata for {}: {}", swatch.id, e).into(),
+                    sqlx::query(
+                        r#"
+                        INSERT INTO swatches (
+                            id, cut_id, material_id, embedding, model_name, model_version, 
+                            created_at, dimensions, metadata, similarity_threshold
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            cut_id = excluded.cut_id,
+                            material_id = excluded.material_id,
+                            embedding = excluded.embedding,
+                            model_name = excluded.model_name,
+                            model_version = excluded.model_version,
+                            dimensions = excluded.dimensions,
+                            metadata = excluded.metadata,
+                            similarity_threshold = excluded.similarity_threshold
+                        "#,
                     )
-                })?;
-
-            sqlx::query(
-                r#"
-                INSERT INTO swatches (
-                    id, cut_id, material_id, embedding, model_name, model_version, 
-                    created_at, dimensions, metadata, similarity_threshold
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    cut_id = excluded.cut_id,
-                    material_id = excluded.material_id,
-                    embedding = excluded.embedding,
-                    model_name = excluded.model_name,
-                    model_version = excluded.model_version,
-                    dimensions = excluded.dimensions,
-                    metadata = excluded.metadata,
-                    similarity_threshold = excluded.similarity_threshold
-                "#,
-            )
-            .bind(&swatch.id)
-            .bind(&swatch.cut_id)
-            .bind(&swatch.material_id)
-            .bind(embedding_bytes)
-            .bind(&swatch.model_name)
-            .bind(&swatch.model_version)
-            .bind(swatch.created_at)
-            .bind(swatch.dimensions as i64)
-            .bind(metadata_json)
-            .bind(swatch.similarity_threshold) // Bind Option<f32>
-            .execute(&mut *tx) // Execute within the transaction
-            .await
-            .map_err(|e| match e {
-                sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
-                    error!(
-                        "Batch save failed on unique constraint for {}: {}",
-                        swatch.id, db_err
-                    );
-                    SwatchRepositoryError::SwatchAlreadyExists(swatch.id.clone().into())
+                    .bind(&swatch.id)
+                    .bind(&swatch.cut_id)
+                    .bind(&swatch.material_id)
+                    .bind(&embedding_bytes)
+                    .bind(&swatch.model_name)
+                    .bind(&swatch.model_version)
+                    .bind(swatch.created_at)
+                    .bind(swatch.dimensions as i64)
+                    .bind(&metadata_json)
+                    .bind(swatch.similarity_threshold)
+                    .execute(&mut **tx)
+                    .await?;
                 }
-                _ => {
-                    error!("Failed to save swatch {} in batch: {}", swatch.id, e);
-                    SwatchRepositoryError::OperationFailed(
-                        format!("Failed during batch save for {}: {}", swatch.id, e).into(),
-                    )
-                }
-            })?;
-        }
-
-        tx.commit().await.map_err(|e| {
-            error!("Failed to commit swatch batch transaction: {}", e);
-            SwatchRepositoryError::OperationFailed(
-                format!("Failed to commit transaction: {}", e).into(),
-            )
-        })
+                
+                Ok(())
+            })
+        }).await
     }
 
     async fn get_swatch_by_id(&self, swatch_id: &str) -> Result<Option<Swatch>> {
