@@ -377,27 +377,29 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn delete_swatch(&self, swatch_id: &str) -> Result<()> {
         debug!("Deleting swatch with id: {}", swatch_id);
-        let result = sqlx::query("DELETE FROM swatches WHERE id = ?")
-            .bind(swatch_id)
-            .execute(&self.pool)
-            .await;
-
-        match result {
-            Ok(exec_result) => {
-                if exec_result.rows_affected() == 0 {
-                    // Deleting something that doesn't exist is not strictly an error in some contexts,
-                    // but the trait defines SwatchNotFound, so we return it.
-                    debug!("Attempted to delete non-existent swatch: {}", swatch_id);
-                    Err(SwatchRepositoryError::SwatchNotFound(swatch_id.into()))
-                } else {
-                    Ok(())
-                }
-            }
-            Err(e) => {
-                error!("Failed to delete swatch {}: {}", swatch_id, e);
-                Err(SwatchRepositoryError::OperationFailed(e.to_string().into()))
-            }
+        
+        // Clone to avoid borrowing issues
+        let id_for_closure = swatch_id.to_string();
+        
+        // Use a query that returns the count of affected rows 
+        let rows_affected = self.execute_query_in_transaction(move |tx| {
+            Box::pin(async move {
+                let result = sqlx::query("DELETE FROM swatches WHERE id = ?")
+                    .bind(&id_for_closure)
+                    .execute(&mut **tx)
+                    .await?;
+                
+                Ok(result.rows_affected())
+            })
+        }).await?;
+        
+        // Check if any rows were affected
+        if rows_affected == 0 {
+            debug!("Attempted to delete non-existent swatch: {}", swatch_id);
+            return Err(SwatchRepositoryError::SwatchNotFound(swatch_id.into()));
         }
+        
+        Ok(())
     }
 
     async fn delete_swatches_by_cut_id(&self, cut_id: &str) -> Result<()> {
