@@ -100,6 +100,36 @@ impl SqliteSwatchRepository {
     /// 
     /// # Returns
     /// * The result of the function execution
+    /// 
+    /// # Future Enhancements
+    /// A retry mechanism could be implemented for transient errors (like connection timeouts or deadlocks) by:
+    /// 1. Adding a retry_count parameter with default value
+    /// 2. Identifying retryable errors in the error handling section
+    /// 3. Implementing exponential backoff for retries
+    /// 4. Preserving the original error context while retrying
+    ///
+    /// Example implementation pattern for future reference:
+    /// ```text
+    /// async fn execute_with_retry<F, T>(&self, f: F, max_retries: u32) -> Result<T>
+    /// where
+    ///    F: for<'a> FnMut(&'a mut Transaction<'_, Sqlite>) -> ... + Send + 'static,
+    /// {
+    ///     let mut retries = 0;
+    ///     let mut backoff = Duration::from_millis(10);
+    ///     
+    ///     loop {
+    ///         match self.execute_in_transaction(f).await {
+    ///             Ok(result) => return Ok(result),
+    ///             Err(e) if retries < max_retries && is_retryable_error(&e) => {
+    ///                 retries += 1;
+    ///                 tokio::time::sleep(backoff).await;
+    ///                 backoff *= 2; // Exponential backoff
+    ///             },
+    ///             Err(e) => return Err(e),
+    ///         }
+    ///     }
+    /// }
+    /// ```
     async fn execute_in_transaction<F, T>(&self, f: F) -> Result<T>
     where
         F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>> + Send + 'static,
@@ -189,12 +219,81 @@ impl SqliteSwatchRepository {
             }
         }
     }
+
+    /// Execute the save swatch query within a transaction.
+    /// 
+    /// This is an extracted helper method to handle the complex save swatch query logic.
+    /// 
+    /// # Arguments
+    /// * `tx` - The transaction to execute the query within
+    /// * `swatch_id` - The ID of the swatch
+    /// * `cut_id` - The ID of the cut
+    /// * `material_id` - The ID of the material
+    /// * `embedding_bytes` - The serialized embedding bytes
+    /// * `model_name` - The name of the embedding model
+    /// * `model_version` - The version of the embedding model
+    /// * `created_at` - When the swatch was created
+    /// * `dimensions` - The number of dimensions in the embedding
+    /// * `metadata_json` - Optional JSON metadata as string
+    /// * `similarity_threshold` - Optional similarity threshold
+    /// 
+    /// # Returns
+    /// * The result of the query execution
+    async fn execute_save_swatch_query(
+        tx: &mut Transaction<'_, Sqlite>,
+        swatch_id: &str,
+        cut_id: &str,
+        material_id: &str,
+        embedding_bytes: &[u8],
+        model_name: &str,
+        model_version: &str,
+        created_at: time::OffsetDateTime,
+        dimensions: i64,
+        metadata_json: &Option<String>,
+        similarity_threshold: Option<f32>,
+    ) -> std::result::Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO swatches (
+                id, cut_id, material_id, embedding, model_name, model_version, 
+                created_at, dimensions, metadata, similarity_threshold
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                cut_id = excluded.cut_id,
+                material_id = excluded.material_id,
+                embedding = excluded.embedding,
+                model_name = excluded.model_name,
+                model_version = excluded.model_version,
+                dimensions = excluded.dimensions,
+                metadata = excluded.metadata,
+                similarity_threshold = excluded.similarity_threshold
+            "#,
+        )
+        .bind(swatch_id)
+        .bind(cut_id)
+        .bind(material_id)
+        .bind(embedding_bytes)
+        .bind(model_name)
+        .bind(model_version)
+        .bind(created_at)
+        .bind(dimensions)
+        .bind(metadata_json)
+        .bind(similarity_threshold)
+        .execute(&mut **tx)
+        .await
+    }
 }
 
 #[async_trait]
 impl SwatchRepository for SqliteSwatchRepository {
     async fn save_swatch(&self, swatch: &Swatch) -> Result<()> {
         debug!("Saving swatch with id: {}", swatch.id);
+        
+        // Using execute_query_in_transaction for this write operation to ensure:
+        // 1. ACID guarantees for the INSERT/UPDATE operation
+        // 2. Proper error mapping for unique constraint violations
+        // 3. Consistent transaction management with automatic rollback on error
         
         // Clone or copy all needed values to avoid borrowing issues
         let swatch_id = swatch.id.clone();
@@ -219,47 +318,26 @@ impl SwatchRepository for SqliteSwatchRepository {
                 )
             })?;
 
-        // Use the transaction helper with cloned values
+        // Use the transaction helper with the extracted query method
         self.execute_query_in_transaction(move |tx| {
-            let q_swatch_id = swatch_id.clone();
-            let q_cut_id = cut_id.clone();
-            let q_material_id = material_id.clone();
-            let q_embedding_bytes = embedding_bytes.clone();
-            let q_model_name = model_name.clone();
-            let q_model_version = model_version.clone();
-            let q_metadata_json = metadata_json.clone();
+            // Use the extracted helper method
+            let bytes_for_query = embedding_bytes.clone();
+            let metadata_for_query = metadata_json.clone();
             
             Box::pin(async move {
-                sqlx::query(
-                    r#"
-                    INSERT INTO swatches (
-                        id, cut_id, material_id, embedding, model_name, model_version, 
-                        created_at, dimensions, metadata, similarity_threshold
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        cut_id = excluded.cut_id,
-                        material_id = excluded.material_id,
-                        embedding = excluded.embedding,
-                        model_name = excluded.model_name,
-                        model_version = excluded.model_version,
-                        dimensions = excluded.dimensions,
-                        metadata = excluded.metadata,
-                        similarity_threshold = excluded.similarity_threshold
-                    "#,
-                )
-                .bind(&q_swatch_id)
-                .bind(&q_cut_id)
-                .bind(&q_material_id)
-                .bind(q_embedding_bytes)
-                .bind(&q_model_name)
-                .bind(&q_model_version)
-                .bind(created_at)
-                .bind(dimensions)
-                .bind(q_metadata_json)
-                .bind(similarity_threshold)
-                .execute(&mut **tx)
-                .await
+                Self::execute_save_swatch_query(
+                    tx,
+                    &swatch_id,
+                    &cut_id,
+                    &material_id,
+                    &bytes_for_query,
+                    &model_name,
+                    &model_version,
+                    created_at,
+                    dimensions,
+                    &metadata_for_query,
+                    similarity_threshold,
+                ).await
             })
         }).await.map(|_| ())
     }
@@ -344,6 +422,11 @@ impl SwatchRepository for SqliteSwatchRepository {
     async fn get_swatch_by_id(&self, swatch_id: &str) -> Result<Option<Swatch>> {
         debug!("Getting swatch by id: {}", swatch_id);
         
+        // Using execute_read_query for this operation because:
+        // 1. It's a read-only query that doesn't require transaction guarantees
+        // 2. It provides consistent error handling and mapping to repository errors
+        // 3. It's more efficient for read operations by avoiding transaction overhead
+        
         // Clone for use in closure
         let id_for_closure = swatch_id.to_string();
         
@@ -419,6 +502,11 @@ impl SwatchRepository for SqliteSwatchRepository {
     async fn delete_swatch(&self, swatch_id: &str) -> Result<()> {
         debug!("Deleting swatch with id: {}", swatch_id);
         
+        // Using execute_query_in_transaction for this deletion operation to:
+        // 1. Ensure atomic deletion with proper transaction handling
+        // 2. Check affected rows to determine if the swatch existed
+        // 3. Map to appropriate domain error (SwatchNotFound) when no rows affected
+        
         // Clone to avoid borrowing issues
         let id_for_closure = swatch_id.to_string();
         
@@ -446,6 +534,11 @@ impl SwatchRepository for SqliteSwatchRepository {
     async fn delete_swatches_by_cut_id(&self, cut_id: &str) -> Result<()> {
         debug!("Deleting swatches by cut_id: {}", cut_id);
         
+        // Using execute_query_in_transaction for this bulk deletion operation to:
+        // 1. Ensure all deletions happen atomically in a single transaction
+        // 2. Provide proper error handling and logging of affected row counts
+        // 3. Allow transaction to be rolled back automatically on error
+        
         // Clone for use in closure
         let cut_id_for_closure = cut_id.to_string();
         
@@ -469,6 +562,11 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn delete_swatches_by_material_id(&self, material_id: &str) -> Result<()> {
         debug!("Deleting swatches by material_id: {}", material_id);
+        
+        // Using execute_query_in_transaction for this bulk deletion operation to:
+        // 1. Ensure all deletions happen atomically in a single transaction
+        // 2. Provide proper error handling and logging of affected row counts
+        // 3. Allow transaction to be rolled back automatically on error
         
         // Clone for use in closure
         let material_id_for_closure = material_id.to_string();
@@ -1205,6 +1303,85 @@ mod tests {
                 // This is the expected error for a unique constraint violation
             },
             _ => panic!("Expected a SwatchAlreadyExists error, got: {:?}", result),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_query_helper() {
+        let pool = setup().await;
+        let repo = SqliteSwatchRepository::new(pool.clone());
+        
+        // Create a test table for read query testing
+        sqlx::query("CREATE TABLE test_read_query (id TEXT PRIMARY KEY, value TEXT)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        
+        // Insert some test data
+        sqlx::query("INSERT INTO test_read_query (id, value) VALUES (?, ?)")
+            .bind("test-read-1")
+            .bind("read-value-1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        
+        // Test successful read query execution
+        let result: Result<Option<String>> = repo.execute_read_query(|pool| {
+            Box::pin(async move {
+                let row = sqlx::query("SELECT value FROM test_read_query WHERE id = ?")
+                    .bind("test-read-1")
+                    .fetch_optional(pool)
+                    .await?;
+                
+                match row {
+                    Some(row) => Ok::<Option<String>, sqlx::Error>(Some(row.try_get("value")?)),
+                    None => Ok::<Option<String>, sqlx::Error>(None)
+                }
+            })
+        }).await;
+        
+        assert!(result.is_ok(), "Read query execution should succeed");
+        assert_eq!(result.unwrap(), Some("read-value-1".to_string()));
+        
+        // Test read for non-existent entry
+        let result: Result<Option<String>> = repo.execute_read_query(|pool| {
+            Box::pin(async move {
+                let row = sqlx::query("SELECT value FROM test_read_query WHERE id = ?")
+                    .bind("non-existent-id")
+                    .fetch_optional(pool)
+                    .await?;
+                
+                match row {
+                    Some(row) => Ok::<Option<String>, sqlx::Error>(Some(row.try_get("value")?)),
+                    None => Ok::<Option<String>, sqlx::Error>(None)
+                }
+            })
+        }).await;
+        
+        assert!(result.is_ok(), "Read query execution for non-existent entry should succeed");
+        assert_eq!(result.unwrap(), None);
+        
+        // Test error handling (query against non-existent table)
+        let result: Result<Option<String>> = repo.execute_read_query(|pool| {
+            Box::pin(async move {
+                let row = sqlx::query("SELECT value FROM non_existent_table WHERE id = ?")
+                    .bind("any-id")
+                    .fetch_optional(pool)
+                    .await?;
+                
+                match row {
+                    Some(row) => Ok::<Option<String>, sqlx::Error>(Some(row.try_get("value")?)),
+                    None => Ok::<Option<String>, sqlx::Error>(None)
+                }
+            })
+        }).await;
+        
+        assert!(result.is_err(), "Query against non-existent table should fail");
+        match result {
+            Err(SwatchRepositoryError::OperationFailed(_)) => {
+                // This is the expected error for a read query failure
+            },
+            _ => panic!("Expected an OperationFailed error, got: {:?}", result),
         }
     }
 }
