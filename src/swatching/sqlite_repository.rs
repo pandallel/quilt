@@ -85,7 +85,7 @@ impl SqliteSwatchRepository {
     /// * The result of the function execution
     async fn execute_in_transaction<F, T>(&self, f: F) -> Result<T>
     where
-        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + 'a>>,
+        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send + 'a>> + Send + 'static,
     {
         let mut tx = self.pool.begin().await.map_err(|e| {
             error!("Failed to begin transaction: {}", e);
@@ -123,7 +123,7 @@ impl SqliteSwatchRepository {
     /// * The result of the query execution mapped to our Result type
     async fn execute_query_in_transaction<F, T>(&self, f: F) -> Result<T>
     where
-        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = std::result::Result<T, sqlx::Error>> + 'a>> + 'static,
+        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = std::result::Result<T, sqlx::Error>> + Send + 'a>> + Send + 'static,
     {
         self.execute_in_transaction(|tx| Box::pin(async move {
             match f(tx).await {
@@ -153,7 +153,19 @@ impl SqliteSwatchRepository {
 impl SwatchRepository for SqliteSwatchRepository {
     async fn save_swatch(&self, swatch: &Swatch) -> Result<()> {
         debug!("Saving swatch with id: {}", swatch.id);
+        
+        // Clone or copy all needed values to avoid borrowing issues
+        let swatch_id = swatch.id.clone();
+        let cut_id = swatch.cut_id.clone();
+        let material_id = swatch.material_id.clone();
         let embedding_bytes = f32_vec_to_bytes(&swatch.embedding);
+        let model_name = swatch.model_name.clone();
+        let model_version = swatch.model_version.clone();
+        let created_at = swatch.created_at;
+        let dimensions = swatch.dimensions as i64;
+        let similarity_threshold = swatch.similarity_threshold;
+        
+        // Serialize metadata outside the closure
         let metadata_json = swatch
             .metadata
             .as_ref()
@@ -165,54 +177,49 @@ impl SwatchRepository for SqliteSwatchRepository {
                 )
             })?;
 
-        let result = sqlx::query(
-            r#"
-            INSERT INTO swatches (
-                id, cut_id, material_id, embedding, model_name, model_version, 
-                created_at, dimensions, metadata, similarity_threshold
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                cut_id = excluded.cut_id,
-                material_id = excluded.material_id,
-                embedding = excluded.embedding,
-                model_name = excluded.model_name,
-                model_version = excluded.model_version,
-                dimensions = excluded.dimensions,
-                metadata = excluded.metadata,
-                similarity_threshold = excluded.similarity_threshold
-            "#,
-        )
-        .bind(&swatch.id)
-        .bind(&swatch.cut_id)
-        .bind(&swatch.material_id)
-        .bind(embedding_bytes)
-        .bind(&swatch.model_name)
-        .bind(&swatch.model_version)
-        .bind(swatch.created_at) // Assuming OffsetDateTime
-        .bind(swatch.dimensions as i64) // Store usize as i64
-        .bind(metadata_json)
-        .bind(swatch.similarity_threshold) // Bind Option<f32>
-        .execute(&self.pool)
-        .await;
-
-        match result {
-            Ok(_) => Ok(()),
-            Err(sqlx::Error::Database(db_err)) if db_err.is_unique_violation() => {
-                // This case should ideally be handled by ON CONFLICT, but log just in case
-                error!(
-                    "Unique constraint violation for swatch {}: {}",
-                    swatch.id, db_err
-                );
-                Err(SwatchRepositoryError::SwatchAlreadyExists(
-                    swatch.id.clone().into(),
-                ))
-            }
-            Err(e) => {
-                error!("Failed to save swatch {}: {}", swatch.id, e);
-                Err(SwatchRepositoryError::OperationFailed(e.to_string().into()))
-            }
-        }
+        // Use the transaction helper with cloned values
+        self.execute_query_in_transaction(move |tx| {
+            let q_swatch_id = swatch_id.clone();
+            let q_cut_id = cut_id.clone();
+            let q_material_id = material_id.clone();
+            let q_embedding_bytes = embedding_bytes.clone();
+            let q_model_name = model_name.clone();
+            let q_model_version = model_version.clone();
+            let q_metadata_json = metadata_json.clone();
+            
+            Box::pin(async move {
+                sqlx::query(
+                    r#"
+                    INSERT INTO swatches (
+                        id, cut_id, material_id, embedding, model_name, model_version, 
+                        created_at, dimensions, metadata, similarity_threshold
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        cut_id = excluded.cut_id,
+                        material_id = excluded.material_id,
+                        embedding = excluded.embedding,
+                        model_name = excluded.model_name,
+                        model_version = excluded.model_version,
+                        dimensions = excluded.dimensions,
+                        metadata = excluded.metadata,
+                        similarity_threshold = excluded.similarity_threshold
+                    "#,
+                )
+                .bind(&q_swatch_id)
+                .bind(&q_cut_id)
+                .bind(&q_material_id)
+                .bind(q_embedding_bytes)
+                .bind(&q_model_name)
+                .bind(&q_model_version)
+                .bind(created_at)
+                .bind(dimensions)
+                .bind(q_metadata_json)
+                .bind(similarity_threshold)
+                .execute(&mut **tx)
+                .await
+            })
+        }).await.map(|_| ())
     }
 
     async fn save_swatches_batch(&self, swatches: &[Swatch]) -> Result<()> {
