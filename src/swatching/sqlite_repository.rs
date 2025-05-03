@@ -53,14 +53,45 @@ impl SqliteSwatchRepository {
     /// 2. `execute_query_in_transaction` - For write operations that need transaction guarantees
     /// 3. `execute_read_query` - For read-only operations that can execute directly against the pool
     /// 
-    /// All repository operations should use one of these patterns to ensure consistent error handling,
-    /// logging, and transaction management across the codebase. This helps maintain atomicity for
-    /// multi-statement operations and consistent error propagation.
+    /// ## Benefits of this approach:
     /// 
-    /// Examples:
+    /// - **Consistency**: All repository operations follow the same patterns for error handling
+    /// - **DRY Code**: Reduces duplication of transaction management logic and error handling
+    /// - **Clear Intent**: Method names explicitly communicate the transaction requirements
+    /// - **Testability**: Centralized transaction logic is easier to test and verify
+    /// - **Error Mapping**: Consistent translation of database errors to domain errors
+    /// 
+    /// ## Examples:
+    /// 
+    /// ```rust
+    /// // For write operations:
+    /// self.execute_query_in_transaction(move |tx| {
+    ///     Box::pin(async move {
+    ///         sqlx::query("INSERT INTO my_table (id, value) VALUES (?, ?)")
+    ///             .bind(&id)
+    ///             .bind(&value)
+    ///             .execute(&mut **tx)
+    ///             .await
+    ///     })
+    /// }).await
+    /// 
+    /// // For read operations:
+    /// self.execute_read_query(move |pool| {
+    ///     Box::pin(async move {
+    ///         sqlx::query_as::<_, MyType>("SELECT * FROM my_table WHERE id = ?")
+    ///             .bind(&id)
+    ///             .fetch_optional(pool)
+    ///             .await
+    ///     })
+    /// }).await
+    /// ```
+    /// 
+    /// ## Usage Guidelines:
+    /// 
     /// - Use `execute_query_in_transaction` for INSERT, UPDATE, DELETE operations
     /// - Use `execute_read_query` for SELECT operations
     /// - Use `execute_in_transaction` for multiple statements that need custom error handling
+    /// - Consider using domain-specific query extraction methods for complex queries
 
     // Helper to map SqliteRow to Swatch
     fn map_row_to_swatch(row: &SqliteRow) -> std::result::Result<Swatch, sqlx::Error> {
