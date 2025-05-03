@@ -11,6 +11,7 @@
 - [Overview](architecture/overview.md)
 - [Core Technologies](architecture/technologies.md)
 - [Actor Model Architecture](architecture/actor-model-architecture.md)
+- [Repository Pattern & Transaction Management](architecture/repository-pattern.md)
 
 # Features
 
