@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{sqlite::SqliteRow, Row, SqlitePool};
+use sqlx::{sqlite::SqliteRow, Row, SqlitePool, Transaction, Sqlite};
 use std::fmt::Debug;
 use tracing::{debug, error};
 
@@ -71,6 +71,44 @@ impl SqliteSwatchRepository {
             metadata,
             similarity_threshold: row.try_get::<Option<f32>, _>("similarity_threshold")?,
         })
+    }
+
+    /// Execute a function within a transaction.
+    /// 
+    /// This helper method creates a new transaction, executes the provided function with the transaction,
+    /// and handles committing or rolling back the transaction based on the function's result.
+    /// 
+    /// # Arguments
+    /// * `f` - A function that takes a transaction and returns a Result
+    /// 
+    /// # Returns
+    /// * The result of the function execution
+    async fn execute_in_transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: for<'a> FnOnce(&'a mut Transaction<'_, Sqlite>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + 'a>>,
+    {
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            error!("Failed to begin transaction: {}", e);
+            SwatchRepositoryError::OperationFailed(format!("Failed to begin transaction: {}", e).into())
+        })?;
+
+        let result = f(&mut tx).await;
+
+        match result {
+            Ok(value) => {
+                tx.commit().await.map_err(|e| {
+                    error!("Failed to commit transaction: {}", e);
+                    SwatchRepositoryError::OperationFailed(format!("Failed to commit transaction: {}", e).into())
+                })?;
+                Ok(value)
+            }
+            Err(err) => {
+                if let Err(e) = tx.rollback().await {
+                    error!("Failed to rollback transaction: {}", e);
+                }
+                Err(err)
+            }
+        }
     }
 }
 
