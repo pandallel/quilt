@@ -45,6 +45,23 @@ impl SqliteSwatchRepository {
         Self { pool }
     }
 
+    /// Transaction Management Pattern
+    /// 
+    /// This repository uses a standardized transaction management pattern with three helper methods:
+    /// 
+    /// 1. `execute_in_transaction` - For raw transactions with custom error handling
+    /// 2. `execute_query_in_transaction` - For write operations that need transaction guarantees
+    /// 3. `execute_read_query` - For read-only operations that can execute directly against the pool
+    /// 
+    /// All repository operations should use one of these patterns to ensure consistent error handling,
+    /// logging, and transaction management across the codebase. This helps maintain atomicity for
+    /// multi-statement operations and consistent error propagation.
+    /// 
+    /// Examples:
+    /// - Use `execute_query_in_transaction` for INSERT, UPDATE, DELETE operations
+    /// - Use `execute_read_query` for SELECT operations
+    /// - Use `execute_in_transaction` for multiple statements that need custom error handling
+
     // Helper to map SqliteRow to Swatch
     fn map_row_to_swatch(row: &SqliteRow) -> std::result::Result<Swatch, sqlx::Error> {
         let embedding_bytes: Vec<u8> = row.try_get("embedding")?;
