@@ -428,24 +428,26 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn delete_swatches_by_material_id(&self, material_id: &str) -> Result<()> {
         debug!("Deleting swatches by material_id: {}", material_id);
-        sqlx::query("DELETE FROM swatches WHERE material_id = ?")
-            .bind(material_id)
-            .execute(&self.pool)
-            .await
-            .map(|exec_result| {
+        
+        // Clone for use in closure
+        let material_id_for_closure = material_id.to_string();
+        
+        self.execute_query_in_transaction(move |tx| {
+            Box::pin(async move {
+                let result = sqlx::query("DELETE FROM swatches WHERE material_id = ?")
+                    .bind(&material_id_for_closure)
+                    .execute(&mut **tx)
+                    .await?;
+                
                 debug!(
                     "Deleted {} swatches for material_id {}",
-                    exec_result.rows_affected(),
-                    material_id
+                    result.rows_affected(),
+                    material_id_for_closure
                 );
+                
+                Ok(result)
             })
-            .map_err(|e| {
-                error!(
-                    "Failed to delete swatches for material {}: {}",
-                    material_id, e
-                );
-                SwatchRepositoryError::OperationFailed(e.to_string().into())
-            })
+        }).await.map(|_| ())
     }
 
     async fn search_similar(
