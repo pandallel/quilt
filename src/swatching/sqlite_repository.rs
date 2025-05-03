@@ -147,6 +147,31 @@ impl SqliteSwatchRepository {
             }
         })).await
     }
+
+    /// Execute a read-only query.
+    ///
+    /// This method is optimized for read operations that don't require transaction
+    /// guarantees and can be executed directly against the connection pool.
+    ///
+    /// # Arguments
+    /// * `f` - A function that takes a SQL connection and returns a result
+    ///
+    /// # Returns
+    /// * The result of the query execution mapped to our Result type
+    async fn execute_read_query<F, T, E>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(&SqlitePool) -> std::pin::Pin<Box<dyn std::future::Future<Output = std::result::Result<T, E>> + Send + '_>> + Send + 'static,
+        E: std::error::Error + 'static,
+    {
+        match f(&self.pool).await {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let err_msg = format!("Read query execution failed: {}", e);
+                error!("{}", err_msg);
+                Err(SwatchRepositoryError::OperationFailed(err_msg.into()))
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -301,27 +326,26 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn get_swatch_by_id(&self, swatch_id: &str) -> Result<Option<Swatch>> {
         debug!("Getting swatch by id: {}", swatch_id);
-        let result = sqlx::query("SELECT * FROM swatches WHERE id = ?")
-            .bind(swatch_id)
-            .fetch_optional(&self.pool)
-            .await;
-
-        match result {
-            Ok(Some(row)) => match Self::map_row_to_swatch(&row) {
-                Ok(swatch) => Ok(Some(swatch)),
-                Err(e) => {
-                    error!("Failed to map row to swatch {}: {}", swatch_id, e);
-                    Err(SwatchRepositoryError::OperationFailed(
-                        format!("Data corruption for swatch {}: {}", swatch_id, e).into(),
-                    ))
+        
+        // Clone for use in closure
+        let id_for_closure = swatch_id.to_string();
+        
+        self.execute_read_query(move |pool| {
+            Box::pin(async move {
+                let row = sqlx::query("SELECT * FROM swatches WHERE id = ?")
+                    .bind(&id_for_closure)
+                    .fetch_optional(pool)
+                    .await?;
+                
+                match row {
+                    Some(row) => {
+                        let swatch = Self::map_row_to_swatch(&row)?;
+                        Ok::<Option<Swatch>, sqlx::Error>(Some(swatch))
+                    },
+                    None => Ok::<Option<Swatch>, sqlx::Error>(None)
                 }
-            },
-            Ok(None) => Ok(None), // Not found is not an error
-            Err(e) => {
-                error!("Failed to get swatch {}: {}", swatch_id, e);
-                Err(SwatchRepositoryError::OperationFailed(e.to_string().into()))
-            }
-        }
+            })
+        }).await
     }
 
     async fn get_swatches_by_cut_id(&self, cut_id: &str) -> Result<Vec<Swatch>> {
