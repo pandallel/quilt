@@ -450,27 +450,27 @@ impl SwatchRepository for SqliteSwatchRepository {
 
     async fn get_swatches_by_cut_id(&self, cut_id: &str) -> Result<Vec<Swatch>> {
         debug!("Getting swatches by cut_id: {}", cut_id);
-        let result = sqlx::query("SELECT * FROM swatches WHERE cut_id = ? ORDER BY created_at")
-            .bind(cut_id)
-            .fetch_all(&self.pool)
-            .await;
-
-        match result {
-            Ok(rows) => rows
-                .iter()
-                .map(Self::map_row_to_swatch)
-                .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(|e| {
-                    error!("Failed to map rows for cut {}: {}", cut_id, e);
-                    SwatchRepositoryError::OperationFailed(
-                        format!("Data corruption for cut {}: {}", cut_id, e).into(),
-                    )
-                }),
-            Err(e) => {
-                error!("Failed to get swatches for cut {}: {}", cut_id, e);
-                Err(SwatchRepositoryError::OperationFailed(e.to_string().into()))
-            }
-        }
+        
+        // Using execute_read_query for this operation because:
+        // 1. It's a read-only query that doesn't require transaction guarantees
+        // 2. It provides consistent error handling and mapping to repository errors
+        // 3. It's more efficient for read operations by avoiding transaction overhead
+        
+        // Clone for use in closure
+        let cut_id_for_closure = cut_id.to_string();
+        
+        self.execute_read_query(move |pool| {
+            Box::pin(async move {
+                let rows = sqlx::query("SELECT * FROM swatches WHERE cut_id = ? ORDER BY created_at")
+                    .bind(&cut_id_for_closure)
+                    .fetch_all(pool)
+                    .await?;
+                
+                rows.iter()
+                    .map(Self::map_row_to_swatch)
+                    .collect::<std::result::Result<Vec<_>, _>>()
+            })
+        }).await
     }
 
     async fn get_swatches_by_material_id(&self, material_id: &str) -> Result<Vec<Swatch>> {
