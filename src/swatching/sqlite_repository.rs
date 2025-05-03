@@ -985,4 +985,82 @@ mod tests {
             _ => panic!("Expected OperationFailed error"),
         }
     }
+
+    #[tokio::test]
+    async fn test_transaction_helper() {
+        let pool = setup().await;
+        let repo = SqliteSwatchRepository::new(pool.clone());
+        
+        // Test successful transaction
+        let result = repo.execute_in_transaction(|tx| Box::pin(async move {
+            // Perform some operation within the transaction
+            sqlx::query("INSERT INTO test_tx_table (id, value) VALUES (?, ?)")
+                .bind("test1")
+                .bind("value1")
+                .execute(&mut **tx)
+                .await
+                .map_err(|e| SwatchRepositoryError::OperationFailed(e.to_string().into()))?;
+            
+            Ok("success")
+        })).await;
+        
+        assert!(result.is_err(), "Expected error since test_tx_table doesn't exist");
+        
+        // Create a test table for transaction testing
+        sqlx::query("CREATE TABLE test_tx_table (id TEXT PRIMARY KEY, value TEXT)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        
+        // Test successful transaction again
+        let result = repo.execute_in_transaction(|tx| Box::pin(async move {
+            // Perform some operation within the transaction
+            sqlx::query("INSERT INTO test_tx_table (id, value) VALUES (?, ?)")
+                .bind("test1")
+                .bind("value1")
+                .execute(&mut **tx)
+                .await
+                .map_err(|e| SwatchRepositoryError::OperationFailed(e.to_string().into()))?;
+            
+            Ok("success")
+        })).await;
+        
+        assert!(result.is_ok(), "Transaction should succeed");
+        assert_eq!(result.unwrap(), "success");
+        
+        // Verify data was committed
+        let row = sqlx::query("SELECT value FROM test_tx_table WHERE id = ?")
+            .bind("test1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        
+        let value: String = row.try_get("value").unwrap();
+        assert_eq!(value, "value1");
+        
+        // Test transaction rollback
+        let result: Result<&str> = repo.execute_in_transaction(|tx| Box::pin(async move {
+            // Insert data
+            sqlx::query("INSERT INTO test_tx_table (id, value) VALUES (?, ?)")
+                .bind("test2")
+                .bind("value2")
+                .execute(&mut **tx)
+                .await
+                .map_err(|e| SwatchRepositoryError::OperationFailed(e.to_string().into()))?;
+            
+            // Return an error to trigger rollback
+            Err(SwatchRepositoryError::OperationFailed("Simulated error".into()))
+        })).await;
+        
+        assert!(result.is_err());
+        
+        // Verify data was rolled back
+        let result = sqlx::query("SELECT value FROM test_tx_table WHERE id = ?")
+            .bind("test2")
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+        
+        assert!(result.is_none(), "Transaction should have been rolled back");
+    }
 }
