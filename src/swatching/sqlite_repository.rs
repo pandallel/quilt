@@ -747,7 +747,7 @@ mod tests {
         let mut s = Swatch::new(
             cut_id.to_string(),
             material_id.to_string(),
-            vec![0.1; 384], // Use 384 dimensions to match VSS schema
+            vec![0.1; 384],
             "test-model".to_string(),
             "v1.0".to_string(),
         );
