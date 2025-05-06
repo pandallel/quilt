@@ -390,7 +390,6 @@ impl SwatchRepository for SqliteSwatchRepository {
             let metadata_for_query = metadata_json.clone();
 
             Box::pin(async move {
-                // First, save to the main swatches table
                 let main_save_result = Self::execute_save_swatch_query(
                     tx,
                     &swatch_id,
