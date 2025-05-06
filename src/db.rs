@@ -1,26 +1,76 @@
 //! Database utilities for SQLite setup and connection management
 
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Sqlite, SqlitePool};
+use std::sync::Once;
 use tracing::{debug, info};
+
+// Global static for ensuring one-time initialization of the sqlite-vec extension.
+static SQLITE_VEC_INIT: Once = Once::new();
+
+/// Registers the sqlite-vec extension globally using rusqlite's auto_extension mechanism.
+/// This function is thread-safe due to std::sync::Once and should be called before
+/// any SQLite connections that need the extension are opened.
+fn register_sqlite_vec_globally() {
+    SQLITE_VEC_INIT.call_once(|| {
+        // Safety: This function interacts with C FFI and modifies global SQLite state.
+        // It's safe assuming sqlite_vec::sqlite3_vec_init provides a valid pointer
+        // and this `call_once` block ensures it only runs once across all threads.
+        // The transmute is necessary for the FFI function signature.
+        unsafe {
+            // Use the rusqlite::ffi module directly for sqlite3_auto_extension
+            match rusqlite::ffi::sqlite3_auto_extension(Some(
+                std::mem::transmute(sqlite_vec::sqlite3_vec_init as *const ()),
+            )) {
+                rusqlite::ffi::SQLITE_OK => {
+                    // Use eprintln! here as tracing might not be initialized yet.
+                    eprintln!("Successfully registered sqlite-vec extension globally.");
+                }
+                err_code => {
+                    // Critical error: The application/tests cannot function correctly without the extension.
+                    eprintln!(
+                        "FATAL: Failed to register sqlite-vec extension globally. SQLite error code: {}",
+                        err_code
+                    );
+                    panic!("Failed to register sqlite-vec extension globally.");
+                }
+            }
+        }
+    });
+}
 
 /// Initialize an in-memory SQLite database with required schema
 pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
+    // Ensure the extension is registered before opening any connections.
+    register_sqlite_vec_globally();
+
     let url = "sqlite::memory:";
 
-    debug!("Creating in-memory SQLite database");
+    debug!("Creating in-memory SQLite database at {}", url);
 
-    // Create database
+    // Create database if it doesn't exist (mostly relevant for file-based DBs, but doesn't hurt)
     if !Sqlite::database_exists(url).await.unwrap_or(false) {
-        Sqlite::create_database(url).await?;
+        match Sqlite::create_database(url).await {
+            Ok(_) => debug!("Created new SQLite database."),
+            Err(e) => {
+                // Use eprintln for early errors
+                eprintln!("Failed to create SQLite database: {}", e);
+                return Err(e);
+            }
+        }
     }
 
-    // Create connection pool with a single connection for in-memory DB
-    // (must keep one connection alive for the in-memory DB to persist)
+    // Create connection pool
+    // For in-memory, must keep at least one connection alive.
+    debug!("Creating SQLite connection pool...");
     let pool = SqlitePoolOptions::new()
         .min_connections(1)
-        .max_connections(5)
+        .max_connections(5) // Adjust max connections as needed
         .connect(url)
         .await?;
+    debug!("SQLite connection pool created.");
+
+    // --- Schema Creation --- //
+    debug!("Applying database schema...");
 
     // Create materials table
     sqlx::query(
@@ -81,38 +131,35 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
     .execute(&pool)
     .await?;
 
-    // Skip the vector search initialization during tests to avoid dependency issues
-    #[cfg(not(test))]
-    {
-        // Initialize the sqlite-vec extension
-        debug!("Initializing sqlite-vec extension");
+    // --- Vector Search Initialization --- //
 
-        // Register the sqlite-vec extension using unsafe because it's an FFI function
-        unsafe {
-            sqlite_vec::sqlite3_vec_init();
-        }
+    // Note: The #[cfg(not(test))] block has been removed.
+    // The global registration now happens via register_sqlite_vec_globally() above.
+    // The old `unsafe { sqlite_vec::sqlite3_vec_init(); }` was incorrect and is removed.
+    // The `SELECT vss0_version()` check is removed as it's not necessary for init
+    // and might fail if the table doesn't exist yet.
 
-        // Now that the extension is registered, call the SQL function to load it in SQLite
-        sqlx::query("SELECT vss0_version()").execute(&pool).await?;
-
-        // Create the vss_swatches virtual table for vector similarity search
-        // We use dimensions=384 which is the default for fastembed
-        debug!("Creating vss_swatches virtual table");
-        sqlx::query(
-            r#"
-            CREATE VIRTUAL TABLE IF NOT EXISTS vss_swatches USING vss0(
-                embedding(384),
-                id UNINDEXED,
-                cut_id UNINDEXED,
-                material_id UNINDEXED
-            )
-            "#,
+    // Create the vss_swatches virtual table for vector similarity search.
+    // The extension is loaded automatically for connections from the pool
+    // because we called sqlite3_auto_extension earlier.
+    // Dimensions set to 384 based on previous code comment.
+    debug!("Creating vss_swatches virtual table (dimension: 384)...");
+    sqlx::query(
+        r#"
+        CREATE VIRTUAL TABLE IF NOT EXISTS vss_swatches USING vec0(
+            embedding float[384]
+            -- Store other swatch fields as UNINDEXED if needed for retrieval
+            -- Example: id UNINDEXED,
+            -- Example: cut_id UNINDEXED
+            -- Only include columns needed by the VSS index or for retrieval alongside distance
         )
-        .execute(&pool)
-        .await?;
-    }
+        "#,
+    )
+    .execute(&pool)
+    .await?;
+    debug!("vss_swatches virtual table created.");
 
-    info!("SQLite in-memory database initialized with tables");
+    info!("SQLite in-memory database initialized successfully.");
 
     Ok(pool)
 }
