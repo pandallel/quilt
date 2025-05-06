@@ -1,11 +1,11 @@
 //! Database utilities for SQLite setup and connection management
 
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Sqlite, SqlitePool};
-use std::sync::Once;
-use tracing::{debug, info};
 use rusqlite::{Connection, Result as SqliteResult};
 use sqlite_vec; // Import the sqlite_vec crate
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Sqlite, SqlitePool};
 use std::path::Path;
+use std::sync::Once;
+use tracing::{debug, info};
 
 // Global static for ensuring one-time initialization of the sqlite-vec extension.
 static SQLITE_VEC_INIT: Once = Once::new();
