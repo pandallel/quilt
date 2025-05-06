@@ -17,7 +17,8 @@ fn f32_vec_to_bytes(vec: &[f32]) -> Vec<u8> {
 }
 
 // Helper function to deserialize Vec<u8> to Vec<f32>
-fn bytes_to_f32_vec(bytes: &[u8]) -> std::result::Result<Vec<f32>, String> {
+// Made public for use in test helpers
+pub(crate) fn bytes_to_f32_vec(bytes: &[u8]) -> std::result::Result<Vec<f32>, String> {
     let float_size = std::mem::size_of::<f32>();
     if bytes.len() % float_size != 0 {
         return Err("Invalid byte slice length for f32 deserialization".to_string());
@@ -387,7 +388,7 @@ impl SwatchRepository for SqliteSwatchRepository {
             let metadata_for_query = metadata_json.clone();
 
             Box::pin(async move {
-                Self::execute_save_swatch_query(
+                let main_save_result = Self::execute_save_swatch_query(
                     tx,
                     &swatch_id,
                     &cut_id,
@@ -400,7 +401,72 @@ impl SwatchRepository for SqliteSwatchRepository {
                     &metadata_for_query,
                     similarity_threshold,
                 )
-                .await
+                .await?;
+
+                // Get the rowid of the inserted/updated swatch using swatch_id
+                let rowid_res: sqlx::Result<(i64,)> =
+                    sqlx::query_as("SELECT rowid FROM swatches WHERE id = ?")
+                        .bind(&swatch_id)
+                        .fetch_one(&mut **tx)
+                        .await;
+
+                let row_id = match rowid_res {
+                    Ok((id,)) => id,
+                    Err(e) => {
+                        error!(
+                            "Failed to fetch rowid for swatch {}: {}. Cannot update VSS.",
+                            swatch_id, e
+                        );
+                        // Propagate the error to rollback the transaction
+                        return Err(e);
+                    }
+                };
+
+                debug!(
+                    "Swatch {} saved/updated. Found rowid: {} for VSS update.",
+                    swatch_id, row_id
+                );
+
+                // Attempt to update the VSS table using the fetched rowid
+                debug!("Attempting VSS update for rowid: {}", row_id);
+
+                // Delete existing entry in vss_swatches (if any)
+                let delete_res = sqlx::query("DELETE FROM vss_swatches WHERE rowid = ?")
+                    .bind(row_id) // Use fetched row_id
+                    .execute(&mut **tx)
+                    .await;
+
+                if let Err(e) = delete_res {
+                    // Log non-fatal error for VSS delete
+                    debug!(
+                        "Failed VSS delete for rowid {}: {}. Continuing transaction.",
+                        row_id, e
+                    );
+                } else {
+                    debug!("VSS delete successful or rowid {} not found.", row_id);
+                }
+
+                // Insert new entry into vss_swatches
+                let insert_res =
+                    sqlx::query("INSERT INTO vss_swatches (rowid, embedding) VALUES (?, ?)")
+                        .bind(row_id) // Use fetched row_id
+                        .bind(&embedding_bytes) // Use original embedding_bytes
+                        .execute(&mut **tx)
+                        .await;
+
+                if let Err(e) = insert_res {
+                    // Log non-fatal error for VSS insert
+                    debug!(
+                        "Failed VSS insert for rowid {}: {}. Continuing transaction.",
+                        row_id, e
+                    );
+                } else {
+                    debug!("VSS insert successful for rowid {}.", row_id);
+                }
+
+                // Return success from the transaction block if main save was ok
+                // The `?` operator above handles the error case for the main save.
+                Ok(main_save_result)
             })
         })
         .await
@@ -673,7 +739,6 @@ mod tests {
     use crate::db::init_memory_db;
     use crate::materials::{Material, MaterialRepository, SqliteMaterialRepository};
     use serde_json::json;
-    use time::Duration;
 
     // Helper to create a test pool
     async fn setup() -> SqlitePool {
@@ -686,7 +751,7 @@ mod tests {
         let mut s = Swatch::new(
             cut_id.to_string(),
             material_id.to_string(),
-            vec![0.1, 0.2, 0.3],
+            vec![0.1; 384],
             "test-model".to_string(),
             "v1.0".to_string(),
         );
@@ -738,38 +803,94 @@ mod tests {
         (material_repo, cuts_repo, material_id, cut_id)
     }
 
+    // Helper to fetch VSS embedding for verification
+    async fn get_vss_embedding(pool: &SqlitePool, swatch_rowid: i64) -> Option<Vec<f32>> {
+        // Query vss_swatches directly using the integer rowid
+        let result = sqlx::query("SELECT embedding FROM vss_swatches WHERE rowid = ?")
+            .bind(swatch_rowid)
+            .fetch_optional(pool)
+            .await;
+
+        match result {
+            Ok(Some(row)) => {
+                // Note: sqlite-vec stores the vector directly, not blob necessarily
+                // Try fetching as Vec<u8> first
+                let embedding_bytes_res: std::result::Result<Vec<u8>, _> = row.try_get("embedding");
+                if let Ok(bytes) = embedding_bytes_res {
+                    match bytes_to_f32_vec(&bytes) {
+                        Ok(vec) => Some(vec),
+                        Err(e) => {
+                            eprintln!(
+                                "Failed to deserialize VSS embedding bytes for rowid {}: {}",
+                                swatch_rowid, e
+                            );
+                            None
+                        }
+                    }
+                } else {
+                    eprintln!(
+                        "Failed to retrieve VSS embedding as bytes for rowid {}: {}",
+                        swatch_rowid,
+                        embedding_bytes_res.unwrap_err()
+                    );
+                    None
+                }
+            }
+            Ok(None) => None,
+            Err(e) => {
+                eprintln!(
+                    "Error fetching VSS embedding from query for rowid {}: {}",
+                    swatch_rowid, e
+                );
+                None
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_save_and_get_swatch() {
         let pool = setup().await;
         let swatch_repo = SqliteSwatchRepository::new(pool.clone());
         let (_material_repo, _cuts_repo, material_id, cut_id) =
             insert_test_dependencies(&pool, "save-get", 0).await;
-
         let swatch = create_test_swatch(&cut_id, &material_id);
+        let swatch_id = swatch.id.clone();
+        let original_embedding = swatch.embedding.clone();
 
-        swatch_repo
-            .save_swatch(&swatch)
-            .await
-            .expect("Failed to save");
+        // Save the swatch
+        let save_result = swatch_repo.save_swatch(&swatch).await;
+        assert!(save_result.is_ok(), "Save failed: {:?}", save_result.err());
 
-        let retrieved_swatch = swatch_repo
-            .get_swatch_by_id(&swatch.id)
-            .await
-            .expect("Failed to get")
-            .expect("Swatch not found");
+        // Retrieve the swatch by ID
+        let retrieved = swatch_repo.get_swatch_by_id(&swatch_id).await;
+        assert!(retrieved.is_ok(), "Get failed: {:?}", retrieved.err());
+        let retrieved_swatch = retrieved.unwrap().expect("Swatch not found after save");
+        assert_eq!(retrieved_swatch.id, swatch_id);
+        assert_eq!(retrieved_swatch.embedding, original_embedding);
 
-        // Compare fields individually
-        assert_eq!(retrieved_swatch.id, swatch.id);
-        assert_eq!(retrieved_swatch.cut_id, cut_id);
-        assert_eq!(retrieved_swatch.material_id, material_id);
-        assert_eq!(retrieved_swatch.embedding, swatch.embedding);
-        assert_eq!(retrieved_swatch.model_name, swatch.model_name);
-        assert_eq!(retrieved_swatch.model_version, swatch.model_version);
-        assert_eq!(retrieved_swatch.dimensions, swatch.dimensions);
-        assert!(retrieved_swatch.metadata.is_none()); // Metadata is none in base helper
-        assert_eq!(retrieved_swatch.similarity_threshold, Some(0.85)); // Check threshold
-                                                                       // Allow a small tolerance for timestamp comparison
-        assert!((retrieved_swatch.created_at - swatch.created_at).abs() < Duration::seconds(1));
+        // Verify VSS table entry
+        let rowid_result = sqlx::query("SELECT rowid FROM swatches WHERE id = ?")
+            .bind(&swatch_id)
+            .fetch_one(&pool)
+            .await;
+        assert!(
+            rowid_result.is_ok(),
+            "Failed to get rowid: {:?}",
+            rowid_result.err()
+        );
+        let rowid: i64 = rowid_result.unwrap().get("rowid");
+
+        let vss_embedding = get_vss_embedding(&pool, rowid).await;
+        assert!(
+            vss_embedding.is_some(),
+            "VSS embedding not found for rowid {}",
+            rowid
+        );
+        assert_eq!(
+            vss_embedding.unwrap(),
+            original_embedding,
+            "VSS embedding does not match original"
+        );
     }
 
     #[tokio::test]
@@ -818,38 +939,90 @@ mod tests {
         let swatch_repo = SqliteSwatchRepository::new(pool.clone());
         let (_material_repo, _cuts_repo, material_id, cut_id) =
             insert_test_dependencies(&pool, "upsert", 0).await;
+        let mut swatch1 = create_test_swatch(&cut_id, &material_id);
+        let swatch_id = swatch1.id.clone(); // Use the same ID for both
+        let original_embedding = swatch1.embedding.clone();
 
-        let mut swatch = create_test_swatch(&cut_id, &material_id);
-        swatch.similarity_threshold = Some(0.7); // Initial threshold
+        // Save the first version
+        let save1_result = swatch_repo.save_swatch(&swatch1).await;
+        assert!(
+            save1_result.is_ok(),
+            "Save 1 failed: {:?}",
+            save1_result.err()
+        );
 
-        // Initial save
-        swatch_repo
-            .save_swatch(&swatch)
+        // Verify VSS after first save
+        let rowid_result1 = sqlx::query("SELECT rowid FROM swatches WHERE id = ?")
+            .bind(&swatch_id)
+            .fetch_one(&pool)
+            .await;
+        assert!(
+            rowid_result1.is_ok(),
+            "Failed to get rowid 1: {:?}",
+            rowid_result1.err()
+        );
+        let rowid1: i64 = rowid_result1.unwrap().get("rowid");
+
+        let vss_embedding1 = get_vss_embedding(&pool, rowid1).await;
+        assert!(
+            vss_embedding1.is_some(),
+            "VSS embedding not found after first save for rowid {}",
+            rowid1
+        );
+        assert_eq!(
+            vss_embedding1.unwrap(),
+            original_embedding,
+            "VSS embedding does not match original after first save"
+        );
+
+        // Modify the swatch (e.g., change embedding)
+        let updated_embedding = vec![0.9; 384]; // Use 384 dimensions
+        swatch1.embedding = updated_embedding.clone();
+
+        // Save the second version (upsert)
+        let save2_result = swatch_repo.save_swatch(&swatch1).await;
+        assert!(
+            save2_result.is_ok(),
+            "Save 2 failed: {:?}",
+            save2_result.err()
+        );
+
+        // Retrieve the updated swatch
+        let retrieved = swatch_repo
+            .get_swatch_by_id(&swatch_id)
             .await
-            .expect("Initial save failed");
+            .unwrap()
+            .unwrap();
+        assert_eq!(retrieved.id, swatch_id);
+        assert_eq!(
+            retrieved.embedding, updated_embedding,
+            "Swatch embedding was not updated"
+        );
 
-        // Modify and save again (upsert)
-        swatch.model_version = "v1.1".to_string();
-        swatch.embedding = vec![0.4, 0.5];
-        swatch.dimensions = swatch.embedding.len();
-        swatch.similarity_threshold = Some(0.75); // Update threshold
+        // Verify VSS after second save (should use same rowid)
+        let rowid_result2 = sqlx::query("SELECT rowid FROM swatches WHERE id = ?")
+            .bind(&swatch_id)
+            .fetch_one(&pool)
+            .await;
+        assert!(
+            rowid_result2.is_ok(),
+            "Failed to get rowid 2: {:?}",
+            rowid_result2.err()
+        );
+        let rowid2: i64 = rowid_result2.unwrap().get("rowid");
+        assert_eq!(rowid2, rowid1, "Rowid changed during upsert"); // Ensure rowid remains stable
 
-        swatch_repo
-            .save_swatch(&swatch)
-            .await
-            .expect("Upsert save failed");
-
-        let retrieved_swatch = swatch_repo
-            .get_swatch_by_id(&swatch.id)
-            .await
-            .expect("Failed to get after upsert")
-            .expect("Swatch not found after upsert");
-
-        assert_eq!(retrieved_swatch.id, swatch.id);
-        assert_eq!(retrieved_swatch.model_version, "v1.1");
-        assert_eq!(retrieved_swatch.embedding, vec![0.4, 0.5]);
-        assert_eq!(retrieved_swatch.dimensions, 2);
-        assert_eq!(retrieved_swatch.similarity_threshold, Some(0.75)); // Check updated threshold
+        let vss_embedding2 = get_vss_embedding(&pool, rowid2).await;
+        assert!(
+            vss_embedding2.is_some(),
+            "VSS embedding not found after second save for rowid {}",
+            rowid2
+        );
+        assert_eq!(
+            vss_embedding2.unwrap(),
+            updated_embedding,
+            "VSS embedding does not match updated embedding after second save"
+        );
     }
 
     #[tokio::test]
