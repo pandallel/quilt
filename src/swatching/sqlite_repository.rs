@@ -45,55 +45,59 @@ impl SqliteSwatchRepository {
         Self { pool }
     }
 
-    /// Transaction Management Pattern
-    /// 
-    /// This repository uses a standardized transaction management pattern with three helper methods:
-    /// 
-    /// 1. `execute_in_transaction` - For raw transactions with custom error handling
-    /// 2. `execute_query_in_transaction` - For write operations that need transaction guarantees
-    /// 3. `execute_read_query` - For read-only operations that can execute directly against the pool
-    /// 
-    /// ## Benefits of this approach:
-    /// 
-    /// - **Consistency**: All repository operations follow the same patterns for error handling
-    /// - **DRY Code**: Reduces duplication of transaction management logic and error handling
-    /// - **Clear Intent**: Method names explicitly communicate the transaction requirements
-    /// - **Testability**: Centralized transaction logic is easier to test and verify
-    /// - **Error Mapping**: Consistent translation of database errors to domain errors
-    /// 
-    /// ## Examples:
-    /// 
-    /// ```rust
-    /// // For write operations:
-    /// self.execute_query_in_transaction(move |tx| {
-    ///     Box::pin(async move {
-    ///         sqlx::query("INSERT INTO my_table (id, value) VALUES (?, ?)")
-    ///             .bind(&id)
-    ///             .bind(&value)
-    ///             .execute(&mut **tx)
-    ///             .await
-    ///     })
-    /// }).await
-    /// 
-    /// // For read operations:
-    /// self.execute_read_query(move |pool| {
-    ///     Box::pin(async move {
-    ///         sqlx::query_as::<_, MyType>("SELECT * FROM my_table WHERE id = ?")
-    ///             .bind(&id)
-    ///             .fetch_optional(pool)
-    ///             .await
-    ///     })
-    /// }).await
-    /// ```
-    /// 
-    /// ## Usage Guidelines:
-    /// 
-    /// - Use `execute_query_in_transaction` for INSERT, UPDATE, DELETE operations
-    /// - Use `execute_read_query` for SELECT operations
-    /// - Use `execute_in_transaction` for multiple statements that need custom error handling
-    /// - Consider using domain-specific query extraction methods for complex queries
+    /*
+     * Transaction Management Pattern
+     *
+     * This repository uses a standardized transaction management pattern with three helper methods:
+     *
+     * 1. `execute_in_transaction` - For raw transactions with custom error handling
+     * 2. `execute_query_in_transaction` - For write operations that need transaction guarantees
+     * 3. `execute_read_query` - For read-only operations that can execute directly against the pool
+     *
+     * ## Benefits of this approach:
+     *
+     * - **Consistency**: All repository operations follow the same patterns for error handling
+     * - **DRY Code**: Reduces duplication of transaction management logic and error handling
+     * - **Clear Intent**: Method names explicitly communicate the transaction requirements
+     * - **Testability**: Centralized transaction logic is easier to test and verify
+     * - **Error Mapping**: Consistent translation of database errors to domain errors
+     *
+     * ## Examples:
+     *
+     * ```
+     * // For write operations:
+     * self.execute_query_in_transaction(move |tx| {
+     *     Box::pin(async move {
+     *         sqlx::query("INSERT INTO my_table (id, value) VALUES (?, ?)")
+     *             .bind(&id)
+     *             .bind(&value)
+     *             .execute(&mut **tx)
+     *             .await
+     *     })
+     * }).await
+     *
+     * // For read operations:
+     * self.execute_read_query(move |pool| {
+     *     Box::pin(async move {
+     *         sqlx::query_as::<_, MyEntity>("SELECT * FROM my_table WHERE id = ?")
+     *             .bind(&id)
+     *             .fetch_optional(pool)
+     *             .await
+     *     })
+     * }).await
+     * ```
+     *
+     * ## Usage Guidelines:
+     *
+     * - Use `execute_query_in_transaction` for INSERT, UPDATE, DELETE operations
+     * - Use `execute_read_query` for SELECT operations
+     * - Use `execute_in_transaction` for multiple statements that need custom error handling
+     * - Consider using domain-specific query extraction methods for complex queries
+     */
 
-    // Helper to map SqliteRow to Swatch
+    // MARK: - Helper methods for data conversion
+    
+    // Helper function to map a SqliteRow to a Swatch object
     fn map_row_to_swatch(row: &SqliteRow) -> std::result::Result<Swatch, sqlx::Error> {
         let embedding_bytes: Vec<u8> = row.try_get("embedding")?;
         let embedding = bytes_to_f32_vec(&embedding_bytes).map_err(|e| {
@@ -270,6 +274,7 @@ impl SqliteSwatchRepository {
     /// 
     /// # Returns
     /// * The result of the query execution
+    #[allow(clippy::too_many_arguments)]
     async fn execute_save_swatch_query(
         tx: &mut Transaction<'_, Sqlite>,
         swatch_id: &str,
