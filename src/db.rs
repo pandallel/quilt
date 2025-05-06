@@ -3,6 +3,9 @@
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Sqlite, SqlitePool};
 use std::sync::Once;
 use tracing::{debug, info};
+use rusqlite::{Connection, Result as SqliteResult};
+use sqlite_vec; // Import the sqlite_vec crate
+use std::path::Path;
 
 // Global static for ensuring one-time initialization of the sqlite-vec extension.
 static SQLITE_VEC_INIT: Once = Once::new();
@@ -19,7 +22,7 @@ fn register_sqlite_vec_globally() {
         unsafe {
             // Use the rusqlite::ffi module directly for sqlite3_auto_extension
             match rusqlite::ffi::sqlite3_auto_extension(Some(
-                std::mem::transmute(sqlite_vec::sqlite3_vec_init as *const ()),
+                std::mem::transmute::<*const (), unsafe extern "C" fn(*mut rusqlite::ffi::sqlite3, *mut *const i8, *const rusqlite::ffi::sqlite3_api_routines) -> i32>(sqlite_vec::sqlite3_vec_init as *const ()),
             )) {
                 rusqlite::ffi::SQLITE_OK => {
                     // Use eprintln! here as tracing might not be initialized yet.
