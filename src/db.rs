@@ -86,17 +86,15 @@ pub async fn init_memory_db() -> Result<SqlitePool, sqlx::Error> {
     {
         // Initialize the sqlite-vec extension
         debug!("Initializing sqlite-vec extension");
-        
+
         // Register the sqlite-vec extension using unsafe because it's an FFI function
         unsafe {
             sqlite_vec::sqlite3_vec_init();
         }
-        
+
         // Now that the extension is registered, call the SQL function to load it in SQLite
-        sqlx::query("SELECT vss0_version()")
-            .execute(&pool)
-            .await?;
-        
+        sqlx::query("SELECT vss0_version()").execute(&pool).await?;
+
         // Create the vss_swatches virtual table for vector similarity search
         // We use dimensions=384 which is the default for fastembed
         debug!("Creating vss_swatches virtual table");
@@ -191,7 +189,7 @@ mod tests {
             table_sql.contains("byte_offset_end"),
             "Missing byte_offset_end column"
         );
-        
+
         // We skip checking for vector search functionality in tests
     }
 }
