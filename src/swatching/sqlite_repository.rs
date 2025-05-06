@@ -315,7 +315,9 @@ impl SqliteSwatchRepository {
         metadata_json: &Option<String>,
         similarity_threshold: Option<f32>,
     ) -> std::result::Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
-        let result = sqlx::query(
+        
+
+        sqlx::query(
             r#"
             INSERT INTO swatches (
                 id, cut_id, material_id, embedding, model_name, model_version, 
@@ -344,9 +346,7 @@ impl SqliteSwatchRepository {
         .bind(metadata_json)
         .bind(similarity_threshold)
         .execute(&mut **tx)
-        .await;
-
-        result
+        .await
     }
 }
 
@@ -741,7 +741,7 @@ mod tests {
     use crate::db::init_memory_db;
     use crate::materials::{Material, MaterialRepository, SqliteMaterialRepository};
     use serde_json::json;
-    use time::Duration;
+    
 
     // Helper to create a test pool
     async fn setup() -> SqlitePool {
