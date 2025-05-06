@@ -2438,6 +2438,7 @@ dependencies = [
  "mockall",
  "serde",
  "serde_json",
+ "sqlite-vec",
  "sqlx",
  "tempfile",
  "text-splitter",
@@ -3099,6 +3100,15 @@ checksum = "7bba3a93db0cc4f7bdece8bb09e77e2e785c20bfebf79eb8340ed80708048790"
 dependencies = [
  "nom",
  "unicode_categories",
+]
+
+[[package]]
+name = "sqlite-vec"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ec77b84fb8dd5f0f8def127226db83b5d1152c5bf367f09af03998b76ba554a"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
