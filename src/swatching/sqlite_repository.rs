@@ -346,7 +346,6 @@ impl SqliteSwatchRepository {
         .execute(&mut **tx)
         .await;
         
-        // Explicitly return only the query result, rowid handling moved to save_swatch
         result
     }
 }
@@ -407,16 +406,29 @@ impl SwatchRepository for SqliteSwatchRepository {
                 )
                 .await?;
                 
-                // Get the rowid of the inserted/updated swatch
-                let last_row_id = main_save_result.last_insert_rowid();
-                debug!("Swatch {} saved/updated with rowid: {}", swatch_id, last_row_id);
+                // Get the rowid of the inserted/updated swatch using swatch_id
+                let rowid_res: sqlx::Result<(i64,)> = sqlx::query_as("SELECT rowid FROM swatches WHERE id = ?")
+                    .bind(&swatch_id)
+                    .fetch_one(&mut **tx)
+                    .await;
+                
+                let row_id = match rowid_res {
+                    Ok((id,)) => id,
+                    Err(e) => {
+                        error!("Failed to fetch rowid for swatch {}: {}. Cannot update VSS.", swatch_id, e);
+                        // Propagate the error to rollback the transaction
+                        return Err(e);
+                    }
+                };
 
-                // Attempt to update the VSS table using the rowid
-                debug!("Attempting VSS update for rowid: {}", last_row_id);
+                debug!("Swatch {} saved/updated. Found rowid: {} for VSS update.", swatch_id, row_id);
+
+                // Attempt to update the VSS table using the fetched rowid
+                debug!("Attempting VSS update for rowid: {}", row_id);
 
                 // Delete existing entry in vss_swatches (if any)
                 let delete_res = sqlx::query("DELETE FROM vss_swatches WHERE rowid = ?")
-                    .bind(last_row_id)
+                    .bind(row_id) // Use fetched row_id
                     .execute(&mut **tx)
                     .await;
 
@@ -424,16 +436,16 @@ impl SwatchRepository for SqliteSwatchRepository {
                     // Log non-fatal error for VSS delete
                     debug!(
                         "Failed VSS delete for rowid {}: {}. Continuing transaction.",
-                        last_row_id, e
+                        row_id, e
                     );
                 } else {
-                    debug!("VSS delete successful or rowid {} not found.", last_row_id);
+                    debug!("VSS delete successful or rowid {} not found.", row_id);
                 }
 
                 // Insert new entry into vss_swatches
                 let insert_res =
                     sqlx::query("INSERT INTO vss_swatches (rowid, embedding) VALUES (?, ?)")
-                        .bind(last_row_id)
+                        .bind(row_id) // Use fetched row_id
                         .bind(&embedding_bytes) // Use original embedding_bytes
                         .execute(&mut **tx)
                         .await;
@@ -442,10 +454,10 @@ impl SwatchRepository for SqliteSwatchRepository {
                     // Log non-fatal error for VSS insert
                     debug!(
                         "Failed VSS insert for rowid {}: {}. Continuing transaction.",
-                        last_row_id, e
+                        row_id, e
                     );
                 } else {
-                    debug!("VSS insert successful for rowid {}.", last_row_id);
+                    debug!("VSS insert successful for rowid {}.", row_id);
                 }
 
                 // Return success from the transaction block if main save was ok
